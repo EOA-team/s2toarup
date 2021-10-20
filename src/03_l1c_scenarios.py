@@ -121,19 +121,19 @@ def gen_rad_unc_scenarios(
         for idx in range(n_scenarios):
             
             unc_realiz = np.empty(shape=(1, unc_data.shape[1], unc_data.shape[2]))
-            # vectorized function call -> fast
-            unc_realiz = sample_fast_v(band_data, unc_data)
+            # vectorized function call -> fast but unstable...
+            # unc_realiz = sample_fast_v(band_data, unc_data)
             
-            # for loop -> slow -> so we don't use it ;)
-            # for i in range(unc_data.shape[1]):
-            #     for j in range(unc_data.shape[2]):
-            #         unc_realiz[0,i,j] = np.random.normal(
-            #             loc=0,
-            #             scale=unc_data[0,i,j]*band_data[0,i,j],
-            #             size=1
-            #         )
-            #         unc_realiz[0,i,j] = band_data[0,i,j] + unc_realiz[0,i,j]
-            #
+            # for loop -> slow but stable
+            for i in range(unc_data.shape[1]):
+                for j in range(unc_data.shape[2]):
+                    unc_realiz[0,i,j] = np.random.normal(
+                        loc=0,
+                        scale=unc_data[0,i,j]*band_data[0,i,j],
+                        size=1
+                    )
+                    unc_realiz[0,i,j] = band_data[0,i,j] + unc_realiz[0,i,j]
+            
 
             # save to scenarios
             current_scenario_path = scenario_path.joinpath(str(idx+1))
@@ -149,6 +149,6 @@ if __name__ == '__main__':
     unc_dataset_path = Path('/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_orig/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.RUT')
     scenario_path = Path('/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_RUT-Scenarios/debug')
     template_path = scenario_path.joinpath('template')
-    n_scenarios = 2
+    n_scenarios = 100
     
     gen_rad_unc_scenarios(orig_dataset_path, unc_dataset_path, scenario_path, template_path, n_scenarios)

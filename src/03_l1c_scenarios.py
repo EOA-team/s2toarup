@@ -7,6 +7,7 @@ Created on Oct 20, 2021
 import shutil
 import glob
 from pathlib import Path
+from typing import List
 import rasterio as rio
 import numpy as np
 import os
@@ -43,13 +44,17 @@ def gen_rad_unc_scenarios(
         unc_dataset_path: Path,
         scenario_path: Path,
         template_path: Path,
-        n_scenarios: int
+        n_scenarios: int,
+        roi_bounds_10m: List[float]
     ) -> None:
     """
     Taking the original Sentinel-2 L1C scene and the radiometric uncertainty
     derived from running the Sentinel-2 radiometric uncertainty toolbox (S2RUT)
     this function creates n_scenario possible "alternative" scene realities that
     can be used for further processing, using, e.g., Sen2cor.
+
+    A region of interest (ROI) can speed things up a lot and is therefore strongly
+    recommended to use instead of processing the entire image.
 
     :param orig_dataset_path:
         original S2 scene in .SAFE format
@@ -62,6 +67,9 @@ def gen_rad_unc_scenarios(
         spectral bands (will be created using this function)
     :param n_scenarios:
         number of scenarios to generate
+    :param roi_bounds_10m:
+        region of interest (ROI) boundaries in image coordindates in 10m resolution.
+        Expected: [col_min, col_max, row_min, row_max]
     """
 
     # create scenario output folders in .SAFE structure
@@ -84,12 +92,29 @@ def gen_rad_unc_scenarios(
 
     sample_fast_v = np.vectorize(_sample_fast)
 
+    # roi bounds in 20m image coordinates
+    roi_bounds_20m = [int(x/2) for x in roi_bounds_10m]
+    roi_bounds_60m = [int(x/6) for x in roi_bounds_10m]
+
     # iterate over each spectral band and generate the scenarios
+    bands_10m = ['b02', 'b03', 'b04', 'b08']
+    bands_20m = ['b05', 'b06', 'b07', 'b8a', 'b11', 'b12']
+    bands_60m = ['b01', 'b09', 'b10']
+
     for s2_band in s2_bands:
 
         print(f'Running scenarios for {s2_band}')
 
         spectral_band_id = Path(s2_band).name.split('_')[2].split('.')[0].lower()
+
+        # check for correct roi bands
+        if spectral_band_id in bands_10m:
+            roi_bounds = roi_bounds_10m
+        elif spectral_band_id in bands_20m:
+            roi_bounds = roi_bounds_20m
+        else:
+            roi_bounds = roi_bounds_60m
+
         unc_band = unc_bands[unc_band_ids.index(spectral_band_id)]
 
         # read uncertainty
@@ -120,20 +145,19 @@ def gen_rad_unc_scenarios(
             
         for idx in range(n_scenarios):
             
-            unc_realiz = np.empty(shape=(1, unc_data.shape[1], unc_data.shape[2]))
-            # vectorized function call -> fast but unstable...
-            # unc_realiz = sample_fast_v(band_data, unc_data)
-            
-            # for loop -> slow but stable
-            for i in range(unc_data.shape[1]):
-                for j in range(unc_data.shape[2]):
+            unc_realiz = np.zeros(shape=(1, unc_data.shape[1], unc_data.shape[2]))
+
+            # for loop over region of interest (ROI)
+            # rows
+            for i in range(roi_bounds[2], roi_bounds[3]):
+                # cols
+                for j in range(roi_bounds[0], roi_bounds[1]):
                     unc_realiz[0,i,j] = np.random.normal(
                         loc=0,
                         scale=unc_data[0,i,j]*band_data[0,i,j],
                         size=1
                     )
                     unc_realiz[0,i,j] = band_data[0,i,j] + unc_realiz[0,i,j]
-            
 
             # save to scenarios
             current_scenario_path = scenario_path.joinpath(str(idx+1))
@@ -145,10 +169,21 @@ def gen_rad_unc_scenarios(
 
 if __name__ == '__main__':
     
-    orig_dataset_path = Path('/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_orig/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.SAFE')
-    unc_dataset_path = Path('/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_orig/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.RUT')
-    scenario_path = Path('/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_RUT-Scenarios/debug')
+    orig_dataset_path = Path('/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_orig/S2A_MSIL1C_20190530T103031_N0207_R108_T32TMT_20190530T123429.SAFE')
+    unc_dataset_path = Path('/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_orig/S2A_MSIL1C_20190530T103031_N0207_R108_T32TMT_20190530T123429.RUT')
+    scenario_path = Path('/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_RUT-Scenarios/S2A_MSIL1C_20190530T103031_N0207_R108_T32TMT_20190530T123429')
     template_path = scenario_path.joinpath('template')
     n_scenarios = 100
+
+    # bounds col_min, col_max, row_min, row_max (image coordinates)
+    roi_bounds_10m = [7000,8000,4000,5000]
     
-    gen_rad_unc_scenarios(orig_dataset_path, unc_dataset_path, scenario_path, template_path, n_scenarios)
+    gen_rad_unc_scenarios(
+        orig_dataset_path=orig_dataset_path,
+        unc_dataset_path=unc_dataset_path,
+        scenario_path=scenario_path,
+        template_path=template_path,
+        n_scenarios=n_scenarios,
+        roi_bounds_10m=roi_bounds_10m
+    )
+

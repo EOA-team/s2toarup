@@ -5,11 +5,15 @@ from pathlib import Path
 import geopandas as gpd
 import rasterio as rio
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 
 from agrisatpy.processing.extraction.utils import raster2table
 from agrisatpy.processing.extraction.sentinel2 import S2singlebands2table
 from copy import deepcopy
 
+
+gain_factor_refl = 0.01
 
 band_dict_l1c = {
     '10': {
@@ -256,12 +260,13 @@ def extract_scenarios_roi(
 
 
 def unc_boxplots(
-        l1c_roi_scenarios: Path,
-        l2a_roi_scenarios: Path,
+        l1c_roi_scenarios: str,
+        l2a_roi_scenarios: str,
         l1c_original_data: Path,
         l2a_original_data: Path,
         id_column: str,
-        land_use_info: Path
+        land_use_info: Path,
+        out_dir: Path
     ):
     """
     Takes extracted ROI data (CSV files) and makes a box plot for each
@@ -269,9 +274,9 @@ def unc_boxplots(
     the L1C uncertainty, the L2A uncertainty and the original values.
 
     :param l1c_roi_scenario:
-        csv file with extracted L1C scenarios for the ROIs
+        basename of csv files with extracted L1C scenarios for the ROIs
     :param l2a_roi_scenario:
-        csv file with extracted L2A scenarios for the ROIs
+        basename of csv files with extracted L2A scenarios for the ROIs
     :param l1_original_data:
         csv file with original L1C data for the ROIs
     :param l2a_original_data:
@@ -281,7 +286,81 @@ def unc_boxplots(
     :param land_use_info:
         file specifying the land use information for each ROI
     """
-    pass
+
+    # get files
+    l1c_scenarios = glob.glob(l1c_roi_scenarios.as_posix())
+    l2a_scenarios = glob.glob(l2a_roi_scenarios.as_posix())
+    l1c_original = glob.glob(l1c_original_data.as_posix())
+    l2a_original = glob.glob(l2a_original_data.as_posix())
+
+    # loop over the different spatial resolutions and over the spectral
+    # bands
+    for resolution in band_dict_l1c:
+
+        # find corresponding original datasets (contain multiple bands)
+        l1c_orig_res = [x for x in l1c_original if x.split('_')[-1].startswith(resolution)]
+        l1c_orig_df = pd.read_csv(l1c_orig_res[0])
+        l2a_orig_res = [x for x in l2a_original if x.split('_')[-1].startswith(resolution)]
+        l2a_orig_df = pd.read_csv(l2a_orig_res[0])
+
+        # number of ROIs
+        rois = l1c_orig_df[id_column].unique()
+        n_rois = len(rois)
+
+        # group original data by ROIs
+        l1c_orig_grouped = l1c_orig_df.groupby(id_column).mean()
+        l2a_orig_grouped = l2a_orig_df.groupby(id_column).mean()
+
+        # numnber of spectral bands with the current spatial resolution
+        band_dict = band_dict_l1c[resolution]
+        n_bands = len(band_dict)
+
+        # loop over single bands here
+        fig, axs = plt.subplots(n_bands, n_rois, constrained_layout=True)
+
+        for idx, band in enumerate(band_dict):
+
+            # read scenarios of the current band
+            l1c_scenario_band = pd.read_csv(
+                [x for x in l1c_scenarios if Path(x).name.split('_')[1] == band][0]
+            )
+            l2a_scenario_band = pd.read_csv(
+                [x for x in l2a_scenarios if Path(x).name.split('_')[1] == band][0]
+            )
+
+            # group by scenario and ROI to get the ROI mean per scenario
+            l1c_grouped = l1c_scenario_band.groupby(by=['scenario', id_column]).mean()
+            l2a_grouped = l2a_scenario_band.groupby(by=['scenario', id_column]).mean()
+
+            # boxplot
+            for jdx, roi in enumerate(rois):
+                l1c_grouped_roi = l1c_grouped.query(f'{id_column} == {roi}')
+                l2a_grouped_roi = l2a_grouped.query(f'{id_column} == {roi}')
+
+                axs[idx][jdx].boxplot(
+                    [
+                        l1c_grouped_roi[band]*gain_factor_refl,
+                        l2a_grouped_roi[band]*gain_factor_refl
+                    ]
+                )
+                axs[idx][jdx].set_xticklabels(['L1C', 'L2A'])
+                axs[idx][jdx].axhline(
+                    l1c_orig_grouped[l1c_orig_grouped.index==roi][band].values * gain_factor_refl,
+                    color='r',
+                    label='L1C original'
+                )
+                axs[idx][jdx].axhline(
+                    l2a_orig_grouped[l2a_orig_grouped.index==roi][band].values * gain_factor_refl,
+                    color='b',
+                    label='L2A original'
+                )
+                if idx == 0:
+                    axs[idx][jdx].title.set_text(f'ROI: {roi}') # use land-use information instead
+                if jdx == 0:
+                    axs[idx][jdx].set_ylabel(f'Reflectance {band} (%)')
+
+        # TODO savefig
+        plt.show()
 
 
 def unc_maps(
@@ -294,6 +373,16 @@ def unc_maps(
 
 
 if __name__ == '__main__':
+
+    # box plots of ROIs (different landuses)
+    unc_res_roi_dir = Path('/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL2A_Analysis/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621/ROIs')
+    l1c_roi_scenarios = unc_res_roi_dir.joinpath('L1C_*.csv')
+    l2a_roi_scenarios = unc_res_roi_dir.joinpath('L2A_*.csv')
+    l1c_original_data = unc_res_roi_dir.joinpath('*_MSIL1C_*.csv')
+    l2a_original_data = unc_res_roi_dir.joinpath('*_MSIL2A_*.csv')
+    land_use_info = Path('')
+    id_column = 'fid'
+    unc_boxplots(l1c_roi_scenarios, l2a_roi_scenarios, l1c_original_data, l2a_original_data, id_column, land_use_info)
 
     # define inputs
     original_scene_l1c = Path(

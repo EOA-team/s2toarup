@@ -1,19 +1,27 @@
 
+import os
 import glob
 import math
 import pandas as pd
+import datetime
+from datetime import date
 from pathlib import Path
 import geopandas as gpd
 import rasterio as rio
 import numpy as np
+from scipy.stats import mode
+from shapely.geometry import Polygon
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from matplotlib.ticker import FormatStrFormatter
 import matplotlib.ticker as ticker
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib import colors
 
 from agrisatpy.processing.extraction.utils import raster2table
 from agrisatpy.processing.extraction.sentinel2 import S2singlebands2table
 from copy import deepcopy
+from pip._vendor.pkg_resources import PathMetadata
 
 
 plt.rcParams['xtick.labelsize'] = 11
@@ -72,7 +80,6 @@ band_dict_l2a = {
 }
 
 
-
 def analyze_scenarios_spatial(
         unc_scenario_dir: Path,
         in_file_shp: Path,
@@ -127,6 +134,7 @@ def analyze_scenarios_spatial(
             scenario_files = glob.glob(
                 str(unc_scenario_dir.joinpath(search_expr + band_dict[band]))
             )
+            n_scenarios = len(scenario_files)
 
             # check CRS between ROI and raster
             sat_crs = rio.open(scenario_files[0]).crs
@@ -159,260 +167,67 @@ def analyze_scenarios_spatial(
                 data_arr[idx,:,:] = out_band[0,:,:]
 
             # analysis: calculate min, max, mean and standard deviation per pixel
+            # (does not apply to SCL - here the majority vote will be analysis)
+            if band == 'SCL':
+                count = 2
+            else:
+                count = 5
             meta.update(
                 {
-                    "count": 5,
+                    "count": count,
                     "dtype": np.float64
                  }
             )
 
             fname = f'{processing_level}_{band}_{spatial_res}m_{in_file_shp.name.split(".")[0]}.tif'
-            
-            with rio.open(out_dir.joinpath(fname), 'w', **meta) as dst:
 
-                # min
-                dst.set_band_description(1, 'min')
-                dst.write_band(1, np.nanmin(data_arr, axis=0))
+            if band == 'SCL':
                 
-                # max
-                dst.set_band_description(2, 'max')
-                dst.write_band(2, np.nanmax(data_arr, axis=0))
+                scl_analysis = mode(data_arr, axis=0)
 
-                # mean
-                dst.set_band_description(3, 'mean')
-                dst.write_band(3, np.nanmean(data_arr, axis=0))
+                with rio.open(out_dir.joinpath(fname), 'w', **meta) as dst:
 
-                # absolute standard deviation
-                dst.set_band_description(4, 'abs_stddev')
-                dst.write_band(4, np.nanstd(data_arr, axis=0))
+                    # majority vote
+                    dst.set_band_description(1, 'majority_vote')
+                    dst.write_band(1, scl_analysis.mode[0,:,:])
 
-                # standard uncertainty -> normalize stack of scenarios
-                data_arr_norm = data_arr / np.linalg.norm(data_arr)
-                dst.set_band_description(5, 'rel_std_unc')
-                rel_std = np.nanstd(data_arr, axis=0) / np.nanmean(data_arr, axis=0)
-                dst.write_band(5, rel_std * 100)
+                    # confidence (percentage of scenario members voting for the decision)
+                    dst.set_band_description(2, 'confidence')
+                    dst.write_band(2, scl_analysis.count[0,:,:]/n_scenarios*100.)
 
-        
+            else:
 
-def extract_scenarios_roi(
-        unc_scenario_dir: Path,
-        in_file_shp: Path,
-        out_dir: Path,
-        processing_level: str,
-        **kwargs
-    ) -> None:
-    """
-    Function to extract spread among scenario members for selected
-    polygons defining regions of interest. Will analyze L1C and
-    L2A data to quantify the impact of both processing levels and
-    their uncertainty on the reflectance quanities and derived
-    products such as the aerosol optical depth (AOT), the water vapor
-    (WVP) and the scene classification layer (SCL). This function
-    works very well on small for small ROIs. For larger ROIs (10 sqkm and
-    more), using a purely raster-based method is faster!
-
-    :param unc_scenario_dir:
-        directory with Sen2Cor runs (L2A) or radiometric uncertainty
-        scenarios (L1C)
-    :param in_file_shp:
-        shape file with ROIs
-    :param out_dir:
-        directory where to store dataframes with extracted data
-        (also for later analysis)
-    :param processing_level:
-        either 'L1C' or 'L2A' for identifying the S2 processing level
-        (before and after atmospheric correction)
-    """
-
-    # check processing level
-    if processing_level == 'L1C':
-        band_dict_s2 = band_dict_l1c
-        abbrev = 'MSIL1C'
-    elif processing_level == 'L2A':
-        band_dict_s2 = band_dict_l2a
-        abbrev = 'MSIL2A'
-
-    # loop over single bands and extract data from scenario runs
-    for spatial_res in band_dict_s2.keys():
-
-        # construct search expression for finding the files
-        if processing_level == 'L1C':
-            search_expr = f'*/*_{abbrev}_*/GRANULE/*/IMG_DATA/'
-        elif processing_level == 'L2A':
-            search_expr = f'*/*_{abbrev}_*/GRANULE/*/IMG_DATA/R{spatial_res}m/'
-        band_dict = band_dict_s2[spatial_res]
-
-        # loop over scenarios of the current band and extract ROIs
-        for band in band_dict.keys():
-
-            print(f'Extracting {band} from {spatial_res}m spatial resolution')
-
-            scenario_files = glob.glob(
-                str(unc_scenario_dir.joinpath(search_expr + band_dict[band]))
-            )
-            res = []
-            for idx, scenario_file in enumerate(scenario_files):
-                df = raster2table(
-                    in_file=Path(scenario_file),
-                    in_file_polys=Path(in_file_shp),
-                    out_colnames=[band],
-                    **kwargs
-                )
-                df['scenario'] = idx + 1
-                res.append(df)
-            band_df = pd.concat(res)
-            fname_band_df = f'{processing_level}_{band}_{spatial_res}m_{in_file_shp.name.split(".")[0]}.csv'
-            band_df.to_csv(out_dir.joinpath(fname_band_df), index=False)
-
-
-def unc_boxplots(
-        l1c_roi_scenarios: str,
-        l2a_roi_scenarios: str,
-        l1c_original_data: Path,
-        l2a_original_data: Path,
-        id_column: str,
-        land_use_info: Path,
-        out_dir: Path
-    ) -> None:
-    """
-    Takes extracted ROI data (CSV files) and makes a box plot for each
-    numerical variable (spectral bands, AOT and WV) taking into account
-    the L1C uncertainty, the L2A uncertainty and the original values.
-
-    :param l1c_roi_scenario:
-        basename of csv files with extracted L1C scenarios for the ROIs
-    :param l2a_roi_scenario:
-        basename of csv files with extracted L2A scenarios for the ROIs
-    :param l1_original_data:
-        csv file with original L1C data for the ROIs
-    :param l2a_original_data:
-        csv file with original L1C data for the ROIs
-    :param id_column:
-        name of the column identifying each ROI
-    :param land_use_info:
-        file specifying the land use information for each ROI
-    """
-
-    # get files
-    l1c_scenarios = glob.glob(l1c_roi_scenarios.as_posix())
-    l2a_scenarios = glob.glob(l2a_roi_scenarios.as_posix())
-    l1c_original = glob.glob(l1c_original_data.as_posix())
-    l2a_original = glob.glob(l2a_original_data.as_posix())
-    luc_info = gpd.read_file(land_use_info)
-
-    # save uncertainties per land cover class
-    uncertainties = []
-
-    # loop over the different spatial resolutions and over the spectral
-    # bands
-    for resolution in band_dict_l1c:
-
-        # find corresponding original datasets (contain multiple bands)
-        l1c_orig_res = [x for x in l1c_original if x.split('_')[-1].startswith(resolution)]
-        l1c_orig_df = pd.read_csv(l1c_orig_res[0])
-        l2a_orig_res = [x for x in l2a_original if x.split('_')[-1].startswith(resolution)]
-        l2a_orig_df = pd.read_csv(l2a_orig_res[0])
-
-        # number of ROIs
-        rois = l1c_orig_df[id_column].unique()
-        roi_luc_mapping = dict.fromkeys(rois)
-        for roi in roi_luc_mapping:
-            roi_luc_mapping[roi] = luc_info[luc_info[id_column] == roi]['crop_type'].iloc[0]
-
-        # join with landuse information
-        l1c_orig_df = pd.merge(l1c_orig_df, luc_info, on=id_column)
-        l2a_orig_df = pd.merge(l2a_orig_df, luc_info, on=id_column)
-
-        n_rois = len(rois)
-
-        # group original data by ROIs
-        l1c_orig_grouped = l1c_orig_df.groupby(id_column).mean()
-        l2a_orig_grouped = l2a_orig_df.groupby(id_column).mean()
-
-        # numnber of spectral bands with the current spatial resolution
-        band_dict = band_dict_l1c[resolution]
-        n_bands = len(band_dict)
-
-        # loop over single bands here
-        fig, axs = plt.subplots(n_bands, n_rois, figsize=(35,40))
-
-        for idx, band in enumerate(band_dict):
-
-            inner_band_dict = {'band': band}
-
-            # read scenarios of the current band
-            l1c_scenario_band = pd.read_csv(
-                [x for x in l1c_scenarios if Path(x).name.split('_')[1] == band][0]
-            )
-            l2a_scenario_band = pd.read_csv(
-                [x for x in l2a_scenarios if Path(x).name.split('_')[1] == band][0]
-            )
-
-            # join land use info
-            l1c_scenario_band = pd.merge(l1c_scenario_band, luc_info, on='fid')
-            l2a_scenario_band = pd.merge(l2a_scenario_band, luc_info, on='fid')
-
-            # group by scenario and ROI to get the ROI mean per scenario
-            l1c_grouped = l1c_scenario_band.groupby(by=['scenario', id_column]).mean()
-            l2a_grouped = l2a_scenario_band.groupby(by=['scenario', id_column]).mean()
-
-            # boxplot
-            for jdx, roi in enumerate(rois):
-
-                l1c_grouped_roi = l1c_grouped.query(f'{id_column} == {roi}')
-                l2a_grouped_roi = l2a_grouped.query(f'{id_column} == {roi}')
-
-                # calculate standard uncertainty as variation coefficient
-                l1c_roi_unc = (np.std(l1c_grouped_roi[band]) / np.mean(l1c_grouped_roi[band])) * 1000
-                l2a_roi_unc = (np.std(l2a_grouped_roi[band]) / np.mean(l2a_grouped_roi[band])) * 1000
-
-                inner_band_dict[f'{roi_luc_mapping[roi]}_roi_L1C'] = l1c_roi_unc
-                inner_band_dict[f'{roi_luc_mapping[roi]}_roi_L2A'] = l2a_roi_unc
-
-                axs[idx][jdx].boxplot(
-                    [
-                        l1c_grouped_roi[band]*gain_factor_refl,
-                        l2a_grouped_roi[band]*gain_factor_refl
-                    ]
-                )
-                axs[idx][jdx].set_xticklabels(['L1C', 'L2A'])
-                [t.set_color(i) for (i,t) in zip(['r','b'], axs[idx][jdx].xaxis.get_ticklabels())]
-
-                axs[idx][jdx].axhline(
-                    l1c_orig_grouped[l1c_orig_grouped.index==roi][band].values * gain_factor_refl,
-                    color='r',
-                    label='L1C original'
-                )
-                axs[idx][jdx].axhline(
-                    l2a_orig_grouped[l2a_orig_grouped.index==roi][band].values * gain_factor_refl,
-                    color='b',
-                    label='L2A original'
-                )
-                axs[idx][jdx].yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
-
-                if idx == 0:
-                    axs[idx][jdx].title.set_text(roi_luc_mapping[roi])
-                if jdx == 0:
-                    axs[idx][jdx].set_ylabel(f'Reflectance {band} (%)', fontsize=28)
-
-            uncertainties.append(inner_band_dict)
-
-        # save plot
-        fname = f'{resolution}m_bands_l1c-l2a_refl-boxplots.png'
-        fig.savefig(out_dir.joinpath(fname), bbox_inches='tight')
-        plt.close(fig)
+                with rio.open(out_dir.joinpath(fname), 'w', **meta) as dst:
     
-    # save the uncertainties per ROI into a dataframe and then to CSV
-    unc_df = pd.DataFrame(uncertainties)
-    unc_df.sort_values(by='band', ascending=True, inplace=True)
-    unc_df.to_csv(out_dir.joinpath('spectral_bands_l1c-l2a_unc.csv'), index=False)
+                    # min
+                    dst.set_band_description(1, 'min')
+                    dst.write_band(1, np.nanmin(data_arr, axis=0))
+                    
+                    # max
+                    dst.set_band_description(2, 'max')
+                    dst.write_band(2, np.nanmax(data_arr, axis=0))
+    
+                    # mean
+                    dst.set_band_description(3, 'mean')
+                    dst.write_band(3, np.nanmean(data_arr, axis=0))
+    
+                    # absolute standard deviation
+                    dst.set_band_description(4, 'abs_stddev')
+                    dst.write_band(4, np.nanstd(data_arr, axis=0))
+    
+                    # standard uncertainty -> normalize stack of scenarios
+                    data_arr_norm = data_arr / np.linalg.norm(data_arr)
+                    dst.set_band_description(5, 'rel_std_unc')
+                    rel_std = np.nanstd(data_arr, axis=0) / np.nanmean(data_arr, axis=0)
+                    dst.write_band(5, rel_std * 100)
 
 
 def unc_maps(
-        l1c_scenarios: str,
-        l2a_scenarios: str,
-        l1c_band_idx: int,
-        l2a_band_idx: int,
+        analysis_results_l1c: str,
+        analysis_results_l2a: str,
+        analysis_results_aot: Path,
+        analysis_results_wvp: Path,
+        analysis_results_scl: Path,
         out_dir: Path
     ) -> None:
     """
@@ -423,6 +238,10 @@ def unc_maps(
         basename of tif files with L1C RUT output
     :param l2a_scenarios:
         basename of the atmospheric correction uncertainty output
+    :param analysis_results_aot:
+        file with aerosol optical thickness (result of atcorr process)
+    :param analysis_results_wvp:
+        file with water vapor content (result of atcorr process)
     :param l1c_band_idx:
         L1C RUT band index
     :param l2a_band_idx:
@@ -430,199 +249,444 @@ def unc_maps(
     """
 
     # get files
-    l1c_scenarios = glob.glob(l1c_scenarios.as_posix())
-    l2a_scenarios = glob.glob(l2a_scenarios.as_posix())
+    l1c_scenarios = glob.glob(analysis_results_l1c.as_posix())
+    l2a_scenarios = glob.glob(analysis_results_l2a.as_posix())
+    aot = glob.glob(analysis_results_aot.as_posix())[0]
+    wvp = glob.glob(analysis_results_wvp.as_posix())[0]
+    scl = glob.glob(analysis_results_scl.as_posix())[0]
+
+    l1c_band_idx = 5
+    l2a_band_idx = 5
 
     # loop over bands
     band_list = ['B01', 'B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B8A', 'B09', 'B11', 'B12']
+    atmospheric_parameters = ['AOT', 'WVP']
+    preclass = ['SCL']
+    band_list.extend(atmospheric_parameters)
+    band_list.extend(preclass)
 
     for band in band_list:
 
         print(f'Working on band {band}')
+
+        if band not in atmospheric_parameters and band not in preclass:
         
-        l2a_raster = [x for x in l2a_scenarios if Path(x).name.split('_')[1] == band][0]
-        l1c_raster = [
-            x for x in l1c_scenarios if Path(x).name.split('_')[-1].split('.')[0] == band.lower()
-        ][0]
+            l2a_raster = [x for x in l2a_scenarios if Path(x).name.split('_')[1] == band][0]
+            l1c_raster = [x for x in l1c_scenarios if Path(x).name.split('_')[1] == band][0]
+    
+            # read rasters into arrays
+            with rio.open(l1c_raster, 'r') as src:
+                l1c_data = src.read(l1c_band_idx)
+                meta = src.meta
+                bounds = src.bounds
+    
+            with rio.open(l2a_raster, 'r') as src:
+                l2a_data = src.read(l2a_band_idx)
+                # since the S2-RUT has only 1 decimal precision, round
+                # the L2A data
+                l2a_data = np.round(l2a_data, 1)
+    
+            single_fig, single_axs = plt.subplots(1, 2, figsize=(10,20))
+    
+            epsg = meta['crs'].to_epsg()
+    
+            # for colormap: find minimum of minima & maximum of maxima
+            minmin = math.trunc(np.nanmin([np.min(l1c_data), np.nanmin(l2a_data)]))
+            maxmax = np.round(np.nanmax([np.max(l1c_data), np.nanmax(l2a_data)]),0)
+    
+            # cut values higher than 10%, otherwise there is not much to see in the L1C image
+            labelpad = 20
+            if maxmax > 10.:
+                maxmax = 10
+    
+            # map
+            im_l1c = single_axs[0].imshow(
+                l1c_data, vmin=minmin, vmax=maxmax, cmap='bwr', interpolation='none',
+                extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
+            )
+            single_axs[0].title.set_text(f'L1C TOA {band}')
+            im_l2a = single_axs[1].imshow(
+                l2a_data, vmin=minmin, vmax=maxmax, cmap='bwr', interpolation='none',
+                extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
+            )
+            single_axs[1].title.set_text(f'L2A TOC {band}')
+    
+            # add colormap: add_axes[left, bottom, width, heigth)
+            cbar_ax = single_fig.add_axes([0.92, 0.39, 0.04, 0.21])
+            n_ticks = int((maxmax - minmin) + 1)
+            v1 = np.linspace(minmin, maxmax, n_ticks, endpoint=True)
+            cbar_ticks_text = [int(i) for i in v1]
+            cbar_ticks_text[-1] = f'>{cbar_ticks_text[-1]}'
+            cbar = single_fig.colorbar(im_l2a, cax=cbar_ax)
+            cbar.ax.set_yticklabels(cbar_ticks_text)
+            cbar.set_label('Uncertainty [%] (k=1)', rotation=270, fontsize=16,
+                           labelpad=labelpad, y=0.45)
+    
+            single_axs[0].set_xlabel(f'X [m] (EPSG:{epsg})', fontsize=14)
+            single_axs[1].set_xlabel(f'X [m] (EPSG:{epsg})', fontsize=14)
+            single_axs[0].set_ylabel(f'Y [m] (EPSG:{epsg})', fontsize=14)
+    
+            single_axs[0].xaxis.set_ticks(np.arange(bounds.left, bounds.right, 5000))
+            single_axs[1].xaxis.set_ticks(np.arange(bounds.left, bounds.right, 5000))
+            single_axs[0].yaxis.set_ticks(np.arange(bounds.bottom, bounds.top, 5000))
+            single_axs[0].yaxis.set_major_formatter(ticker.FormatStrFormatter('%0.0f'))
+            single_axs[1].yaxis.set_ticks(np.arange(bounds.bottom, bounds.top, 5000))
+            single_axs[1].set_yticklabels([])
 
-        # read rasters into arrays
-        with rio.open(l1c_raster, 'r') as src:
-            l1c_data = src.read(l1c_band_idx) * 0.1
-            meta = src.meta
-            bounds = src.bounds
+        elif band in atmospheric_parameters:
+            
+            if band == 'AOT':
+                with rio.open(aot, 'r') as src:
+                    atm_data = src.read(l1c_band_idx)
+                    meta = src.meta
+                    bounds = src.bounds
+            elif band == 'WVP':
+                with rio.open(wvp, 'r') as src:
+                    atm_data = src.read(l1c_band_idx)
+                    meta = src.meta
+                    bounds = src.bounds
 
-        with rio.open(l2a_raster, 'r') as src:
-            l2a_data = src.read(l2a_band_idx)
-            # since the S2-RUT has only 1 decimal precision, round
-            # the L2A data
-            l2a_data = np.round(l2a_data, 1)
+            single_fig, single_axs = plt.subplots(1, 1, figsize=(10,10))
+            epsg = meta['crs'].to_epsg()
+    
+            # for colormap: find minimum of minima & maximum of maxima
+            minmin = math.trunc(np.nanmin(atm_data))
+            maxmax = np.round(np.nanmax(atm_data),0)
+    
+            # cut values higher than 10%, otherwise there is not much to see in the L1C image
+            labelpad = 20
 
-        single_fig, single_axs = plt.subplots(1, 2, figsize=(10,20))
+            # map
+            im_l1c = single_axs.imshow(
+                atm_data, vmin=minmin, vmax=maxmax, cmap='bwr', interpolation='none',
+                extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
+            )
+            single_axs.title.set_text(f'L2A Atmospheric {band}')
+    
+            # add colormap: add_axes[left, bottom, width, heigth)
+            cbar_ax = single_fig.add_axes([0.92, 0.39, 0.04, 0.21])
+            n_ticks = int((maxmax - minmin) + 1)
+            v1 = np.linspace(minmin, maxmax, n_ticks, endpoint=True)
+            cbar_ticks_text = [int(i) for i in v1]
+            cbar_ticks_text[-1] = f'>{cbar_ticks_text[-1]}'
+            cbar = single_fig.colorbar(im_l2a, cax=cbar_ax)
+            cbar.ax.set_yticklabels(cbar_ticks_text)
+            cbar.set_label('Uncertainty [%] (k=1)', rotation=270, fontsize=16,
+                           labelpad=labelpad, y=0.45)
+    
+            single_axs.set_xlabel(f'X [m] (EPSG:{epsg})', fontsize=14)
+            single_axs.set_ylabel(f'Y [m] (EPSG:{epsg})', fontsize=14)
+    
+            single_axs.xaxis.set_ticks(np.arange(bounds.left, bounds.right, 5000))
+            single_axs.yaxis.set_ticks(np.arange(bounds.bottom, bounds.top, 5000))
+            single_axs.yaxis.set_major_formatter(ticker.FormatStrFormatter('%0.0f'))
 
-        epsg = meta['crs'].to_epsg()
+        elif band in preclass:
+            
+            with rio.open(scl, 'r') as src:
+                scl_data = src.read()
+                meta = src.meta
+                bounds = src.bounds
+            
+            single_fig, single_axs = plt.subplots(1, 2, figsize=(10,20))
+            epsg = meta['crs'].to_epsg()
 
-        # for colormap: find minimum of minima & maximum of maxima
-        minmin = math.trunc(np.min([np.min(l1c_data), np.min(l2a_data)]))
-        maxmax = np.round(np.max([np.max(l1c_data), np.max(l2a_data)]),0)
+            cmap = colors.ListedColormap(
+                ['black', 'red', 'grey', 'brown', 'green', 'yellow', 'blue', 'lightgrey',
+                 'lightsteelblue', 'lavender', 'cyan', 'magenta']
+            )
 
-        # cut values higher than 10%, otherwise there is not much to see in the L1C image
-        labelpad = 20
-        if maxmax > 10.:
-            maxmax = 10
+            vote = single_axs[0].imshow(
+                scl_data[0,:,:].astype(int), cmap=cmap,
+                extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
+            )
+            single_axs[0].title.set_text(f'L2A SCL (Majority Vote)')
 
-        # map
-        im_l1c = single_axs[0].imshow(
-            l1c_data, vmin=minmin, vmax=maxmax, cmap='bwr', interpolation='none',
-            extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
-        )
-        single_axs[0].title.set_text(f'L1C TOA {band}')
-        im_l2a = single_axs[1].imshow(
-            l2a_data, vmin=minmin, vmax=maxmax, cmap='bwr', interpolation='none',
-            extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
-        )
-        single_axs[1].title.set_text(f'L2A TOC {band}')
+            cbar_vote = single_fig.colorbar(
+                vote, orientation='horizontal', ax=single_axs[0],
+                ticks=np.linspace(0,11,12).astype(int), pad=0.06
+            )
+            cbar_vote.set_label('SCL', fontsize=16)
 
-        # add colormap: add_axes[left, bottom, width, heigth)
-        cbar_ax = single_fig.add_axes([0.92, 0.39, 0.04, 0.21])
-        n_ticks = int((maxmax - minmin) + 1)
-        v1 = np.linspace(minmin, maxmax, n_ticks, endpoint=True)
-        cbar_ticks_text = [int(i) for i in v1]
-        cbar_ticks_text[-1] = f'>{cbar_ticks_text[-1]}'
-        cbar = single_fig.colorbar(im_l2a, cax=cbar_ax)
-        cbar.ax.set_yticklabels(cbar_ticks_text)
-        cbar.set_label('Uncertainty [%] (k=1)', rotation=270, fontsize=16,
-                       labelpad=labelpad, y=0.45)
+            conf = single_axs[1].imshow(
+                scl_data[1,:,:], vmin=0, vmax=100, cmap='Greens', interpolation='none',
+                extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
+            )
+            single_axs[1].title.set_text(f'L2A SCL (Confidence)')
 
-        single_axs[0].set_xlabel(f'X [m] (EPSG:{epsg})', fontsize=14)
-        single_axs[1].set_xlabel(f'X [m] (EPSG:{epsg})', fontsize=14)
-        single_axs[0].set_ylabel(f'Y [m] (EPSG:{epsg})', fontsize=14)
+            cbar_conf = single_fig.colorbar(
+                conf, orientation='horizontal', ax=single_axs[1], pad=0.06
+            )
+            cbar_conf.set_label('% Scenario Members Voting for Class', fontsize=16)
 
-        single_axs[0].xaxis.set_ticks(np.arange(bounds.left, bounds.right, 5000))
-        single_axs[1].xaxis.set_ticks(np.arange(bounds.left, bounds.right, 5000))
-        single_axs[0].yaxis.set_ticks(np.arange(bounds.bottom, bounds.top, 5000))
-        single_axs[0].yaxis.set_major_formatter(ticker.FormatStrFormatter('%0.0f'))
-        single_axs[1].yaxis.set_ticks(np.arange(bounds.bottom, bounds.top, 5000))
-        single_axs[1].set_yticklabels([])
+            single_axs[0].set_xlabel(f'X [m] (EPSG:{epsg})', fontsize=14)
+            single_axs[1].set_xlabel(f'X [m] (EPSG:{epsg})', fontsize=14)
+            single_axs[0].set_ylabel(f'Y [m] (EPSG:{epsg})', fontsize=14)
+    
+            single_axs[0].xaxis.set_ticks(np.arange(bounds.left, bounds.right, 5000))
+            single_axs[1].xaxis.set_ticks(np.arange(bounds.left, bounds.right, 5000))
+            single_axs[0].yaxis.set_ticks(np.arange(bounds.bottom, bounds.top, 5000))
+            single_axs[0].yaxis.set_major_formatter(ticker.FormatStrFormatter('%0.0f'))
+            single_axs[1].yaxis.set_ticks(np.arange(bounds.bottom, bounds.top, 5000))
+            single_axs[1].set_yticklabels([])
+
 
         # save figure
         fname = out_dir.joinpath(f'{band}_l1c-l2a_uncertainty-map.png')
         single_fig.savefig(fname, bbox_inches='tight')
         plt.close(single_fig)
 
-        del(cbar)
-        del(single_fig)
+
+def _get_roi_mean(
+        raster_file: str,
+        band_idx: int,
+        geom: Polygon,
+        nodata_value: float
+    ) -> float:
+    """
+    Calculates the mean of the pixel in a ROI
+    """
+    with rio.open(raster_file, 'r') as src:
+        out_band, _ = rio.mask.mask(
+            src,
+            [geom],
+            crop=True, 
+            all_touched=True # IMPORTANT!
+        )
+    out_band = out_band[band_idx-1,:,:]
+    out_band[out_band == nodata_value] = np.nan
+    return np.nanmean(out_band)
 
 
-def analyze_scl(
-        scl_scenarios: Path,
-        out_dir: Path
-    ):
+def extract_roi_unc(
+        analysis_results_l1c: Path,
+        analysis_results_l2a: Path,
+        analysis_results_aot: Path,
+        analysis_results_wvp: Path,
+        shapefile_rois: Path,
+        id_column: str,
+        img_date: date
+    ) -> pd.DataFrame:
     """
-    Analyzes the differences in the scene classification layer among scenario
-    members to assses the impact of uncertainty on the scene classification
-    outcomes and hence the selection of "valid" pixels
+    Once the study areas has been extracted and the statistics per pixel
+    have been compiled (using analyze_scenarios_spatial) the single regions
+    of interest (ROIs) can be analyzed. These are polygons consisting of 1
+    up to N pixels and can represent, e.g., different land use/ cover classes.
+    The function extracts the relative uncertainty estimates (band 5 in the
+    resulting tif-files of analyze_scenarios_spatial) and computes a spatial
+    average. The results are then stored in a pandas dataframe and written to
+    CSV.
+
+    :param analysis_results_l1c:
+        path object with wildcard to find all .tif files in L1C level output
+        from analyze_scenarios_spatial
+    :param analysis_results_l2a:
+        path object with wildcard to find all .tif files in L2A level output
+        from analyze_scenarios_spatial
+    :param analysis_results_aot:
+        file with aerosol optical thickness (result of atcorr process)
+    :param analysis_results_wvp:
+        file with water vapor content (result of atcorr process)
+    :param shapefile_rois:
+        shapefile with polygons defining the single ROIs (each ROI is a feature
+        in the file).
+    :param id_column:
+        name of the column with the unique identifier of each ROI
+    :param date:
+        acquisition date of the original S2 image (helps to track uncertainty
+        over time)
+    :return:
+        pandas dataframe with the results
     """
+
+    # get files
+    l1c_scenarios = glob.glob(analysis_results_l1c.as_posix())
+    l2a_scenarios = glob.glob(analysis_results_l2a.as_posix())
+    aot = glob.glob(analysis_results_aot.as_posix())[0]
+    wvp = glob.glob(analysis_results_wvp.as_posix())[0]
+
+    l1c_band_idx = 5
+    l2a_band_idx = 5
+
+    # read ROIs from file into a GeoDataFrame
+    gdf = gpd.read_file(shapefile_rois)
+
+    # loop over bands
+    band_list = ['B01', 'B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B8A', 'B09', 'B11', 'B12']
+    atmospheric_parameters = ['WVP', 'AOT']
+    atmospheric_dict = {
+        'WVP': wvp,
+        'AOT': aot
+    }
+    band_list.extend(atmospheric_parameters)
+
+    res = []
+    for _, roi in gdf.iterrows():
+
+        # store results in dict
+        band_res_l1c = {}
+        band_res_l2a = {}
+
+        band_res_l1c['date'] = img_date
+        band_res_l2a['date'] = img_date
+        band_res_l1c['processing_level'] = 'L1C'
+        band_res_l2a['processing_level'] = 'L2A'
+        band_res_l1c['ROI'] = roi[id_column]
+        band_res_l2a['ROI'] = roi[id_column]
+
+        for band in band_list:
+
+            # get raster for the band
+            if band not in atmospheric_parameters:
+                l2a_raster = [x for x in l2a_scenarios if Path(x).name.split('_')[1] == band][0]
+                l1c_raster = [x for x in l1c_scenarios if Path(x).name.split('_')[1] == band][0]
     
+                # get ROI mean of the band
+                band_res_l1c[band] = _get_roi_mean(
+                    raster_file=l1c_raster,
+                    band_idx=l1c_band_idx,
+                    geom=roi['geometry'],
+                    nodata_value=0.
+                )
+    
+                band_res_l2a[band] = _get_roi_mean(
+                    raster_file=l2a_raster,
+                    band_idx=l1c_band_idx,
+                    geom=roi['geometry'],
+                    nodata_value=0.
+                )
+            else:
+                band_res_l2a[band] = _get_roi_mean(
+                    raster_file=atmospheric_dict[band],
+                    band_idx=l1c_band_idx,
+                    geom=roi['geometry'],
+                    nodata_value=0.
+                )
 
+        res.append(band_res_l1c)
+        res.append(band_res_l2a)
+
+    return pd.DataFrame(res)
+
+
+def main(
+        unc_scenario_dir_home: Path,
+        out_dir_home: Path,
+        in_file_shp: Path,
+        in_file_shp_rois: Path,
+        id_column: str
+    ) -> None:
+    """
+    main executable function calling all other functions
+    required to analyze the results of the uncertainty
+    propagation study
+    """
+    # loop over single scenes and extract the uncertainty of the study area
+    # and the regions of interest (ROIs)
+    dir_list = next(os.walk(unc_scenario_dir_home.as_posix()))[1]
+    for scene in dir_list:
+
+        unc_scenario_dir = unc_scenario_dir_home.joinpath(scene)
+        out_dir = out_dir_home.joinpath(scene)
+
+        print(f'** Analyzing Uncertainty of: {unc_scenario_dir.name}')
+
+        # processing levels of the data; we analyze L1C and L2A
+        processing_levels = ['L1C', 'L2A']
+    
+        #    STEP_1      ANALYZE THE SCENARIOS BY READING ALL REALIZATIONS
+        #                FOR YOUR STUDY AREA
+        #
+        #    FOR THE SPECTRAL BANDS, THE WATER VAPOR AND AEROSOL BAND THIS
+        #    RESULTS IN A NEW RASTER FILE WITH 5 BANDS CONTAINING THE MIN,
+        #    MAX, MEAN, STD AND STANDARD UNCERTAINTY DENOTING THE SPREAD
+        #    AMONG THE SCENARIO MEMBERS
+        #    TODO: SCL
+    
+        for processing_level in processing_levels:
+        
+            analyze_scenarios_spatial(
+                unc_scenario_dir=unc_scenario_dir,
+                in_file_shp=in_file_shp,
+                out_dir=out_dir,
+                processing_level=processing_level
+            )
+    
+        #    STEP_2        ANALYSIS AND VISUALIZATION OF UNCERTAINTY
+    
+        # uncertainty maps
+        analysis_results_l1c = out_dir.joinpath('L1C_B*.tif')
+        analysis_results_l2a = out_dir.joinpath('L2A_B*.tif')
+        analysis_results_wvp = out_dir.joinpath('L2A_WVP_60m_*.tif')
+        analysis_results_aot = out_dir.joinpath('L2A_AOT_20m_*.tif')
+        analysis_results_scl = out_dir.joinpath('L2A_SCL*.tif')
+    
+        out_dir_maps = out_dir.joinpath('maps')
+        if not out_dir_maps.exists():
+            out_dir_maps.mkdir()
+    
+        unc_maps(
+            analysis_results_l1c=analysis_results_l1c,
+            analysis_results_l2a=analysis_results_l2a,
+            analysis_results_aot=analysis_results_aot,
+            analysis_results_wvp=analysis_results_wvp,
+            analysis_results_scl=analysis_results_scl,
+            out_dir=out_dir_maps
+        )
+    
+        # acquisition date of the S2 image
+        img_date = datetime.datetime.strptime(
+            unc_scenario_dir.name.split('_')[2].split('T')[0],
+            '%Y%m%d'
+        ).date()
+    
+        # extract uncertainty for the selected ROIs
+        unc_roi_df = extract_roi_unc(
+            analysis_results_l1c=analysis_results_l1c,
+            analysis_results_l2a=analysis_results_l2a,
+            analysis_results_aot=analysis_results_aot,
+            analysis_results_wvp=analysis_results_wvp,
+            shapefile_rois=in_file_shp_rois,
+            id_column=id_column,
+            img_date=img_date
+        )
+    
+        # save (backup) dataframe as csv
+        csv_dir = out_dir.joinpath('csv')
+        if not csv_dir.exists():
+            csv_dir.mkdir()
+        fname_csv = csv_dir.joinpath(
+            f'spectral-band_l1c-l2a_uncertainty_{in_file_shp_rois.name.split(".")[0]}.csv'
+        )
+        unc_roi_df.to_csv(fname_csv, index=False)
 
 
 if __name__ == '__main__':
 
-    # uncertainty maps
-    unc_res_raster_dir = Path('/mnt/ides/Lukas/owncloud/PhenomEn_Project/PAPER_1/S2A_MSIL2A_Analysis/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621')
-    l1c_scenarios = unc_res_raster_dir.joinpath('*_rut_b*.tif')
-    l2a_scenarios = unc_res_raster_dir.joinpath('L2A_B*.tif')
-    l1c_band_idx = 1
-    l2a_band_idx = 5
-    out_dir = Path('/mnt/ides/Lukas/04_Work/Uncertainty/Atcorr')
-
-    unc_maps(l1c_scenarios, l2a_scenarios, l1c_band_idx, l2a_band_idx, out_dir)
-
-    # box plots of ROIs (different landuses)
-    unc_res_roi_dir = Path('/mnt/ides/Lukas/owncloud/PhenomEn_Project/PAPER_1/S2A_MSIL2A_Analysis/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621/ROIs')
-    l1c_roi_scenarios = unc_res_roi_dir.joinpath('L1C_*.csv')
-    l2a_roi_scenarios = unc_res_roi_dir.joinpath('L2A_*.csv')
-    l1c_original_data = unc_res_roi_dir.joinpath('*_MSIL1C_*.csv')
-    l2a_original_data = unc_res_roi_dir.joinpath('*_MSIL2A_*.csv')
-    land_use_info = Path('/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/STUDY_AREA/ZH_Polygons_2019_EPSG32632_samples_scenarios.shp')
-    id_column = 'fid'
-
-    unc_boxplots(
-        l1c_roi_scenarios=l1c_roi_scenarios,
-        l2a_roi_scenarios=l2a_roi_scenarios,
-        l1c_original_data=l1c_original_data,
-        l2a_original_data=l2a_original_data,
-        id_column=id_column,
-        land_use_info=land_use_info,
-        out_dir=out_dir
-    )
-
-    # define inputs
-    original_scene_l1c = Path(
-        '/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_orig/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.SAFE'
-    )
-    original_scene_l2a = Path(
-        '/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_orig/S2B_MSIL2A_20190830T102029_N9999_R065_T32TMT_20211020T160133.SAFE'
-    )
-    unc_scenario_dir = Path(
-        '/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_RUT-Scenarios/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621'
-    )
-    in_file_shp = Path(
-        '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/STUDY_AREA/ZH_Polygons_2019_EPSG32632_samples_scenarios.shp'
-    )
-    options = {
-        'buffer': 0.,
-        'id_column': 'fid'
-    }
-    processing_levels = ['L2A']
-    # define directory where to backup extracted pixel values
-    out_dir = Path(
-        '/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL2A_Analysis/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621/ROIs'
-    )
-
-    # single ROIs (different land use types)
-    for processing_level in processing_levels:
-
-        extract_scenarios_roi(
-            unc_scenario_dir=unc_scenario_dir,
-            in_file_shp=in_file_shp,
-            out_dir=out_dir,
-            processing_level=processing_level,
-            **options
-        )
-        # extract original data (i.e., without uncertainty scenarios)
-        if processing_level == 'L1C':
-            in_file = original_scene_l1c
-            is_l2a = False
-        elif processing_level == 'L2A':
-            in_file = original_scene_l2a
-            is_l2a = True
-        resolutions = [10, 20, 60]
-        for resolution in resolutions:
-            df, scl = S2singlebands2table(
-                in_dir=in_file,
-                in_file_polys=in_file_shp,
-                filter_clouds=False,
-                is_L2A=is_l2a,
-                product_date='20190830',
-                resolution=resolution,
-                **options
-            )
-            fname = f'{in_file.name.split(".")[0]}_{resolution}m.csv'
-            df.to_csv(out_dir.joinpath(fname), index=False)
-            if is_l2a and resolution == 20:
-                fname_scl = f'{in_file.name.split(".")[0]}_scl.csv'
-                scl.to_csv(out_dir.joinpath(fname_scl), index=False)
-        
-    #################################3
-
-    # entire region
+    ### user inputs
+    
+    # shapefile (or other vector format) defining the extent of the study area
     in_file_shp = Path(
         '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/STUDY_AREA/AOI_Esch_EPSG32632-large.shp'
     )
-    analyze_scenarios_spatial(
-        unc_scenario_dir=unc_scenario_dir,
+    in_file_shp_rois = Path(
+        '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/STUDY_AREA/ZH_Polygons_2019_EPSG32632_selected-crops.shp'
+    )
+    id_column = 'crop_type'
+
+    # directory containing the raster realizations
+    unc_scenario_dir_home = Path(
+        '/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_RUT-Scenarios'
+    )
+    # directory where to save the resulting files to
+    out_dir_home = Path(
+        '/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL2A_Analysis'
+    )
+
+    main(
+        unc_scenario_dir_home=unc_scenario_dir_home,
+        out_dir_home=out_dir_home,
         in_file_shp=in_file_shp,
-        out_dir=out_dir,
-        processing_level=processing_level
-    )    
+        in_file_shp_rois=in_file_shp_rois,
+        id_column=id_column
+    )

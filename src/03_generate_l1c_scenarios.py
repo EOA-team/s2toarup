@@ -11,6 +11,8 @@ from typing import List
 import rasterio as rio
 import numpy as np
 import os
+from pip._vendor.pkg_resources import PathMetadata
+from patsy import origin
 
 
 def _sample_fast(
@@ -167,23 +169,93 @@ def gen_rad_unc_scenarios(
                 print(f'Wrote scenario {idx+1}/{n_scenarios} for {s2_band}')
 
 
+def main(
+        orig_datasets_dir: Path,
+        unc_datasets_dir: Path,
+        scenario_dir: Path,
+        roi_bounds_10m: List[int],
+        n_scenarios: int
+    ) -> None:
+    """
+    main executable function taking care about everything
+    """
+
+    # find scenes and their uncertainty
+    orig_datasets = glob.glob(orig_datasets_dir.joinpath('*.SAFE').as_posix())
+    unc_datasets = glob.glob(unc_datasets_dir.joinpath('*.RUT').as_posix())
+
+    # loop over the scenes. Before generating the scenarios some
+    # preparation is required
+    for orig_dataset in orig_datasets:
+
+        orig_dataset_path = Path(orig_dataset)
+        scene_name = orig_dataset_path.name
+
+        print(f'** Working on {scene_name}')
+
+        # find corresponding uncertainty directory
+        unc_dataset_path = [
+            Path(x) for x in unc_datasets if Path(x).name.split('.')[0] == scene_name.split('.')[0]
+        ][0]
+
+        # preparation
+        # create a subdirectory in the scenario folder with the scene name without .SAFE
+        scene_name_without_safe = scene_name.replace('.SAFE', '')
+
+        scenario_path = scenario_dir.joinpath(scene_name_without_safe)
+        if not scenario_path.exists():
+            scenario_path.mkdir()
+        # create a folder to store the scene template (entire .SAFE structure)
+        template_path = scenario_path.joinpath('template')
+        if not template_path.exists():
+            template_path.mkdir()
+
+        # copy the original L1C scene into the template folder and delete
+        # the jp2 files in the GRANULE directory
+        shutil.copytree(orig_dataset_path, template_path.joinpath(scene_name))
+
+        # delete the jp2 files in the template
+        search_expr = '*.SAFE/GRANULE/*/IMG_DATA/*_B*.jp2'
+        jp2_files = glob.glob(template_path.joinpath(search_expr).as_posix())
+        for jp2_file in jp2_files:
+            os.remove(jp2_file)
+
+        # finally, generate the scenarios
+        gen_rad_unc_scenarios(
+            orig_dataset_path=orig_dataset_path,
+            unc_dataset_path=unc_dataset_path,
+            scenario_path=scenario_path,
+            template_path=template_path,
+            n_scenarios=n_scenarios,
+            roi_bounds_10m=roi_bounds_10m
+        )
+
+
 if __name__ == '__main__':
-    
-    orig_dataset_path = Path('/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_orig/S2A_MSIL1C_20190530T103031_N0207_R108_T32TMT_20190530T123429.SAFE')
-    unc_dataset_path = Path('/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_orig/S2A_MSIL1C_20190530T103031_N0207_R108_T32TMT_20190530T123429.RUT')
-    scenario_path = Path('/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_RUT-Scenarios/S2A_MSIL1C_20190530T103031_N0207_R108_T32TMT_20190530T123429')
-    template_path = scenario_path.joinpath('template')
-    n_scenarios = 100
 
-    # bounds col_min, col_max, row_min, row_max (image coordinates)
+    ### define user inputs
+
+    # directory with L1C data (.SAFE subdirectories)
+    orig_datasets_dir = Path('/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_orig')
+
+    # directory with radiometric uncertainty outputs (.RUT subdirectories)
+    unc_datasets_dir = orig_datasets_dir
+
+    # directory where to store the scenarios (a subdirectory will be created for each scene)
+    # in which the actual scenarios are placed
+    scenario_dir = Path('/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_RUT-Scenarios')
+
+    # define bounds of the study area (encompassing the single regions of interest)
+    # bounds col_min, col_max, row_min, row_max (image coordinates of the 10m raster)
     roi_bounds_10m = [7000,8000,4000,5000]
-    
-    gen_rad_unc_scenarios(
-        orig_dataset_path=orig_dataset_path,
-        unc_dataset_path=unc_dataset_path,
-        scenario_path=scenario_path,
-        template_path=template_path,
-        n_scenarios=n_scenarios,
-        roi_bounds_10m=roi_bounds_10m
-    )
 
+    # number of scenarios (each scenario is a possible realization of a S2 scene!)
+    n_scenarios = 100
+    
+    main(
+        orig_datasets_dir,
+        unc_datasets_dir,
+        scenario_dir,
+        roi_bounds_10m,
+        n_scenarios
+    )

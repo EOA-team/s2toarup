@@ -1,40 +1,74 @@
-# shell script to calculate the radiometric uncertainty for each spectral band using S2-RUT
+#!/usr/bin/env bash
 
-gpt S2RutOp -Ssource="S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.SAFE" -f "GeoTIFF" -t "S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.RUT/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621_rut_b01.tif" -Pband_names="B1"
-rm -rf /home/graflu/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+dot_safe_dir="/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_orig"
+cd "$dot_safe_dir"
 
-gpt S2RutOp -Ssource="S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.SAFE" -f "GeoTIFF" -t "S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.RUT/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621_rut_b02.tif" -Pband_names="B2"
-rm -rf /home/graflu/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+# find subdirectories and loop over them
+IFS=""
+mapfile -t dirlist < <( find ${dot_safe_dir} -maxdepth 1 -mindepth 1 -type d -printf '%f\n' )
 
-gpt S2RutOp -Ssource="S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.SAFE" -f "GeoTIFF" -t "S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.RUT/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621_rut_b03.tif" -Pband_names="B3"
-rm -rf /home/graflu/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+for dir in ${dirlist[@]}; do
 
-gpt S2RutOp -Ssource="S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.SAFE" -f "GeoTIFF" -t "S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.RUT/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621_rut_b04.tif" -Pband_names="B4"
-rm -rf /home/graflu/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+	# check if directory ends with .SAFE
+	if [[ "$dir" == *.SAFE ]]
+	then
 
-gpt S2RutOp -Ssource="S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.SAFE" -f "GeoTIFF" -t "S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.RUT/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621_rut_b05.tif" -Pband_names="B5"
-rm -rf /home/graflu/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+ 		# the uncertainty files shall be stored in a directory with the same
+ 		# name but ending with .RUT (radiometric uncertainty toolbox)
+ 		replace=".RUT"
+ 		rut_dir=${dir//.SAFE/$replace}
+ 
+		# create the .RUT directory
+ 		mkdir "$rut_dir"
+ 
+ 		# the resulting files (one uncertainty raster per spectral band) shall be
+ 		# named like the original dataset but without .SAFE and ending with
+ 		# _rut_<band>.tif
+ 		replace="_rut_"
+ 		unc_files_basename=${dir//.SAFE/$replace}
 
-gpt S2RutOp -Ssource="S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.SAFE" -f "GeoTIFF" -t "S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.RUT/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621_rut_b06.tif" -Pband_names="B6"
-rm -rf /home/graflu/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+ 		# start the S2-Uncertainty toolbox using SNAP's graph processing CLI
+ 		# each band is processed separately
+ 		# empty the cache after each band; otherwise there might be out-of-memory errors
+ 		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b01.tif -Pband_names=B1
+ 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+ 
+ 		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b02.tif -Pband_names=B2
+ 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+ 
+		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b03.tif -Pband_names=B3
+ 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+ 
+		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b04.tif -Pband_names=B4
+ 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+ 
+		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b05.tif -Pband_names=B5
+ 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+ 
+		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b06.tif -Pband_names=B6
+ 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+ 
+		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b07.tif -Pband_names=B7
+ 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+ 
+		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b08.tif -Pband_names=B8
+ 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+ 
+		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b8a.tif -Pband_names=B8A
+ 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+ 
+		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b09.tif -Pband_names=B9
+ 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
 
-gpt S2RutOp -Ssource="S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.SAFE" -f "GeoTIFF" -t "S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.RUT/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621_rut_b07.tif" -Pband_names="B7"
-rm -rf /home/graflu/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b10.tif -Pband_names=B10
+ 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+ 
+		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b11.tif -Pband_names=B11
+ 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+ 
+		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b12.tif -Pband_names=B12
+ 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
 
-gpt S2RutOp -Ssource="S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.SAFE" -f "GeoTIFF" -t "S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.RUT/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621_rut_b08.tif" -Pband_names="B8"
-rm -rf /home/graflu/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+    fi
 
-gpt S2RutOp -Ssource="S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.SAFE" -f "GeoTIFF" -t "S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.RUT/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621_rut_b8a.tif" -Pband_names="B8A"
-rm -rf /home/graflu/.snap/var/cache/s2tbx/l1c-reader/8.0.4
-
-gpt S2RutOp -Ssource="S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.SAFE" -f "GeoTIFF" -t "S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.RUT/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621_rut_b09.tif" -Pband_names="B9"
-rm -rf /home/graflu/.snap/var/cache/s2tbx/l1c-reader/8.0.4
-
-gpt S2RutOp -Ssource="S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.SAFE" -f "GeoTIFF" -t "S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.RUT/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621_rut_b10.tif" -Pband_names="B10"
-rm -rf /home/graflu/.snap/var/cache/s2tbx/l1c-reader/8.0.4
-
-gpt S2RutOp -Ssource="S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.SAFE" -f "GeoTIFF" -t "S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.RUT/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621_rut_b11.tif" -Pband_names="B11"
-rm -rf /home/graflu/.snap/var/cache/s2tbx/l1c-reader/8.0.4
-
-gpt S2RutOp -Ssource="S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.SAFE" -f "GeoTIFF" -t "S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621.RUT/S2B_MSIL1C_20190830T102029_N0208_R065_T32TMT_20190830T130621_rut_b12.tif" -Pband_names="B12"
-rm -rf /home/graflu/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+done

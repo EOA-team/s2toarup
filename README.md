@@ -25,7 +25,7 @@ export JDK_HOME=/=${JAVA_HOME}
 export PATH=$PATH:${JAVA_HOME}/bin
 export PATH=$PATH:${JAVA_HOME}/include
 ```
-Don't forget to run `source ~\.bashrc` after making the changes to apply them. Then continue with building jpy. Copy the wheel package (jpy-0.10.0.dev1-cp38-cp38-linux_x86_64.whl) into /home/<user>/.snap/snap-python/snappy/
+Don't forget to run `source ~\.bashrc` after making the changes to apply them. Then continue with building jpy. Copy the wheel package (jpy-0.10.0.dev1-cp39-cp39-linux_x86_64.whl) into /home/$USER/.snap/snap-python/snappy/
 
 The actual algorithm of the toolbox is coded in Python and takes its inputs from the metadata xml (MTD_MSIL1C.xml). The algorithm works bandwise and assign pixel uncertainties values between 0 and 250 (250 = 25% uncertainty or higher). Thus, a value of 12 corresponds to a uncertainty of 1.2%.
 
@@ -65,9 +65,9 @@ Then copy the created wheel packages and the shared object files (*.so) from the
 To check if snappy was installed correctly start Python in interactive mode:
 
 ```{python}
-snap-python) [graflu@kp140-208 snappy]$ python
-Python 3.8.10 (default, May  4 2021, 00:00:00) 
-[GCC 10.2.1 20201125 (Red Hat 10.2.1-9)] on linux
+(snap-python) [graflu@kp140-208 snappy]$ python
+Python 3.9.7 (default, Aug 30 2021, 00:00:00) 
+[GCC 11.2.1 20210728 (Red Hat 11.2.1-1)] on linux
 Type "help", "copyright", "credits" or "license" for more information.
 >>> import snappy
 INFO: org.esa.snap.python.gpf.PyOperatorSpi: Python operator 'S2RutOp' registered (Python module: 's2_rut', class: 'S2RutOp', root: '/mnt/ides/Lukas/software/snap/s2tbx/modules/org-esa-snap-snap-rut.jar')
@@ -87,7 +87,12 @@ Download Sen2Cor from the [official access point](http://step.esa.int/main/snap-
 |---------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | /bin                      | place the Sen2Cor stand-alone version here.                                                                                                                                                       |
 | /shp                      | contains the shapefile defining the extent of the study area (AOI_Esch_EPSG32632.shp) and the single regions of interest (ROIs) within that area (ZH_Polygons_2019_EPSG32632_selected-crops.shp). |
+| /src						| here, all the required Python and shell scripts are located.
 | /S2A_MSIL1C_orig          | here, the original L1C scenes will be downloaded to (from Creodias).                                                                                                                              |
 | /S2A_MSIL1C_RUT-Scenarios | here, the L1C scenarios (based on the radiometric uncertainty assessment) and the resulting L2A outputs (uncertainty propagation) will be stored.                                                 |
 | /S2A_MSIL2A_Analysis      | here, the results of the analysis of the L1C and L2A scenarios will be stored
-|---------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+
+## Executing the Workflow
+
+coming soon
+

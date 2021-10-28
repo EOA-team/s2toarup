@@ -81,9 +81,9 @@ if __name__ == '__main__':
 
     # shapefile defining the bounds of your region of interest
     aoi_file = Path(
-        '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/STUDY_AREA/AOI_Esch_EPSG32632.shp'
+        './../shp/AOI_Esch_EPSG32632.shp'
     )
-    download_dir = Path('/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_orig')
+    download_dir = Path('./../S2A_MSIL1C_orig')
 
     main(
         start_date=start_date,

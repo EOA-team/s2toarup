@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-dot_safe_dir="/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_orig"
+dot_safe_dir="./../S2A_MSIL1C_orig"
 cd "$dot_safe_dir"
 
 # find subdirectories and loop over them

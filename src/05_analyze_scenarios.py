@@ -667,20 +667,20 @@ if __name__ == '__main__':
     
     # shapefile (or other vector format) defining the extent of the study area
     in_file_shp = Path(
-        '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/STUDY_AREA/AOI_Esch_EPSG32632-large.shp'
+        './../shp/AOI_Esch_EPSG32632.shp'
     )
     in_file_shp_rois = Path(
-        '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/STUDY_AREA/ZH_Polygons_2019_EPSG32632_selected-crops.shp'
+        './../shp/ZH_Polygons_2019_EPSG32632_selected-crops.shp'
     )
     id_column = 'crop_type'
 
     # directory containing the raster realizations
     unc_scenario_dir_home = Path(
-        '/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_RUT-Scenarios'
+        './../S2A_MSIL1C_RUT-Scenarios'
     )
     # directory where to save the resulting files to
     out_dir_home = Path(
-        '/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL2A_Analysis'
+        './../S2A_MSIL2A_Analysis'
     )
 
     main(

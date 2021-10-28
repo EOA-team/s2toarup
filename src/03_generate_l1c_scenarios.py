@@ -230,20 +230,23 @@ def main(
             roi_bounds_10m=roi_bounds_10m
         )
 
+        # clean up and remove the template directory as it not required any further
+        shutil.rmtree(template_path, ignore_errors=True)
+
 
 if __name__ == '__main__':
 
     ### define user inputs
 
     # directory with L1C data (.SAFE subdirectories)
-    orig_datasets_dir = Path('/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_orig')
+    orig_datasets_dir = Path('./../S2A_MSIL1C_orig')
 
     # directory with radiometric uncertainty outputs (.RUT subdirectories)
     unc_datasets_dir = orig_datasets_dir
 
     # directory where to store the scenarios (a subdirectory will be created for each scene)
     # in which the actual scenarios are placed
-    scenario_dir = Path('/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_RUT-Scenarios')
+    scenario_dir = Path('./../S2A_MSIL1C_RUT-Scenarios')
 
     # define bounds of the study area (encompassing the single regions of interest)
     # bounds col_min, col_max, row_min, row_max (image coordinates of the 10m raster)

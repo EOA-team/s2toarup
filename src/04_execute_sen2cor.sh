@@ -34,6 +34,7 @@ for unc_dir in ${scenario_list[@]}; do
 	then
 
 		mapfile -t dirlist < <( find ${unc_scenarios}/${unc_dir} -maxdepth 2 -mindepth 2 -type d -printf '%f\n' )
+
 		# loop over scenarios
 		counter=1
 		for dir in ${dirlist[@]}; do
@@ -44,7 +45,7 @@ for unc_dir in ${scenario_list[@]}; do
 			    counter=$((counter+1))
 			    # call Sen2Cor
 			    L2A_Process --resolution 10 --output_dir "${output_dir}" "${scenario}"
-			    echo "${scenario}"
+			    echo Processed "${scenario}"
 			fi
 		done
 	fi

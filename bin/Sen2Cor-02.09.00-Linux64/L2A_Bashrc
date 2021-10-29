@@ -1,0 +1,29 @@
+#!/bin/sh
+
+# These environment variables only affect current terminal.
+
+# unset some variables that allows to have an isolate python environment
+unset LD_LIBRARY_PATH
+unset PYTHONPATH
+unset PYTHONHOME
+unset PYTHONEXECUTABLE
+unset PYTHONUSERBASE
+
+SEN2COR_HOME=/home/graflu/sen2cor/2.9
+SEN2COR_BIN=/mnt/ides/Lukas/software/Sen2Cor-02.09.00-Linux64/lib/python2.7/site-packages/sen2cor
+
+export SEN2COR_HOME SEN2COR_BIN
+
+# Add bin direcotory to system PATH
+PATH=/mnt/ides/Lukas/software/Sen2Cor-02.09.00-Linux64/bin:$PATH
+
+# set numeric locale to C
+LC_NUMERIC=C
+
+#set GDAL_DATA
+GDAL_DATA=/mnt/ides/Lukas/software/Sen2Cor-02.09.00-Linux64/share/gdal
+GDAL_DRIVER_PATH=disable
+
+# export variables
+export LC_NUMERIC PATH GDAL_DATA GDAL_DRIVER_PATH
+

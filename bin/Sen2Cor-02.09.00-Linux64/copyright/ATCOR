@@ -1,0 +1,22 @@
+The program "ATCOR" (hereinafer called "program") is proprietary of the German
+Aerospace center (Deutsches Zentrum Für Luft- und Raumfahrt e.V., DLR) and is protected
+by the German Copyright Act. The program is made avaialable to customer only for the
+purpose of use for the ESA Sentinel-2-project, the use of ATCOR for other projects is
+expressively excluded. With acceptance of these terms of a license the customer receives -
+without the right to grant sublicenses - a non exclusive, non transferable right to use the
+program for Sentinel-2 project. This right comprises the right to reprocess the source-
+code and to translate the source-code into a different programming language (hereinafer
+called "derived ATCOR")
+
+Definition of the terms ATCOR sources and ATCOR binaries:
+The term ATCOR sources specify the following three items: the source code of ATCOR or the
+source code or Python byte code of the derived ATCOR program.
+
+The term ATCOR binaries specify a non-readable version of the derived ATCOR program.
+This can be either a binary executable program or an object library which is compiled from
+the derived ATCOR sources
+
+The ATCOR sources may only be used for own purposes of the customer related to the
+Sentinel-2 project. The transfer of the ATCOR sources to third parties other than ESA and its
+ESA selected contractors, or the use of ATCOR sources for other projects than Sentinel-2
+is subject to the prior written consent of DLR. No restrictions shall be given in the use of ATCOR binaries.

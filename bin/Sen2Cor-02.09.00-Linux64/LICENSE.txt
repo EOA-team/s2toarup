@@ -1,0 +1,298 @@
+Notice of Third Party Software Licenses
+
+This package contains open source software binaries and or python code from external projects. These are available on an “as is” basis and subject to their individual license agreements. This package is subject to their individual licenses as well as the Sen2Cor code license. Sen2cor development team reserves the right to change which third party tools will be provided in any version of this project. Changes to license in individual packages will be updated in this file.
+
+Sen2cor windows package contains re-distributable, run-time, shared-library files from the Intel(TM) Math Kernel Library (“MKL binaries”). You are specifically authorized to use the MKL binaries. Use and redistribution of the MKL binaries are subject to the licensing terms located at https://software.intel.com/en-us/license/intel-simplified-software-license. However, GNU/Linux and Apple Mac OSX platforms are free from intel MKL binaries.
+
+
+This software includes code from Python(R) project
+  Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006 Python Software Foundation;
+  http://www.python.org/
+  Python(R) is a registered trademark of the Python Software Foundation.
+  Python is released under PSF License:
+  https://docs.python.org/2/license.html
+
+This software includes binaries from musl libc
+  Copyright © 2005-2014 Rich Felker, et al.
+  http://www.musl-libc.org/
+  Musl is released under standard MIT License:
+  http://git.musl-libc.org/cgit/musl/tree/COPYRIGHT
+
+This software includes code from GDAL.
+  Copyright (c) 2000-2016, Frank Warmerdam
+  http://www.gdal.org/
+  GDAL is released under X11/MIT License:
+  https://trac.osgeo.org/gdal/wiki/FAQGeneral#WhatlicensedoesGDALOGRuse
+
+This software includes code from numpy
+  Copyright (c) 2005, NumPy Developers
+  http://www.numpy.org/
+  Numpy is released under BSD-New license:
+  https://docs.scipy.org/doc/numpy-1.10.0/license.html
+
+This software includes code from scipy
+  Copyright © 2001, 2002 Enthought, Inc.
+  Copyright © 2003-2013 SciPy Developers.
+  http://www.scipy.org/
+  Scipy is released under BSD-New license:
+  https://www.scipy.org/scipylib/license.html
+
+This software includes code from pytables
+  Copyright (c) 2002-2004 by Francesc Alted
+  Copyright (c) 2005-2007 by Carabos Coop. V.
+  Copyright (c) 2008-2010 by Francesc Alted
+  Copyright (c) 2011-2015 by PyTables maintainers
+  http://www.pytables.org/
+  pytables is released under BSD 3-clause "New" or "Revised" License
+  https://github.com/PyTables/PyTables/blob/2.2-pro/LICENSE.txt
+
+This software includes code from hdf5
+  Copyright (c) 2006, The HDF Group.
+  Copyright (c) 1998-2006, The Board of Trustees of the University of Illinois. 
+  http://www.hdfgroup.org/
+  License for hdf5 is given here:
+  https://support.hdfgroup.org/products/licenses.html
+ 
+This software includes code from numexpr.
+  Copyright (c) 2007,2008  David M. Cooke <david.m.cooke@gmail.com>
+  Copyright (c) 2009,2010  Francesc Alted <faltet@pytables.org>
+  Copyright (c) 2011- See AUTHORS.txt
+  https://github.com/pydata/numexpr
+  numexpr is released under MIT License:
+  https://github.com/pydata/numexpr/blob/master/LICENSE.txt
+
+This software includes code from lxml.
+  Copyright (c) 2004 Infrae. All rights reserved.
+  http://lxml.de/
+  lxml is released under BSD License
+  https://github.com/lxml/lxml/blob/master/doc/licenses/BSD.txt
+
+This software includes code from psutil.
+  Copyright (c) 2009, Jay Loden, Dave Daeschler, Giampaolo Rodola'
+  https://github.com/giampaolo/psutil
+  psutil is distributed under BSD license
+  https://github.com/giampaolo/psutil/blob/master/LICENSE
+
+This software includes code from skimage.
+  Copyright (C) 2011, the scikit-image team
+  http://scikit-image.org/
+  skimage is released under BSD License
+  http://scikit-image.org/docs/0.12.x/license.html
+
+This software includes code from glymur.
+  Copyright (C) 2013 John Evans
+  https://github.com/quintusdias/glymur
+  glymur is released under MIT License
+  https://github.com/quintusdias/glymur/blob/master/LICENSE.txt
+
+This software includes code from dateutil.
+  Copyright (c) 2003-2011 - Gustavo Niemeyer <gustavo@niemeyer.net>
+  Copyright (c) 2012-2014 - Tomi Pieviläinen <tomi.pievilainen@iki.fi>
+  Copyright (c) 2014-2016 - Yaron de Leeuw <me@jarondl.net>
+  Copyright (c) 2015- - Paul Ganssle <paul@ganssle.io>
+  https://github.com/dateutil/dateutil/
+  dateutil is released under Simplified BSD
+
+This software includes code from matplotlib.
+  Copyright (c) 2012-2013 Matplotlib Development Team
+  https://matplotlib.org/
+  matplotlib is released under PSF license
+  https://matplotlib.org/users/license.html
+
+This software includes code from Python Imaging Library (PIL).
+   Copyright (c) 1997-2011 by Secret Labs AB
+   Copyright (c) 1995-2011 by Fredrik Lundh
+   Pillow is the friendly PIL fork. It is
+   Copyright (c) 2010-2017 by Alex Clark and contributors
+   Pillow is licensed under the open source PIL Software License:
+   https://github.com/python-pillow/Pillow/blob/master/LICENSE
+
+This software includes code from setuptools
+https://pypi.python.org/pypi/setuptools
+
+This software includes code from packaging
+https://pypi.python.org/pypi/packaging
+
+Files:
+      lib/python2.7/site-packages/sen2cor/L2A_Config.py
+      lib/python2.7/site-packages/sen2cor/L2A_Library.py
+      lib/python2.7/site-packages/sen2cor/L2A_Logger.py
+      lib/python2.7/site-packages/sen2cor/L2A_Manifest.py
+      lib/python2.7/site-packages/sen2cor/L2A_Process.py
+      lib/python2.7/site-packages/sen2cor/L2A_ProcessTile.py
+      lib/python2.7/site-packages/sen2cor/L2A_SceneClass.py
+      lib/python2.7/site-packages/sen2cor/L2A_Schedule.py
+      lib/python2.7/site-packages/sen2cor/L2A_Tables.py
+      lib/python2.7/site-packages/sen2cor/L2A_XmlParser.py
+      lib/python2.7/site-packages/sen2cor/__init__.py
+
+Copyright: Copyright (C) 2017 European Space Agency (ESA).
+      	   All Rights reserved
+License:   Apache 2.0
+
+Files     : lib/python2.7/site-packages/sen2cor/aux_data/
+Copyright : Copyright (C) 2017 European Space Agency (ESA).
+      	    All Rights reserved
+License   : Apache 2.0  
+
+Files     : lib/python2.7/site-packages/sen2cor/cfg/*
+Copyright : Copyright (C) 2017 European Space Agency (ESA).
+      	    All Rights reserved
+License   : Apache 2.0  
+
+Files     : lib/python2.7/site-packages/sen2cor/lib_S2A/*
+Copyright : Copyright (C) 2017 European Space Agency (ESA).
+      	    All Rights reserved
+License   : Apache 2.0  
+
+Files     : lib/python2.7/site-packages/sen2cor/lib_S2B/*
+Copyright : Copyright (C) 2017 European Space Agency (ESA).
+      	    All Rights reserved
+License   : Apache 2.0  
+
+See copyright/Sen2cor for full text of apache 2.0 license
+
+Files: lib/python2.7/site-packages/sen2cor/L2A_AtmCorr.so
+Copyright: German Aerospace center (Deutsches Zentrum Für Luft- und Raumfahrt e.V., DLR)
+License: see copyright/ATCOR which is the license granted to ESA by DLR
+
+This software contains binaries from lapack project.
+  Copyright (c) 1992-2013 The University of Tennessee and The University
+  of Tennessee Research Foundation.  All rights reserved.
+  Copyright (c) 2000-2013 The University of California Berkeley. All rights reserved.
+  Copyright (c) 2006-2013 The University of Colorado Denver.  All rights reserved.
+  http://www.netlib.org/
+  Lapack is released under modified BSD license:  
+  http://www.netlib.org/lapack/LICENSE.txt
+
+This package contains binaries from libpng project
+  http://www.libpng.org/
+  libpng is distributed under libpng license
+  Copyright and license are listed here:
+  http://www.libpng.org/pub/png/src/libpng-LICENSE.txt
+
+This package contains binaries from zlib project
+  Copyright (C) 1995-2017 Jean-loup Gailly and Mark Adler
+  https://www.zlib.net/
+  zlib is released under zlib license:
+  https://www.zlib.net/zlib_license.html
+
+This package contains binaries from curl project
+  https://curl.haxx.se
+  Curl is released under MIT/X derivative license:
+  https://curl.haxx.se/docs/copyright.html
+
+This package contains binaries from jpeg-turbo project
+  http://www.libjpeg-turbo.org
+  libjpeg-turbo is covered by three compatible BSD-style open source licenses:
+  https://github.com/libjpeg-turbo/libjpeg-turbo/blob/master/LICENSE.md
+
+This package contains binaries from libxslt
+  http://xmlsoft.org
+  xslt is released under MIT license:
+  http://xmlsoft.org/XSLT/intro.html
+
+This package contains binaries from libexslt
+http://xmlsoft.org
+exslt is released under MIT license:
+http://xmlsoft.org/XSLT/EXSLT/index.html
+
+This package contains binaries from libxml2
+http://xmlsoft.org
+libxml2 is released under MIT license
+
+This package contains binaries from libtiff
+Copyright (c) 1988-1997 Sam Leffler
+Copyright (c) 1991-1997 Silicon Graphics, Inc.
+http://www.libtiff.org/
+libtiff is released under BSD-like licence.
+
+This package contains binaries from proj4
+Copyright (c) 2000, Frank Warmerdam
+proj4 is released under MIT licence:
+http://proj4.org/license.html
+
+This package contains binaries from libexpat
+Copyright (c) 1998-2000 Thai Open Source Software Center Ltd and Clark Cooper
+Copyright (c) 2001-2017 Expat maintainers
+https://libexpat.github.io/
+libexpat is released under MIT licence.
+https://github.com/libexpat/libexpat/blob/master/expat/COPYING
+
+This package contains binaries from Freetype2
+Copyright (c) 2000, Frank Warmerdam
+Freetype2 is released under FTL licence:
+http://git.savannah.gnu.org/cgit/freetype/freetype2.git/tree/docs/FTL.TXT
+
+This package contains binaries from libgeotiff project
+libgeotiff is released under public domain or X style licence:
+https://svn.osgeo.org/metacrs/geotiff/trunk/libgeotiff/LICENSE
+
+This package contains binaries from SQLite project
+https://sqlite.org/
+SQLite is released under public domain
+https://sqlite.org/copyright.html
+
+This package contains binaries from OpenJPEG project
+http://www.openjpeg.org/
+OpenJPEG is released under 2-clause BSD license
+https://github.com/uclouvain/openjpeg/blob/master/LICENSE
+
+This package contains binaries from GNU Readline project
+https://cnswww.cns.cwru.edu/php/chet/readline/rltop.html
+Readline is released under GNU GPL v3 License.
+http://www.gnu.org/licenses/gpl.html
+
+This package contains binaries from lcms2 project
+http://www.littlecms.com/
+lcms2 is released under MIT license
+
+This package contains binaries from libffi project
+https://sourceware.org/libffi/
+libffi is released under MIT license
+https://github.com/libffi/libffi/blob/master/LICENSE
+
+This package contains binaries from ncurses project
+Copyright (c) 2011-2014,2015 by Thomas E. Dickey
+https://www.gnu.org/software/ncurses/
+ncurses is distributed under MIT license
+http://invisible-island.net/ncurses/ncurses-license.html
+
+This package contains binaries from libssh2 project
+http://www.libssh2.org/
+ncurses is distributed under BSD license
+https://libssh2.org/license.html
+
+This package contains binaries from libressl project
+http://www.libressl.org/
+libressl is distributed under a mix of licenses
+https://github.com/libressl/libressl/blob/master/src/LICENSE
+
+This package contains binaries from gnupg project
+https://www.gnupg.org/
+gnupg is distributed under a GPL license
+
+This package contains binaries from libbz2 project
+Copyright (c) Julian Seward, jseward@bzip.org
+http://www.bzip.org/
+libbz2 is distributed under BSD license
+
+This package contains binaries from BLAS project
+http://www.netlib.org/blas/
+BLAS is distributed under public domain
+
+This package contains binaries from OpenBLAS project
+http://www.openblas.net/
+OpenBLAS is distributed under BSD License
+
+This package contains binaries from GDBM project
+http://www.gnu.org.ua/software/gdbm/
+GDBM is released under GPL v3 License
+
+This software includes binaries from GCC project
+Copyright (C) 2009 Free Software Foundation, Inc.
+libstdc++ has GCC Runtime Library Exception:
+https://gcc.gnu.org/onlinedocs/libstdc++/manual/license.html
+The libgcc library is licensed under the GNU GPL plus the GCC Runtime Library Exception
+
+

@@ -15,13 +15,14 @@
 #
 
 # define directory where the L1C realizations are located
-unc_scenarios="./../S2A_MSIL1C_RUT-Scenarios"
+unc_scenarios="/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_RUT-Scenarios"
 # define directory where Sen2Cor is installed to
+
+# source Sen2Cor bashrc (if not added permanently to PATH)
 sen2cor_install_dir="./../bin/Sen2Cor-02.09.00-Linux64"
+source "$sen2cor_install_dir"/L2A_Bashrc
 
 cd "$unc_scenarios" 
-# source Sen2Cor bashrc (if not added permanently to PATH)
-source "$sen2cor_install_dir"/L2A_Bashrc
 
 IFS=""
 mapfile -t scenario_list < <( find ${unc_scenarios} -maxdepth 1 -mindepth 1 -type d -printf '%f\n' )
@@ -36,14 +37,14 @@ for unc_dir in ${scenario_list[@]}; do
 		# loop over scenarios
 		counter=1
 		for dir in ${dirlist[@]}; do
-			if [[ "$dir" == S2* ]]
+			if [[ "$dir" == S2*_MSIL1C_* ]]
 			then
 			    scenario="${unc_dir}"/"${counter}"/"${dir}"
 			    output_dir="${unc_dir}"/"${counter}"
-			    echo "${scenario}"
 			    counter=$((counter+1))
 			    # call Sen2Cor
 			    L2A_Process --resolution 10 --output_dir "${output_dir}" "${scenario}"
+			    echo "${scenario}"
 			fi
 		done
 	fi

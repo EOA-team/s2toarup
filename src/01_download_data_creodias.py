@@ -16,7 +16,6 @@
             It is the FIRST script in the uncertainty processing chain
 """
 
-
 import geopandas as gpd
 from datetime import date
 from pathlib import Path
@@ -25,7 +24,7 @@ from typing import Optional
 from agrisatpy.downloader.sentinel2.creodias import query_creodias
 from agrisatpy.downloader.sentinel2.creodias import download_datasets
 from agrisatpy.downloader.sentinel2.creodias import ProcessingLevels
-
+from agrisatpy.downloader.sentinel2.utils import unzip_datasets
 
 def main(
         start_date: date,
@@ -61,6 +60,9 @@ def main(
         download_datasets(datasets, download_dir)
     except Exception as e:
         print(e)
+
+    # unzip files
+    unzip_datasets(download_dir=download_dir)
 
 
 if __name__ == '__main__':

@@ -81,6 +81,8 @@ INFO: org.esa.snap.core.util.EngineVersionCheckActivator: Please check regularly
 
 Download Sen2Cor from the [official access point](http://step.esa.int/main/snap-supported-plugins/sen2cor/sen2cor-v2-9/). Place the installer `*.run` in the bin folder of that project and let it install.
 
+A **pre-installed** version of Sen2Cor is already available in the [bin](./bin) directory of this repository. If you need an older version you can place it there as well and just change the path in the [bash script](./src/04_execute_sen2cor.sh).
+
 ## Filesystem Structure
 
 | directory                 | purpose                                                                                                                                                                                           |

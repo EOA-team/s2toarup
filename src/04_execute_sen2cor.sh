@@ -1,4 +1,7 @@
+#!/usr/bin/env bash
+
 #
+#	@author		Lukas Graf (D-USYS, ETHZ)
 #	@purpose	script to run Sen2Cor (Sentinel-2 atmospheric correction)
 #				on each L1C realization drawn from the radiometric uncertainty
 #				modelling approach.
@@ -10,8 +13,6 @@
 #				stand-alone version has to be specified.
 #				It is recommended to place it in the /../bin directory of
 #				the project root.
-#
-#	@author		Lukas Graf (D-USYS, ETHZ)
 #
 
 # define directory where the L1C realizations are located

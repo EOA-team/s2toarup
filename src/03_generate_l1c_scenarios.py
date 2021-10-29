@@ -1,7 +1,15 @@
 '''
 Created on Oct 20, 2021
 
-@author: Lukas Graf (D-USYS, ETHZ)
+@author:     Lukas Graf (D-USYS, ETHZ)
+
+@purpose:    This script takes the radiometric uncertainty and
+             creates L1C scenarios using the original L1C scene.
+             To speed things up, it only samples over the study
+             area and sets all other parts of the scene to NoData.
+             This helps to make the sampling process faster and
+             also enables a faster execution of Sen2Cor in the
+             next processing step.
 '''
 
 import shutil

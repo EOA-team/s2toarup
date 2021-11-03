@@ -49,6 +49,25 @@ def _sample_fast(
     return data_val + rval
 
 
+def calc_covariance(
+        orig_dataset_path: Path
+    ):
+    """
+    Calculates the covariance matrix of a multi-band
+    (Sentinel-2) image
+
+    :param orig_dataset_path:
+        path to the original L1C TOA scene
+    """
+
+    # read data from file
+    
+    with rio.open(orig_dataset_path, 'r') as src:
+        data_arr = src.read()
+    
+    
+
+
 def gen_rad_unc_scenarios(
         orig_dataset_path: Path,
         unc_dataset_path: Path,
@@ -199,6 +218,9 @@ def main(
         orig_dataset_path = Path(orig_dataset)
         scene_name = orig_dataset_path.name
 
+        # band-covariance
+        cov = calc_covariance(orig_dataset_path=orig_dataset_path)
+
         print(f'** Working on {scene_name}')
 
         # find corresponding uncertainty directory
@@ -258,6 +280,7 @@ if __name__ == '__main__':
 
     # define bounds of the study area (encompassing the single regions of interest)
     # bounds col_min, col_max, row_min, row_max (image coordinates of the 10m raster)
+    # TODO: get the bounds from the shapefile of the study area!!
     roi_bounds_10m = [7000,8000,4000,5000]
 
     # number of scenarios (each scenario is a possible realization of a S2 scene!)

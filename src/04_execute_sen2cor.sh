@@ -16,7 +16,7 @@
 #
 
 # define directory where the L1C realizations are located
-unc_scenarios="/run/media/graflu/ETH-KP-SSD6/SAT/S2A_MSIL1C_RUT-Scenarios"
+unc_scenarios="./../S2A_MSIL1C_RUT-Scenarios"
 # define directory where Sen2Cor is installed to
 
 # source Sen2Cor bashrc (if not added permanently to PATH)

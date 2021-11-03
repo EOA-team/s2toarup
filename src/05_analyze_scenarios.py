@@ -13,6 +13,8 @@ Created on Oct 20, 2021
              interest (ROI) into a handy CSV file format.
 '''
 
+# TODO: add TCI image clipped to study region!
+
 import os
 import glob
 import math

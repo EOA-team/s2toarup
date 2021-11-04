@@ -1,0 +1,17 @@
+<parameters>
+    <coverage_factor>1.0</coverage_factor>
+    <band_names>B1</band_names>
+    <Instrument_noise>true</Instrument_noise>
+    <OOF_straylight-systematic>false</OOF_straylight-systematic>
+    <OOF_straylight-random>false</OOF_straylight-random>
+    <Crosstalk>false</Crosstalk>
+    <ADC_quantisation>false</ADC_quantisation>
+    <DS_stability>false</DS_stability>
+    <Gamma_knowledge>false</Gamma_knowledge>
+    <Diffuser-absolute_knowledge>false</Diffuser-absolute_knowledge>
+    <Diffuser-temporal_knowledge>false</Diffuser-temporal_knowledge>
+    <Diffuser-cosine_effect>false</Diffuser-cosine_effect>
+    <Diffuser-straylight_residual>false</Diffuser-straylight_residual>
+    <L1C_image_quantisation>false</L1C_image_quantisation>
+</parameters>
+

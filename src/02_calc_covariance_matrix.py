@@ -41,7 +41,8 @@ def main(
         shapefile_study_area: Path
     ) -> None:
     """
-    executable function
+    executable function to generate the inter-band correlation
+    and covariance matrix of a S2 scene
 
     :param orig_datasets_dir:
         directory where the L1C (.SAFE) scenes are stored

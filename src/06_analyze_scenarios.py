@@ -1,7 +1,5 @@
 
 '''
-Created on Oct 20, 2021
-
 @author:     Lukas Graf (D-USYS, ETHZ)
 
 @purpose:    This script is used to analyze the uncertainty

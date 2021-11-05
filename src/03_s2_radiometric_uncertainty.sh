@@ -8,7 +8,8 @@
 #				SNAP (Sentinel Application Platform). See the README
 #				about how to get it running.
 #				The script loops over all L1C scenes found and calculates
-#				the radiometric uncertainty for each band separately.
+#				the radiometric uncertainty for each band and uncertainty 
+#				contributor separately.
 #				The results are stored in a sub-directory named as the original
 #				scene but ending with *.RUT instead of *.SAFE
 #
@@ -39,48 +40,66 @@ for dir in ${dirlist[@]}; do
  		# _rut_<band>.tif
  		replace="_rut_"
  		unc_files_basename=${dir//.SAFE/$replace}
+ 
+ 		# define band names to loop over the single spectral bands
+ 		bandList=("B1" "B2" "B3" "B4" "B5" "B6" "B7" "B8" "B8A" "B9" "B10" "B11" "B12")
+ 
+		for band in "${bandList[@]}"; do
 
- 		# start the S2-Uncertainty toolbox using SNAP's graph processing CLI
- 		# each band is processed separately
- 		# empty the cache after each band; otherwise there might be out-of-memory errors
- 		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b01.tif -Pband_names=B1
- 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
- 
- 		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b02.tif -Pband_names=B2
- 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
- 
-		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b03.tif -Pband_names=B3
- 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
- 
-		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b04.tif -Pband_names=B4
- 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
- 
-		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b05.tif -Pband_names=B5
- 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
- 
-		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b06.tif -Pband_names=B6
- 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
- 
-		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b07.tif -Pband_names=B7
- 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
- 
-		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b08.tif -Pband_names=B8
- 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
- 
-		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b8a.tif -Pband_names=B8A
- 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
- 
-		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b09.tif -Pband_names=B9
- 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
-
-		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b10.tif -Pband_names=B10
- 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
- 
-		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b11.tif -Pband_names=B11
- 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
- 
-		gpt S2RutOp -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"b12.tif -Pband_names=B12
- 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+	 		# start the S2-Uncertainty toolbox using SNAP's graph processing CLI
+	 		# each band and uncertainty contributor is processed separately
+	 		# empty the cache after each processing step; otherwise there might be out-of-memory errors
+	
+	 		# 	************************** uncertainty contributors *************************
+	 		# instrument noise
+	 		gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"noise_"$band".tif -Pband_names="$band" -p Instrument_noise.properties
+	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+	
+			# out-of-field straylight systematic part
+	 		gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"stray_sys_"$band".tif -Pband_names="$band" -p OOF_straylight-systematic.properties
+	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+	 
+	 		# out-of-field straylight random part
+	 		gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"stray_rand_"$band".tif -Pband_names="$band" -p OOF_straylight-random.properties
+	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+	
+			# crosstalk
+	 		gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"x_talk_"$band".tif -Pband_names="$band" -p Crosstalk.properties
+	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+	
+			# ADC quantisation
+	 		gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"ADC_"$band".tif -Pband_names="$band" -p ADC_quantisation.properties
+	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+	
+			# dark signal stability
+	 		gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"DS_"$band".tif -Pband_names="$band" -p DS_stability.properties
+	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+	
+			# non-linearty and non-uniformity knowledge
+	 		gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"gamma_"$band".tif -Pband_names="$band" -p Gamma_knowledge.properties
+	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+	
+			# diffuser reflectance absolute knowledge
+	 		gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"diff_abs_"$band".tif -Pband_names="$band" -p Diffuser-absolute_knowledge.properties
+	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+	
+			# diffuse reflectance temporal knowledge
+	 		gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"diff_temp_"$band".tif -Pband_names="$band" -p Diffuser-temporal_knowledge.properties
+	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+	
+			# Angular diffuser knowledge - cosine effect
+	 		gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"diff_cos_"$band".tif -Pband_names="$band" -p Diffuser-cosine_effect.properties
+	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+	
+			# strayligth in calibration mode
+	 		gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"diff_k_"$band".tif -Pband_names="$band" -p Diffuser-straylight_residual.properties
+	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+	
+			# L1C image quantisation
+			gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"quant_"$band".tif -Pband_names="$band" -p L1C_image_quantisation.properties
+	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+		
+		done
 
     fi
 

@@ -222,12 +222,27 @@ def gen_rad_unc_scenarios(
         (corr_df.spectral == 999) & (corr_df.temporal == 999) & (corr_df.spatial == 999)
     ].index.tolist()
 
-    # fully correlated contributors (correlated in all dimensions)
+    # fully correlated contributors (correlated, i.e., correlation_coeff == 1 in all dimensions)
     fully_corr_contributors = corr_df[dimensions][
         (corr_df.spectral == 1) & (corr_df.temporal == 1) & (corr_df.spatial == 1)
     ].index.tolist()
+
+    # partly correlated contributors with an correlation_coeff of smaller 1 the spectral
+    # dimension
+    partly_corr_contributors = corr_df[dimensions][
+        (
+            (corr_df.spectral.between(0.01,0.99)) | (corr_df.temporal.between(0.01,0.99)) | (corr_df.spatial.between(0.01,0.99))
+        ) &
+        (
+            ((corr_df.temporal == 1) & (corr_df.spatial == 1)) | ((corr_df.spatial == 1) & (corr_df.spectral == 1)) | ((corr_df.spectral == 1) & (corr_df.temporal == 1))
+        )
+    ].index.tolist()
     
-    # partly correlated contributors -> all others
+    # contributors correlated in some but not all dimensions
+    # these contributors are treated separately because of their more complex correlation implementation
+    only_temporally_corr_contributors = corr_df[dimensions][
+        (corr_df.spectral == 0) & (corr_df.temporal == 1) & (corr_df.spatial == 0)
+    ].index.tolist()
 
     # empty image matrices for writing the samples to (dtype: uint16)
     img_matrices = dict.fromkeys(full_img_size.keys())
@@ -244,6 +259,7 @@ def gen_rad_unc_scenarios(
         for s2_band in s2_bands:
             error_band_dict[s2_band] = np.zeros_like(mc_input_data[s2_band].r_toa.astype(np.float16))
 
+        # completely uncorrelated contributors
         for s2_band in s2_bands:
 
             # get spatial resolution and corresponding array size of the ROI
@@ -276,14 +292,20 @@ def gen_rad_unc_scenarios(
                 error_band_dict[s2_band] += \
                     mc_input_data[s2_band].unc_contrib[const_error_term] / 10 # 10 because of scaling of S2-RUT images
 
-        # fully correlated contributors
+        # fully and partly correlated contributors
         # append these to a list of arrays and concatenate them into a 1d-array
         # this way it is possible to combine spectral bands with different pixel sizes
-        for fully_corr_contributor in fully_corr_contributors:
+        # and to sample along all three dimensions.
+        # If the spectral dimension has a correlation coefficient smaller 1, than it is
+        # necessary to sample for that dimension using a second, independent distribution
+        # and combine the samples weighted according to the correlation coefficient
+        corr_contributors = fully_corr_contributors + partly_corr_contributors
+        for corr_contributor in corr_contributors:
 
+            # we must consider all three dimensions
             band_unc_arr_list = []
             for s2_band in s2_bands:
-                band_unc_arr_list.append(mc_input_data[s2_band].unc_contrib[fully_corr_contributor])
+                band_unc_arr_list.append(mc_input_data[s2_band].unc_contrib[corr_contributor])
 
             # remember the size of the original arrays so that they can be
             # reshaped into 2d afterwards
@@ -291,25 +313,78 @@ def gen_rad_unc_scenarios(
             trailing_indices.extend([x.shape[0]*x.shape[1] for x in band_unc_arr_list])
 
             # concatente all 2d arrays into a single 1d array, axis=None flattens the array
-            corr_unc = np.concatenate(band_unc_arr_list, axis=None)
+            corr_rut = np.concatenate(band_unc_arr_list, axis=None)
 
             # sample from the same normal or uniform distribution depending on the contributor
-            dist_type = corr_df[corr_df.index == fully_corr_contributor]['distribution'].values[0]
+            dist_type = corr_df[corr_df.index == corr_contributor]['distribution'].values[0]
             if dist_type == 'normal':
-                corr_rut = np.ones(shape=corr_unc.shape) * corr_unc
-                corr_rut = np.random.normal(0, 1, 1)[0] * corr_rut # divide by 10 is not required here because of N(0,1)
+                corr_sample = np.ones(shape=corr_rut.shape) * corr_rut
+                corr_sample = np.random.normal(0, 1, 1)[0] * corr_sample # divide by 10 is not required here because of N(0,1)
             elif dist_type == 'uniform':
-                corr_rut = np.empty(shape=corr_unc.shape)
-                corr_rut = np.random.uniform(-1, 1, 1)[0] * corr_rut * np.sqrt(3) / 10
+                corr_sample = np.empty(shape=corr_rut.shape)
+                corr_sample = np.random.uniform(-1, 1, 1)[0] * corr_rut * np.sqrt(3) / 10
 
-            # undo the flattening of the band arrays and add the samples to
-            # the error_band_dict
+            # partly contributors with a weaker correlation in one dimension
+            # In this case, it is necessary to combine the two samples for that dimensions
+            # one fully correlated and one that is independent
+            if corr_contributor in partly_corr_contributors:
+    
+                if corr_df[corr_df.index == corr_contributor]['spectral'].values[0] < 1:
+                    # get the correlation coefficient (alpha)
+                    alpha = corr_df[corr_df.index == corr_contributor]['spectral'].values[0]
+
+                    # loop over the spectral bands and sample for each band
+                    # independently, maintain the correlation in the spatial
+                    # and temporal domain
+                    indep_band_samples = []
+                    for s2_band in s2_bands:
+                        corr_spatial_temporal_rut = mc_input_data[s2_band].unc_contrib[corr_contributor]
+                        if dist_type == 'normal':
+                            corr_spatial_temporal = np.ones(shape=corr_spatial_temporal_rut.shape) * \
+                                corr_spatial_temporal_rut
+                            corr_spatial_temporal = np.random.normal(0, 1, 1)[0] * corr_spatial_temporal
+                        elif dist_type == 'uniform':
+                            corr_spatial_temporal = np.empty(shape=corr_spatial_temporal_rut.shape)
+                            corr_spatial_temporal = np.random.uniform(-1, 1, 1)[0] * corr_spatial_temporal_rut * np.sqrt(3) / 10
+                        indep_band_samples.append(corr_spatial_temporal)
+                else:
+                    raise Exception('this correlation is not implemented!')
+
+            # undo the flattening of the band arrays
             for idx, s2_band in enumerate(s2_bands):
-                band_samples = corr_rut[trailing_indices[idx]:trailing_indices[idx]+trailing_indices[idx+1]].reshape(
-                    mc_input_data[s2_band].unc_contrib[fully_corr_contributor].shape
-                )
-                error_band_dict[s2_band] += uncorr_sample
 
+                band_samples = corr_sample[trailing_indices[idx]:trailing_indices[idx]+trailing_indices[idx+1]].reshape(
+                     mc_input_data[s2_band].unc_contrib[corr_contributor].shape
+                )
+                # add the sample to the error_band_dict if all contributors are correlated
+                if corr_contributor in fully_corr_contributors:
+                    error_band_dict[s2_band] += band_samples
+                # or weight it by alpha in case the spectral domain has a correlation coefficient
+                # smaller 1
+                elif corr_contributor in partly_corr_contributors:
+                    error_band_dict[s2_band] += (1 - alpha) * band_samples + \
+                        alpha * indep_band_samples[idx]
+
+        # correlation in the temporal domain only -> should be u_stray_rand
+        for contributor in only_temporally_corr_contributors:
+
+            for s2_band in s2_bands:
+                temp_rut = mc_input_data[s2_band].unc_contrib[corr_contributor]
+                temp_corr = np.ones(shape=temp_rut.shape) * temp_rut
+                num_row, num_col = temp_rut.shape
+                for row in range(num_row):
+                    temp_corr[row, :] = np.random.normal(
+                        0,
+                        temp_corr[row, :] + 1e-9, # avoids 0 std (taken from Gorrono et al. 2018 code)
+                        num_col
+                    )
+                # add to other contributors
+                error_band_dict[s2_band] += temp_corr
+
+        # TODO: How to implement correlation in the temporal+spatial domain???, difficult
+        # -> similar to l. 368f but without the loop over the spectral bands
+        
+                    
 
 def main(
         orig_datasets_dir: Path,

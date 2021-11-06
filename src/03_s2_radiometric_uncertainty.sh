@@ -63,9 +63,9 @@ for dir in ${dirlist[@]}; do
 	 		gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"stray_rand_"$band".tif -Pband_names="$band" -p OOF_straylight-random.properties
 	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
 	
-			# crosstalk
-	 		gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"x_talk_"$band".tif -Pband_names="$band" -p Crosstalk.properties
-	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
+			# crosstalk (not considered any more, see Gorrono et al., 2018 for a discussion)
+	 		# gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"x_talk_"$band".tif -Pband_names="$band" -p Crosstalk.properties
+	 		# rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
 	
 			# ADC quantisation
 	 		gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"ADC_"$band".tif -Pband_names="$band" -p ADC_quantisation.properties

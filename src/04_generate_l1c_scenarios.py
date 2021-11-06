@@ -222,8 +222,12 @@ def gen_rad_unc_scenarios(
         (corr_df.spectral == 999) & (corr_df.temporal == 999) & (corr_df.spatial == 999)
     ].index.tolist()
 
-    # TODO: fully correlated
-    # TODO: partly correlated
+    # fully correlated contributors (correlated in all dimensions)
+    fully_corr_contributors = corr_df[dimensions][
+        (corr_df.spectral == 1) & (corr_df.temporal == 1) & (corr_df.spatial == 1)
+    ].index.tolist()
+    
+    # partly correlated contributors -> all others
 
     # empty image matrices for writing the samples to (dtype: uint16)
     img_matrices = dict.fromkeys(full_img_size.keys())
@@ -249,20 +253,20 @@ def gen_rad_unc_scenarios(
 
             # loop over uncorrelated contributors
             for fully_uncorr_contributor in fully_uncorr_contributors:
-                uncorr_noise_rut = mc_input_data[s2_band].unc_contrib[fully_uncorr_contributor]
+                uncorr_rut = mc_input_data[s2_band].unc_contrib[fully_uncorr_contributor]
 
                 # check type of distribution
-                dist_type = corr_df[corr_df.index == 'noise']['distribution'].values[0]
+                dist_type = corr_df[corr_df.index == fully_uncorr_contributor]['distribution'].values[0]
                 if dist_type == 'normal':
                     uncorr_sample = np.random.normal(
                         loc=0,
-                        scale=uncorr_noise_rut,
+                        scale=uncorr_rut,
                         size=(num_row, num_col)
                     ) / 10 # 10 because of scaling of S2-RUT images
                 elif dist_type == 'uniform':
                     uncorr_sample = np.random.uniform(
-                        low=-uncorr_noise_rut * np.sqrt(3),
-                        high=uncorr_noise_rut * np.sqrt(3),
+                        low=-uncorr_rut * np.sqrt(3),
+                        high=uncorr_rut * np.sqrt(3),
                         size=(numrow, numcol)
                     ) / 10 # 10 because of scaling of S2-RUT images
                 error_band_dict[s2_band] += uncorr_sample
@@ -272,7 +276,39 @@ def gen_rad_unc_scenarios(
                 error_band_dict[s2_band] += \
                     mc_input_data[s2_band].unc_contrib[const_error_term] / 10 # 10 because of scaling of S2-RUT images
 
-            # fully correlated contributors
+        # fully correlated contributors
+        # append these to a list of arrays and concatenate them into a 1d-array
+        # this way it is possible to combine spectral bands with different pixel sizes
+        for fully_corr_contributor in fully_corr_contributors:
+
+            band_unc_arr_list = []
+            for s2_band in s2_bands:
+                band_unc_arr_list.append(mc_input_data[s2_band].unc_contrib[fully_corr_contributor])
+
+            # remember the size of the original arrays so that they can be
+            # reshaped into 2d afterwards
+            trailing_indices = [0]
+            trailing_indices.extend([x.shape[0]*x.shape[1] for x in band_unc_arr_list])
+
+            # concatente all 2d arrays into a single 1d array, axis=None flattens the array
+            corr_unc = np.concatenate(band_unc_arr_list, axis=None)
+
+            # sample from the same normal or uniform distribution depending on the contributor
+            dist_type = corr_df[corr_df.index == fully_corr_contributor]['distribution'].values[0]
+            if dist_type == 'normal':
+                corr_rut = np.ones(shape=corr_unc.shape) * corr_unc
+                corr_rut = np.random.normal(0, 1, 1)[0] * corr_rut # divide by 10 is not required here because of N(0,1)
+            elif dist_type == 'uniform':
+                corr_rut = np.empty(shape=corr_unc.shape)
+                corr_rut = np.random.uniform(-1, 1, 1)[0] * corr_rut * np.sqrt(3) / 10
+
+            # undo the flattening of the band arrays and add the samples to
+            # the error_band_dict
+            for idx, s2_band in enumerate(s2_bands):
+                band_samples = corr_rut[trailing_indices[idx]:trailing_indices[idx]+trailing_indices[idx+1]].reshape(
+                    mc_input_data[s2_band].unc_contrib[fully_corr_contributor].shape
+                )
+                error_band_dict[s2_band] += uncorr_sample
 
 
 def main(
@@ -355,10 +391,10 @@ if __name__ == '__main__':
 
     # debug
     orig_dataset_path = Path(
-        './../S2A_MSIL1C_orig/S2A_MSIL1C_20190818T103031_N0208_R108_T32TMT_20190818T124651.SAFE'
+        './../S2A_MSIL1C_orig/done/S2A_MSIL1C_20190818T103031_N0208_R108_T32TMT_20190818T124651.SAFE'
     )
     unc_dataset_path = Path(
-        './../S2A_MSIL1C_orig/S2A_MSIL1C_20190818T103031_N0208_R108_T32TMT_20190818T124651.RUT'
+        './../S2A_MSIL1C_orig/done/S2A_MSIL1C_20190818T103031_N0208_R108_T32TMT_20190818T124651.RUT'
     )
     scenario_path = Path(
         './../debug'

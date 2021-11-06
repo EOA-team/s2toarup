@@ -1,0 +1,12 @@
+uncertainty_contributor,spatial,temporal,spectral,distribution
+noise,0,0,0,normal
+stray_sys,999,999,999,const
+stray_rand,0,1,0,normal
+ADC,0,0,0,uniform
+DS,1,1,0.5,uniform
+gamma,0,1,1,normal
+diff_abs,1,1,1,normal
+diff_temp,999,999,999,normal
+diff_cos,1,1,1,normal
+diff_k,1,1,0.5,normal
+quant,0,0,0,uniform

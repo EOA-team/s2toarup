@@ -465,7 +465,7 @@ def gen_rad_unc_scenarios(
             resample_bands = [True if x[1] != 10 else False for x in s2_band_res.items()]
             num_row_10m, num_col_10m = mc_input_data['B02'].unc_contrib[contributor].shape
 
-            all_rut = np.empty(shape=(n_row_10m, num_col_10m*len(s2_bands.keys())))
+            all_rut = np.empty(shape=(n_row_10m, num_col_10m*len(s2_bands)))
             band_scaling_factors = dict.fromkeys(s2_bands)
             for idx, s2_band in enumerate(s2_bands):
                 rut_array = mc_input_data[s2_band].unc_contrib[contributor]
@@ -487,11 +487,9 @@ def gen_rad_unc_scenarios(
             # the original pixel size
             unc_samples = np.empty_like(all_rut)
             for row in range(num_row_10m):
+                unc_samples = np.ones(num_col_10m*len(s2_bands)) * all_rut[row,:]
                 unc_samples[row,:] = np.random.normal(
-                    loc=0,
-                    scale=all_rut,
-                    size=all_rut.shape[1]
-                )
+                    loc=0, scale=1, size=1)[0] * all_rut[row,:]
 
             for idx, s2_band in enumerate(s2_bands):
                 

@@ -1,5 +1,8 @@
 # Radiometric Atmospheric Correction Uncertainty Propagation Study
 
+This repository implements the **complete processing workflow required to reproduce our study about the impact of
+radiometric uncertainty on the retrieval of key phenological stages from Sentinel-2 data**.
+
 ## OS and Software Requirements
 
 While the Python scripts are OS-independent, the shell-scripts only work in a *nix environment. They were developed and tested under Fedora 34 (64-bit) machine using Python 3.9.7.
@@ -91,7 +94,7 @@ A **pre-installed** version of Sen2Cor is already available in the [bin](./bin) 
 | /shp                      | contains the shapefile defining the extent of the study area (AOI_Esch_EPSG32632.shp) and the single regions of interest (ROIs) within that area (ZH_Polygons_2019_EPSG32632_selected-crops.shp). |
 | /src						| here, all the required Python and shell scripts are located.
 | /S2A_MSIL1C_orig          | here, the original L1C scenes will be downloaded to (from Creodias).                                                                                                                              |
-| /S2A_MSIL1C_RUT-Scenarios | here, the L1C scenarios (based on the radiometric uncertainty assessment) and the resulting L2A outputs (uncertainty propagation) will be stored.                                                 |
+| /S2A_MSIL1C_RUT-Scenarios | here, the L1C scenarios (based on the radiometric uncertainty assessment) and the resulting L2A outputs (uncertainty propagation) will be stored.                                                 
 | /S2A_MSIL2A_Analysis      | here, the results of the analysis of the L1C and L2A scenarios will be stored
 
 ## Executing the Workflow

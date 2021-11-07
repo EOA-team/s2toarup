@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 #
-#	@author:	Lukas Graf (D-USYS ETHZ)
+#	@author:	Lukas Graf (D-USYS, ETHZ)
 #
 #	@purpose:	Calls the Sentinel-2 Radiometric Uncertainty Toolbox
 #				(S2-RUT) using the Graph Processing Tool (GPT) of

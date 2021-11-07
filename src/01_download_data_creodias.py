@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 """
 
 @author:    Lukas Graf (D-USYS, ETHZ)

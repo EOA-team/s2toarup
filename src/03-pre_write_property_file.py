@@ -1,3 +1,4 @@
+#!/usr/bin/python
 
 """
 
@@ -5,7 +6,9 @@
 
 @purpose:   This scripts generates xml parameter files
             to run the S2 L1C-RUT for the single uncertainty
-            contributors.
+            contributors. It is therefore the step before
+            running the actually *.sh bash script to execute
+            the S2 L1C RUT.
 
 """
 

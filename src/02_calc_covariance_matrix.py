@@ -1,4 +1,17 @@
 
+"""
+
+@author:    Lukas Graf (D-USYS, ETHZ)
+
+@purpose:   This script provides inter-band (i.e., signal) correlation
+            matrices for each scene over the study area.
+
+            It is actually not necessary to run this script in the
+            entire processing chain since its results are not used
+            anywhere else. It has been written mainly for doing some
+            descriptive statistics stuff
+"""
+
 import glob
 from pathlib import Path
 import numpy as np

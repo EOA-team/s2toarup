@@ -1,16 +1,53 @@
 
+"""
+
+@author:    Lukas Graf (D-USYS, ETHZ)
+            with some support and inspirations by Javier Gorroño
+            (Universitat Politècnica de València)
+
+@purpose:   This scripts implements the error correlation in the
+            spectral, temporal (along-track), and spatial (across-track)
+            dimension among the uncertainty contributors available from the
+            S2 L1C-RUT runs per single uncertainty contributor to get a
+            user-defined (>=100, ideally) number of L1C TOA scenarios using
+            Monte Carlo (MC).
+            In short, each L1C TOA scenario generated reflects the radiometric uncertainty
+            taking into account that the uncertainty contributors might be
+            correlated in one or more out of the three dimensions (multiple
+            combinations as well as strength levels of correlation are possible).
+
+            NOTE: The uncertainty scenarios will only cover the selected study area
+            (in the script termed region of interest, ROI). The ROI MUST have a quadratic
+            shape and should have a number of pixels in the 10m band that can be divided by
+            6 (because of the 60m S2 bands).
+            In our example we use a region of interest of 1200 by 1200 10m pixels (12 by 12 km)
+            that equals 600 by 600 20m pixels and 200 by 200 60m pixels.
+
+            The information about the error correlation is taken from the
+            paper by Gorroño et al. (2018, https://doi.org/10.1080/22797254.2018.1471739),
+            Table 1. The script has been developed based on an intensive exchange of
+            ideas and support by Javier Gorroño (Nov. 2021) which is gratefully
+            acknowledged.
+
+            It took the idea of the MC framework from the Python script written by
+            Javier Gorroño to support their 2018 publication. The script is available here:
+            https://github.com/senbox-org/snap-rut/blob/master/src/test/python/s2roiunc_test.py
+            (link accessed latest: 7th Nov 2021)
+
+"""
+
 import os
 import glob
 import shutil
 import numpy as np
 import pandas as pd
+import rasterio as rio
+import itertools
+import logging
 from pathlib import Path
 from typing import Dict
 from typing import List
 from typing import Optional
-import rasterio as rio
-import itertools
-import logging
 
 # setup logger -> will write to the home directory of the user
 home = os.path.expanduser('~')
@@ -639,7 +676,7 @@ if __name__ == '__main__':
         './../debug/template'
     )
     n_scenarios = 1
-    roi_bounds_10m = [7000,8000,4000,5000]
+    roi_bounds_10m = [7000,8200,4000,5200] # pixel coordinates!
     
     gen_rad_unc_scenarios(orig_dataset_path, unc_dataset_path, scenario_path, template_path, n_scenarios, roi_bounds_10m)
     
@@ -656,10 +693,9 @@ if __name__ == '__main__':
     # # in which the actual scenarios are placed
     # scenario_dir = Path('./../S2A_MSIL1C_RUT-Scenarios')
     #
-    # # define bounds of the study area (encompassing the single regions of interest)
+    # # define bounds of the study area (aka region of interest)
     # # bounds col_min, col_max, row_min, row_max (image coordinates of the 10m raster)
-    # # TODO: get the bounds from the shapefile of the study area!!
-    # roi_bounds_10m = [7000,8000,4000,5000]
+    # roi_bounds_10m = [7000,8200,4000,5200]
     #
     # # number of scenarios (each scenario is a possible realization of a S2 scene!)
     # n_scenarios = 100

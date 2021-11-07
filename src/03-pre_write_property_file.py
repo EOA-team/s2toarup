@@ -5,7 +5,7 @@
 
 @purpose:   This scripts generates xml parameter files
             to run the S2 L1C-RUT for the single uncertainty
-            contributors
+            contributors.
 
 """
 

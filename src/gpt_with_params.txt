@@ -1,1 +1,0 @@
-gpt S2RutOp -x -Ssource="${dir}" -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"B01.tif -Pband_names=B1 -p parameters_example.xml

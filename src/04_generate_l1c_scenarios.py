@@ -49,10 +49,12 @@ from pathlib import Path
 from typing import Dict
 from typing import List
 from typing import Optional
+from copy import deepcopy
 
 # setup logger -> will write to the home directory of the user
 home = os.path.expanduser('~')
-logging.basicConfig( level=logging.INFO, filename=Path(home).joinpath('l1c_scenario-generator.log'))
+logging.basicConfig(level=logging.INFO, filename=Path(home).joinpath('l1c_scenario-generator.log'))
+
 
 # define L1C uncertainty contributors available from L1C-RUT
 l1c_unc_contributors = [
@@ -80,7 +82,7 @@ s2_band_res = {
     'B8A': 20, 'B09': 60, 'B10': 60, 'B11': 20, 'B12': 20
 }
 
-+def upsample_array(
+def upsample_array(
         in_array: np.array,
         scaling_factor: int,
     ) -> np.array:
@@ -108,9 +110,11 @@ s2_band_res = {
         raise ValueError('scaling_factor must be greater/equal 1')
 
     # define output image matrix array bounds
-    shape_out = (in_array.shape[0]*scaling_factor,
-                 in_array.shape[1]*scaling_factor)
-    out_array = np.zeros(shape_out, dtype = in_array.dtype)
+    shape_out = (
+        int(in_array.shape[0]*scaling_factor),
+        int(in_array.shape[1]*scaling_factor)
+    )
+    out_array = np.zeros(shape_out, dtype=in_array.dtype)
 
     # increase resolution using itertools by repeating pixel values
     # scaling_factor times
@@ -232,7 +236,9 @@ def gen_rad_unc_scenarios(
     band_files = dict.fromkeys(s2_bands)
     band_georeference_info = dict.fromkeys(s2_bands)
 
-    logger.info(f'Reading TOA reflectance data and uncertainty contributors for {orig_dataset_path.name}')
+    logging.info(
+        f'Reading TOA reflectance data and uncertainty contributors for {orig_dataset_path.name}'
+    )
 
     for s2_band in s2_bands:
 
@@ -313,7 +319,7 @@ def gen_rad_unc_scenarios(
     # fully uncorrelated contributors
     fully_uncorr_contributors = corr_df[dimensions][
         (corr_df.spectral == 0) & (corr_df.temporal == 0) & (corr_df.spatial == 0)
-    ].index
+    ].index.tolist()
 
     # constant error terms
     const_error_terms = corr_df[dimensions][
@@ -355,7 +361,7 @@ def gen_rad_unc_scenarios(
     # start the iteration process
     for scenario in range(n_scenarios):
         
-        logger.info(
+        logging.info(
             f'Creating scenario {scenario+1}/{n_scenarios} for {orig_dataset_path.name}'
         )
 
@@ -394,7 +400,7 @@ def gen_rad_unc_scenarios(
                     uncorr_sample = np.random.uniform(
                         low=-uncorr_rut * np.sqrt(3),
                         high=uncorr_rut * np.sqrt(3),
-                        size=(numrow, numcol)
+                        size=(num_row, num_col)
                     ) / 10 # 10 because of scaling of S2-RUT images
                 error_band_dict[s2_band] += uncorr_sample
 
@@ -503,14 +509,14 @@ def gen_rad_unc_scenarios(
             resample_bands = [True if x[1] != 10 else False for x in s2_band_res.items()]
             num_row_10m, num_col_10m = mc_input_data['B02'].unc_contrib[contributor].shape
 
-            all_rut = np.empty(shape=(n_row_10m, num_col_10m*len(s2_bands)))
+            all_rut = np.empty(shape=(num_row_10m, num_col_10m*len(s2_bands)))
             band_scaling_factors = dict.fromkeys(s2_bands)
             for idx, s2_band in enumerate(s2_bands):
                 rut_array = mc_input_data[s2_band].unc_contrib[contributor]
                 if resample_bands[idx]:
                     # "resample" 10 and 20m bands
-                    scaling_factor = s2_band_res[s2_band] / 10 # 10 m is target spatial resolution
-                    band_scaling_factor[s2_band] = scaling_factor
+                    scaling_factor = int(s2_band_res[s2_band] / 10) # 10 m is target spatial resolution
+                    band_scaling_factors[s2_band] = scaling_factor
                     all_rut[:,idx*num_col_10m:(idx+1)*num_col_10m] = upsample_array(
                         in_array=rut_array,
                         scaling_factor=scaling_factor
@@ -525,21 +531,21 @@ def gen_rad_unc_scenarios(
             # the original pixel size
             unc_samples = np.empty_like(all_rut)
             for row in range(num_row_10m):
-                unc_samples = np.ones(num_col_10m*len(s2_bands)) * all_rut[row,:]
+                unc_sample_row = np.ones(num_col_10m*len(s2_bands)) * all_rut[row,:]
                 unc_samples[row,:] = np.random.normal(
-                    loc=0, scale=1, size=1)[0] * all_rut[row,:]
+                    loc=0, scale=1, size=1)[0] * unc_sample_row
 
             for idx, s2_band in enumerate(s2_bands):
                 
-                band_data = unc_samples[:,idx*num_col_10m:(idx+1)*num_col_10m]
+                band_arr = unc_samples[:,idx*num_col_10m:(idx+1)*num_col_10m]
                 # band has 10m pixel size -> nothing to do
                 if band_scaling_factors[s2_band] == 1:
-                    error_band_dict[s2_band] += band_data
+                    error_band_dict[s2_band] += band_arr
                 # else take if n-th row and column element to obtain the original number
                 # of pixels due to the pixel size
                 else:
-                    error_band_dict[s2_band] += band_data[
-                        0:band_scaling_factors[s2_band],0:band_scaling_factors[s2_band]
+                    error_band_dict[s2_band] += band_arr[
+                        0::band_scaling_factors[s2_band],0::band_scaling_factors[s2_band]
                     ]
 
         ######################################################################
@@ -560,12 +566,12 @@ def gen_rad_unc_scenarios(
             dataset_path = str(band_files[s2_band].parent).split(os.sep)
             dot_safe = [x for x in dataset_path if '.SAFE' in x][0]
             dataset = os.path.sep.join(dataset_path[dataset_path.index(dot_safe)::])
-            current_scenario_path = scenario_path.joinpath(str(idx+1))
+            current_scenario_path = scenario_path.joinpath(str(scenario+1))
             file_dst = current_scenario_path.joinpath(dataset).joinpath(band_fname).as_posix()
 
             # create the L1C TOA scenario
             l1c_toa_scenario = mc_input_data[s2_band].r_toa + \
-                mc_input[s2_band].r_toa * error_band_dict[s2_band]
+                mc_input_data[s2_band].r_toa * error_band_dict[s2_band]
 
             # finally, we have to insert the scenario data into the empty image
             # matrix having the full spatial extent of the original S2 scene
@@ -573,14 +579,14 @@ def gen_rad_unc_scenarios(
             roi_bounds = roi_bounds_all[spatial_res_band]
             min_row, max_row = roi_bounds[2], roi_bounds[3]
             min_col, max_col = roi_bounds[0], roi_bounds[1]
-            img_matrices[spatial_res_band][min_row:max_row, min_col:max_row] = \
-                l1c_toa_scenario.astype(np.uint16)
+            img = deepcopy(img_matrices[spatial_res_band])
+            img[min_row:max_row, min_col:max_col] = l1c_toa_scenario.astype(np.uint16)
 
             # write to file (jp2), data type must be np.uint16
-            with rio.open(file_dst, 'w', **band_georeference_info[s2_band]) as dst:
-                dst.write(img_matrices[spatial_res_band], 1) 
+            with rio.open(file_dst, 'w+', **band_georeference_info[s2_band]) as dst:
+                dst.write(img, 1)
 
-        logger.info(
+        logging.info(
             f'Created scenario {scenario+1}/{n_scenarios} for {orig_dataset_path.name}'
         )
               

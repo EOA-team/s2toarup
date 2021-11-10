@@ -30,7 +30,7 @@ unc_scenarios="./../S2A_MSIL1C_RUT-Scenarios"
 # define directory where Sen2Cor is installed to (we take the binary delivered
 # in the /bin directory per default)
 # source Sen2Cor bashrc (if not added permanently to PATH)
-sen2cor_install_dir="./../bin/SenCor-02.09.00-Linux64"
+sen2cor_install_dir="./../bin/Sen2Cor-02.09.00-Linux64"
 source "$sen2cor_install_dir"/L2A_Bashrc
 
 cd "$unc_scenarios" 

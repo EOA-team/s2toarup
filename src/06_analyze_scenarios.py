@@ -2,13 +2,13 @@
 '''
 @author:     Lukas Graf (D-USYS, ETHZ)
 
-@purpose:    This script is used to analyze the uncertainty
-             propagation outcomes after Sen2Cor. It generates
-             tiff files summarizing the scenario spread and hence
-             standard uncertainty. In addition, it produces some
-             maps useful for visually analyzing the results and
-             extracts the uncertainty for the single regions of
-             interest (ROI) into a handy CSV file format.
+@purpose:   This script is used to analyze the uncertainty
+            propagation outcomes after Sen2Cor. It generates
+            tiff files summarizing the scenario spread and hence
+            relative standard uncertainty. In addition, it produces
+            some maps useful for visually analyzing the results and
+            extracts the uncertainty for the single regions of
+            interest (ROI) into a handy CSV file format.
 '''
 
 import os
@@ -210,7 +210,6 @@ def analyze_scenarios_spatial(
             else:
 
                 with rio.open(out_dir.joinpath(fname), 'w', **meta) as dst:
-    
                     # min
                     dst.set_band_description(1, 'min')
                     dst.write_band(1, np.nanmin(data_arr, axis=0))
@@ -232,7 +231,6 @@ def analyze_scenarios_spatial(
                     dst.set_band_description(5, 'rel_std_unc')
                     rel_std = np.nanstd(data_arr, axis=0) / np.nanmean(data_arr, axis=0)
                     dst.write_band(5, rel_std * 100)
-
 
 def unc_maps(
         analysis_results_l1c: str,
@@ -678,6 +676,7 @@ if __name__ == '__main__':
     ### user inputs
     
     # shapefile (or other vector format) defining the extent of the study area
+    # should be a bit smaller than the ROI defined for sampling (TODO)
     in_file_shp = Path(
         './../shp/AOI_Esch_EPSG32632.shp'
     )

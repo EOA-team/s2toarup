@@ -50,10 +50,26 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from copy import deepcopy
+from datetime import datetime
 
-# setup logger -> will write to the home directory of the user
-home = os.path.expanduser('~')
-logging.basicConfig(level=logging.INFO, filename=Path(home).joinpath('l1c_scenario-generator.log'))
+
+# setup logger -> will write log file to the /../log directory
+logger = logging.getLogger('l1c_monte-carlo')
+logger.setLevel(logging.INFO)
+# create file handler (has current timestamp in file name)
+now = datetime.now().strftime('%Y%m%d-%H%M%S')
+fh = logging.FileHandler(f'./../log/l1c_monte-carlo_{now}.log')
+fh.setLevel(logging.INFO)
+# create console handler
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+# create formatter and add it to the handlers
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+fh.setFormatter(formatter)
+ch.setFormatter(formatter)
+# add the handlers to the logger
+logger.addHandler(fh)
+logger.addHandler(ch)
 
 
 # define L1C uncertainty contributors available from L1C-RUT
@@ -81,6 +97,11 @@ s2_band_res = {
     'B01': 60, 'B02': 10, 'B03': 10, 'B04': 10, 'B05': 20, 'B06': 20, 'B07': 20, 'B08': 10,
     'B8A': 20, 'B09': 60, 'B10': 60, 'B11': 20, 'B12': 20
 }
+
+# rut gain factor (RUT outputs are decoded as integers between 0 and 250, 250 means 25%
+# relative uncertainty). We rescale the values to fall between 0 and 25.
+rut_gain = 0.1
+
 
 def upsample_array(
         in_array: np.array,
@@ -236,7 +257,7 @@ def gen_rad_unc_scenarios(
     band_files = dict.fromkeys(s2_bands)
     band_georeference_info = dict.fromkeys(s2_bands)
 
-    logging.info(
+    logger.info(
         f'Reading TOA reflectance data and uncertainty contributors for {orig_dataset_path.name}'
     )
 
@@ -361,7 +382,7 @@ def gen_rad_unc_scenarios(
     # start the iteration process
     for scenario in range(n_scenarios):
         
-        logging.info(
+        logger.info(
             f'Creating scenario {scenario+1}/{n_scenarios} for {orig_dataset_path.name}'
         )
 
@@ -395,19 +416,19 @@ def gen_rad_unc_scenarios(
                         loc=0,
                         scale=uncorr_rut,
                         size=(num_row, num_col)
-                    ) / 10 # 10 because of scaling of S2-RUT images
+                    ) * rut_gain
                 elif dist_type == 'uniform':
                     uncorr_sample = np.random.uniform(
                         low=-uncorr_rut * np.sqrt(3),
                         high=uncorr_rut * np.sqrt(3),
                         size=(num_row, num_col)
-                    ) / 10 # 10 because of scaling of S2-RUT images
+                    ) * rut_gain
                 error_band_dict[s2_band] += uncorr_sample
 
             # loop over constant error terms; they are simply added
             for const_error_term in const_error_terms:
                 error_band_dict[s2_band] += \
-                    mc_input_data[s2_band].unc_contrib[const_error_term] / 10 # 10 because of scaling of S2-RUT images
+                    mc_input_data[s2_band].unc_contrib[const_error_term] * rut_gain
 
         # fully and partly correlated contributors
         # append these to a list of arrays and concatenate them into a 1d-array
@@ -436,10 +457,10 @@ def gen_rad_unc_scenarios(
             dist_type = corr_df[corr_df.index == corr_contributor]['distribution'].values[0]
             if dist_type == 'normal':
                 corr_sample = np.ones(shape=corr_rut.shape) * corr_rut
-                corr_sample = np.random.normal(0, 1, 1)[0] * corr_sample # divide by 10 is not required here because of N(0,1)
+                corr_sample = np.random.normal(0, 1, 1)[0] * corr_sample
             elif dist_type == 'uniform':
                 corr_sample = np.empty(shape=corr_rut.shape)
-                corr_sample = np.random.uniform(-1, 1, 1)[0] * corr_rut * np.sqrt(3) / 10
+                corr_sample = np.random.uniform(-1, 1, 1)[0] * corr_rut * np.sqrt(3) * rut_gain
 
             # partly contributors with a weaker correlation in one dimension
             # In this case, it is necessary to combine the two samples for that dimensions
@@ -462,7 +483,7 @@ def gen_rad_unc_scenarios(
                             corr_spatial_temporal = np.random.normal(0, 1, 1)[0] * corr_spatial_temporal
                         elif dist_type == 'uniform':
                             corr_spatial_temporal = np.empty(shape=corr_spatial_temporal_rut.shape)
-                            corr_spatial_temporal = np.random.uniform(-1, 1, 1)[0] * corr_spatial_temporal_rut * np.sqrt(3) / 10
+                            corr_spatial_temporal = np.random.uniform(-1, 1, 1)[0] * corr_spatial_temporal_rut * np.sqrt(3) * rut_gain
                         indep_band_samples.append(corr_spatial_temporal)
                 else:
                     raise Exception('this correlation is not implemented!')
@@ -571,7 +592,7 @@ def gen_rad_unc_scenarios(
 
             # create the L1C TOA scenario
             l1c_toa_scenario = mc_input_data[s2_band].r_toa + \
-                mc_input_data[s2_band].r_toa * error_band_dict[s2_band]
+                error_band_dict[s2_band]
 
             # finally, we have to insert the scenario data into the empty image
             # matrix having the full spatial extent of the original S2 scene
@@ -586,7 +607,7 @@ def gen_rad_unc_scenarios(
             with rio.open(file_dst, 'w+', **band_georeference_info[s2_band]) as dst:
                 dst.write(img, 1)
 
-        logging.info(
+        logger.info(
             f'Created scenario {scenario+1}/{n_scenarios} for {orig_dataset_path.name}'
         )
               
@@ -619,15 +640,16 @@ def main(
     # find scenes and their uncertainty
     orig_datasets = glob.glob(orig_datasets_dir.joinpath('*.SAFE').as_posix())
     unc_datasets = glob.glob(unc_datasets_dir.joinpath('*.RUT').as_posix())
-
+    n_datasets = len(orig_datasets)
+    
     # loop over the scenes. Before generating the scenarios some
     # preparation is required
-    for orig_dataset in orig_datasets:
+    for counter, orig_dataset in enumerate(orig_datasets):
 
         orig_dataset_path = Path(orig_dataset)
         scene_name = orig_dataset_path.name
 
-        print(f'** Working on {scene_name}')
+        logger.info(f'Working on {scene_name} ({counter+1}/{n_datasets})')
 
         # find corresponding uncertainty directory
         unc_dataset_path = [
@@ -656,7 +678,9 @@ def main(
         for jp2_file in jp2_files:
             os.remove(jp2_file)
 
-        # finally, generate the scenarios
+        logger.info(f'Created template for sampling for {scene_name} ({counter+1}/{n_datasets})')
+
+        # finally, generate the scenarios using Monte Carlo
         gen_rad_unc_scenarios(
             orig_dataset_path=orig_dataset_path,
             unc_dataset_path=unc_dataset_path,
@@ -666,51 +690,52 @@ def main(
             roi_bounds_10m=roi_bounds_10m
         )
 
+        logger.info(f'Finished MC simulations for {scene_name} ({counter+1}/{n_datasets})')
 
 if __name__ == '__main__':
 
     # debug
-    orig_dataset_path = Path(
-        './../S2A_MSIL1C_orig/done/S2A_MSIL1C_20190818T103031_N0208_R108_T32TMT_20190818T124651.SAFE'
-    )
-    unc_dataset_path = Path(
-        './../S2A_MSIL1C_orig/done/S2A_MSIL1C_20190818T103031_N0208_R108_T32TMT_20190818T124651.RUT'
-    )
-    scenario_path = Path(
-        './../debug'
-    )
-    template_path = Path(
-        './../debug/template'
-    )
-    n_scenarios = 1
-    roi_bounds_10m = [7000,8200,4000,5200] # pixel coordinates!
-    
-    gen_rad_unc_scenarios(orig_dataset_path, unc_dataset_path, scenario_path, template_path, n_scenarios, roi_bounds_10m)
-    
-
-    # ### define user inputs
-    #
-    # # directory with L1C data (.SAFE subdirectories)
-    # orig_datasets_dir = Path('./../S2A_MSIL1C_orig')
-    #
-    # # directory with radiometric uncertainty outputs (.RUT subdirectories)
-    # unc_datasets_dir = orig_datasets_dir
-    #
-    # # directory where to store the scenarios (a subdirectory will be created for each scene)
-    # # in which the actual scenarios are placed
-    # scenario_dir = Path('./../S2A_MSIL1C_RUT-Scenarios')
-    #
-    # # define bounds of the study area (aka region of interest)
-    # # bounds col_min, col_max, row_min, row_max (image coordinates of the 10m raster)
-    # roi_bounds_10m = [7000,8200,4000,5200]
-    #
-    # # number of scenarios (each scenario is a possible realization of a S2 scene!)
-    # n_scenarios = 100
-    #
-    # main(
-    #     orig_datasets_dir,
-    #     unc_datasets_dir,
-    #     scenario_dir,
-    #     roi_bounds_10m,
-    #     n_scenarios
+    # orig_dataset_path = Path(
+    #     './../S2A_MSIL1C_orig/done/S2A_MSIL1C_20190818T103031_N0208_R108_T32TMT_20190818T124651.SAFE'
     # )
+    # unc_dataset_path = Path(
+    #     './../S2A_MSIL1C_orig/done/S2A_MSIL1C_20190818T103031_N0208_R108_T32TMT_20190818T124651.RUT'
+    # )
+    # scenario_path = Path(
+    #     './../debug'
+    # )
+    # template_path = Path(
+    #     './../debug/template'
+    # )
+    # n_scenarios = 1
+    # roi_bounds_10m = [7000,8200,4000,5200] # pixel coordinates!
+    #
+    # gen_rad_unc_scenarios(orig_dataset_path, unc_dataset_path, scenario_path, template_path, n_scenarios, roi_bounds_10m)
+    #
+
+    ### define user inputs
+    
+    # directory with L1C data (.SAFE subdirectories)
+    orig_datasets_dir = Path('./../S2A_MSIL1C_orig')
+    
+    # directory with radiometric uncertainty outputs (.RUT subdirectories)
+    unc_datasets_dir = orig_datasets_dir
+    
+    # directory where to store the scenarios (a subdirectory will be created for each scene)
+    # in which the actual scenarios are placed
+    scenario_dir = Path('./../S2A_MSIL1C_RUT-Scenarios')
+    
+    # define bounds of the study area (aka region of interest)
+    # bounds col_min, col_max, row_min, row_max (image coordinates of the 10m raster)
+    roi_bounds_10m = [7000,8200,4000,5200]
+    
+    # number of scenarios (each scenario is a possible realization of a S2 scene!)
+    n_scenarios = 1
+    
+    main(
+        orig_datasets_dir,
+        unc_datasets_dir,
+        scenario_dir,
+        roi_bounds_10m,
+        n_scenarios
+    )

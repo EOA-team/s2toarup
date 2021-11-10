@@ -43,14 +43,18 @@ import shutil
 import numpy as np
 import pandas as pd
 import rasterio as rio
+import rasterio.mask
 import itertools
 import logging
 from pathlib import Path
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Union
 from copy import deepcopy
 from datetime import datetime
+from shapely.geometry import Polygon
+from scipy import spatial
 
 
 # setup logger -> will write log file to the /../log directory
@@ -101,6 +105,45 @@ s2_band_res = {
 # rut gain factor (RUT outputs are decoded as integers between 0 and 250, 250 means 25%
 # relative uncertainty). We rescale the values to fall between 0 and 25.
 rut_gain = 0.1
+
+
+def get_roi_geom(
+       ulx: Union[int,float],
+       uly: Union[int,float],
+       min_col: int,
+       max_col: int,
+       min_row: int,
+       max_row: int,
+       spatial_res: Union[int,float]
+    ) -> Polygon:
+    """
+    Converts the image coordinates denoting the ROI boundaries
+    in terms of row and columns into a shapely Polygon with
+    projected coordinates
+
+    :return:
+        polygon of the ROI in image projection (i.e., UTM
+        coordinates)
+    """
+    ulx_roi = ulx + min_col * spatial_res
+    uly_roi = uly - min_row * spatial_res
+
+    llx_roi = ulx_roi
+    lly_roi = uly - max_row * spatial_res
+
+    lrx_roi = ulx + max_col * spatial_res
+    lry_roi = lly_roi
+
+    urx_roi = lrx_roi
+    ury_roi = uly_roi
+
+    roi_coords = [
+        [ulx_roi, uly_roi],
+        [urx_roi, ury_roi],
+        [lrx_roi, lry_roi],
+        [llx_roi, lly_roi]
+    ]
+    return geometry.Polygon(roi_coords)
 
 
 def upsample_array(
@@ -281,18 +324,39 @@ def gen_rad_unc_scenarios(
         )[0]
         band_files[s2_band] = Path(r_toa_file)
 
+        # using rasterio.mask is much faster than subsetting the array after reading
+        # therefore we need to translate the ROI into a shapely polygon using
+        # the upper left coordinate information
+        with rio.open(r_toa_file, 'r') as src:
+            ulx, uly = src.meta['transform'][2], src.meta['transform'][5]
+
+        # generate polygon from ROI bounds for masking
+        roi_geom = get_roi_geom(
+            ulx=ulx,
+            uly=uly,
+            min_col=min_col,
+            max_col=max_col,
+            min_row=min_row,
+            max_row=max_row,
+            spatial_res=spatial_res
+        )
+
         with rio.open(r_toa_file, 'r') as src:
             n_rows_full = src.height
             n_cols_full = src.width
             # keep the band geo-referencation and related metadata for writing
             band_georeference_info[s2_band] = src.meta
-            r_toa = src.read(1)
-
-        # remember the original image size
+            # read with roi_geom as mask
+            out_band, _ = rio.mask.mask(
+                src, 
+                [roi_geom], 
+                crop = True, 
+                all_touched = True
+            )
+        # remember the original image size and save the band data
         if full_img_size[spatial_res] is None:
             full_img_size[spatial_res] = (n_rows_full, n_cols_full)
-
-        band_data.r_toa = r_toa[min_row:max_row,min_col:max_col]
+        band_data.r_toa = out_band[0,:,:]
 
         # read the single uncertainty contributors
         unc_contrib_dict = dict.fromkeys(l1c_unc_contributors)
@@ -303,8 +367,15 @@ def gen_rad_unc_scenarios(
             )[0]
 
             with rio.open(unc_contrib_file, 'r') as src:
-                unc = src.read(1)
-            unc_contrib_dict[l1c_unc_contributor] = unc[min_row:max_row,min_col:max_col]
+                # read with roi_geom as mask
+                out_band, _ = rio.mask.mask(
+                    src, 
+                    [roi_geom], 
+                    crop = True, 
+                    all_touched = True
+                )
+            unc_contrib_dict[l1c_unc_contributor] = out_band[0,:,:]
+
         band_data.unc_contrib = unc_contrib_dict
 
         # save the extracted reflectance and uncertainty of the current band

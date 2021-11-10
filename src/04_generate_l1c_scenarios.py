@@ -143,7 +143,7 @@ def get_roi_geom(
         [lrx_roi, lry_roi],
         [llx_roi, lly_roi]
     ]
-    return geometry.Polygon(roi_coords)
+    return Polygon(roi_coords)
 
 
 def upsample_array(
@@ -350,8 +350,8 @@ def gen_rad_unc_scenarios(
             out_band, _ = rio.mask.mask(
                 src, 
                 [roi_geom], 
-                crop = True, 
-                all_touched = True
+                crop=True, 
+                all_touched=True
             )
         # remember the original image size and save the band data
         if full_img_size[spatial_res] is None:
@@ -363,7 +363,9 @@ def gen_rad_unc_scenarios(
         for l1c_unc_contributor in l1c_unc_contributors:
             
             unc_contrib_file = glob.glob(
-                unc_dataset_path.joinpath(f'S2*_rut_{l1c_unc_contributor}_{s2_band_alias}.tif').as_posix()
+                unc_dataset_path.joinpath(
+                    f'S2*_rut_{l1c_unc_contributor}_{s2_band_alias}.tif'
+                ).as_posix()
             )[0]
 
             with rio.open(unc_contrib_file, 'r') as src:
@@ -371,8 +373,8 @@ def gen_rad_unc_scenarios(
                 out_band, _ = rio.mask.mask(
                     src, 
                     [roi_geom], 
-                    crop = True, 
-                    all_touched = True
+                    crop=True, 
+                    all_touched=True
                 )
             unc_contrib_dict[l1c_unc_contributor] = out_band[0,:,:]
 
@@ -741,7 +743,11 @@ def main(
 
         # copy the original L1C scene into the template folder and delete
         # the jp2 files in the GRANULE directory
-        shutil.copytree(orig_dataset_path, template_path.joinpath(scene_name))
+        shutil.copytree(
+            orig_dataset_path,
+            template_path.joinpath(scene_name),
+            dirs_exist_ok=True
+        )
 
         # delete the jp2 files in the template
         search_expr = '*.SAFE/GRANULE/*/IMG_DATA/*_B*.jp2'
@@ -798,7 +804,7 @@ if __name__ == '__main__':
     
     # define bounds of the study area (aka region of interest)
     # bounds col_min, col_max, row_min, row_max (image coordinates of the 10m raster)
-    roi_bounds_10m = [7000,8200,4000,5200]
+    roi_bounds_10m = [7200,8400,4200,5400]
     
     # number of scenarios (each scenario is a possible realization of a S2 scene!)
     n_scenarios = 1

@@ -54,7 +54,6 @@ from typing import Union
 from copy import deepcopy
 from datetime import datetime
 from shapely.geometry import Polygon
-from scipy import spatial
 
 
 # setup logger -> will write log file to the /../log directory

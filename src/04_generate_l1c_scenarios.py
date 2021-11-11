@@ -345,7 +345,12 @@ def gen_rad_unc_scenarios(
             n_rows_full = src.height
             n_cols_full = src.width
             # keep the band geo-referencation and related metadata for writing
-            band_georeference_info[s2_band] = src.meta
+            meta = src.meta
+            meta.update({
+                'QUALITY': '100',
+                'REVERSIBLE': 'YES'
+            })
+            band_georeference_info[s2_band] = meta
             # read with roi_geom as mask
             out_band, _ = rio.mask.mask(
                 src, 
@@ -807,7 +812,7 @@ if __name__ == '__main__':
     roi_bounds_10m = [7200,8400,4200,5400]
     
     # number of scenarios (each scenario is a possible realization of a S2 scene!)
-    n_scenarios = 1
+    n_scenarios = 150
     
     main(
         orig_datasets_dir,

@@ -695,6 +695,7 @@ def gen_rad_unc_scenarios(
 
             fname_fig_save = current_scenario_path.joinpath(f'{s2_band}_sample.png')
             fig.savefig(fname_fig_save, bbox_inches='tight')
+            plt.close(fig)
 
             # finally, we have to insert the scenario data into the empty image
             # matrix having the full spatial extent of the original S2 scene
@@ -836,7 +837,7 @@ if __name__ == '__main__':
     roi_bounds_10m = [7200,8400,4200,5400]
     
     # number of scenarios (each scenario is a possible realization of a S2 scene!)
-    n_scenarios = 1
+    n_scenarios = 150
     
     main(
         orig_datasets_dir,

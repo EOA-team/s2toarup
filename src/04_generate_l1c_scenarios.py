@@ -683,7 +683,7 @@ def gen_rad_unc_scenarios(
             err_img = axs[0].imshow(error_band_dict[s2_band].astype(np.float32)*100, cmap='coolwarm')
             cbar = plt.colorbar(err_img, cax=cax)
             cbar.ax.get_yaxis().labelpad = 20
-            cbar.set_label('Relative Error $\rho_{TOA}$ [%]', rotation=270)
+            cbar.set_label(r'Relative Error $\rho_{TOA}$ [%]', rotation=270)
             axs[0].set_title(s2_band)
 
             divider = make_axes_locatable(axs[1])
@@ -691,7 +691,7 @@ def gen_rad_unc_scenarios(
             diff_img = axs[1].imshow(diff, cmap='coolwarm')
             cbar = plt.colorbar(diff_img, cax=cax)
             cbar.ax.get_yaxis().labelpad = 20
-            cbar.set_label('Absolute Error $\rho_{TOA}$', rotation=270)
+            cbar.set_label(r'Absolute Error $\rho_{TOA}$', rotation=270)
 
             fname_fig_save = current_scenario_path.joinpath(f'{s2_band}_sample.png')
             fig.savefig(fname_fig_save, bbox_inches='tight')

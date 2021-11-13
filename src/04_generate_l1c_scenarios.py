@@ -54,6 +54,8 @@ from typing import Union
 from copy import deepcopy
 from datetime import datetime
 from shapely.geometry import Polygon
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 # setup logger -> will write log file to the /../log directory
@@ -102,8 +104,8 @@ s2_band_res = {
 }
 
 # rut gain factor (RUT outputs are decoded as integers between 0 and 250, 250 means 25%
-# relative uncertainty). We rescale the values to fall between 0 and 25.
-rut_gain = 0.1
+# relative uncertainty). We rescale the values to fall between 0 and 0.25.
+rut_gain = 0.001
 
 
 def get_roi_geom(
@@ -380,7 +382,7 @@ def gen_rad_unc_scenarios(
                     crop=True, 
                     all_touched=True
                 )
-            unc_contrib_dict[l1c_unc_contributor] = out_band[0,:,:]
+            unc_contrib_dict[l1c_unc_contributor] = out_band[0,:,:] * rut_gain
 
         band_data.unc_contrib = unc_contrib_dict
 
@@ -493,19 +495,19 @@ def gen_rad_unc_scenarios(
                         loc=0,
                         scale=uncorr_rut,
                         size=(num_row, num_col)
-                    ) * rut_gain
+                    )
                 elif dist_type == 'uniform':
                     uncorr_sample = np.random.uniform(
                         low=-uncorr_rut * np.sqrt(3),
                         high=uncorr_rut * np.sqrt(3),
                         size=(num_row, num_col)
-                    ) * rut_gain
+                    )
                 error_band_dict[s2_band] += uncorr_sample
 
             # loop over constant error terms; they are simply added
             for const_error_term in const_error_terms:
                 error_band_dict[s2_band] += \
-                    mc_input_data[s2_band].unc_contrib[const_error_term] * rut_gain
+                    mc_input_data[s2_band].unc_contrib[const_error_term]
 
         # fully and partly correlated contributors
         # append these to a list of arrays and concatenate them into a 1d-array
@@ -537,7 +539,7 @@ def gen_rad_unc_scenarios(
                 corr_sample = np.random.normal(0, 1, 1)[0] * corr_sample
             elif dist_type == 'uniform':
                 corr_sample = np.empty(shape=corr_rut.shape)
-                corr_sample = np.random.uniform(-1, 1, 1)[0] * corr_rut * np.sqrt(3) * rut_gain
+                corr_sample = np.random.uniform(-1, 1, 1)[0] * corr_rut * np.sqrt(3)
 
             # partly contributors with a weaker correlation in one dimension
             # In this case, it is necessary to combine the two samples for that dimensions
@@ -560,7 +562,7 @@ def gen_rad_unc_scenarios(
                             corr_spatial_temporal = np.random.normal(0, 1, 1)[0] * corr_spatial_temporal
                         elif dist_type == 'uniform':
                             corr_spatial_temporal = np.empty(shape=corr_spatial_temporal_rut.shape)
-                            corr_spatial_temporal = np.random.uniform(-1, 1, 1)[0] * corr_spatial_temporal_rut * np.sqrt(3) * rut_gain
+                            corr_spatial_temporal = np.random.uniform(-1, 1, 1)[0] * corr_spatial_temporal_rut * np.sqrt(3)
                         indep_band_samples.append(corr_spatial_temporal)
                 else:
                     raise Exception('this correlation is not implemented!')
@@ -669,7 +671,30 @@ def gen_rad_unc_scenarios(
 
             # create the L1C TOA scenario
             l1c_toa_scenario = mc_input_data[s2_band].r_toa + \
-                error_band_dict[s2_band]
+                error_band_dict[s2_band] * mc_input_data[s2_band].r_toa
+
+            # plotting for debug/ visualization
+
+            diff = mc_input_data[s2_band].r_toa - l1c_toa_scenario
+            # plot difference image for debugging and plausibility checking
+            fig, axs = plt.subplots(2)
+            divider = make_axes_locatable(axs[0])
+            cax = divider.append_axes('right', size='5%', pad=0.05)
+            err_img = axs[0].imshow(error_band_dict[s2_band].astype(np.float32)*100, cmap='coolwarm')
+            cbar = plt.colorbar(err_img, cax=cax)
+            cbar.ax.get_yaxis().labelpad = 20
+            cbar.set_label('Combined Uncertainty [%]', rotation=270)
+            axs[0].set_title(s2_band)
+
+            divider = make_axes_locatable(axs[1])
+            cax = divider.append_axes('right', size='5%', pad=0.05)
+            diff_img = axs[1].imshow(diff, cmap='coolwarm')
+            cbar = plt.colorbar(diff_img, cax=cax)
+            cbar.ax.get_yaxis().labelpad = 20
+            cbar.set_label('Difference Orig - Sample', rotation=270)
+
+            fname_fig_save = current_scenario_path.joinpath(f'{s2_band}_sample.png')
+            fig.savefig(fname_fig_save, bbox_inches='tight')
 
             # finally, we have to insert the scenario data into the empty image
             # matrix having the full spatial extent of the original S2 scene
@@ -811,7 +836,7 @@ if __name__ == '__main__':
     roi_bounds_10m = [7200,8400,4200,5400]
     
     # number of scenarios (each scenario is a possible realization of a S2 scene!)
-    n_scenarios = 150
+    n_scenarios = 1
     
     main(
         orig_datasets_dir,

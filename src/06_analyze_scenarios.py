@@ -1,10 +1,10 @@
 
 '''
-@author:     Lukas Graf (D-USYS, ETHZ)
+@author:    Lukas Graf (D-USYS, ETHZ)
 
 @purpose:   This script is used to analyze the uncertainty
-            propagation outcomes after Sen2Cor. It generates
-            tiff files summarizing the scenario spread and hence
+            propagation outcomes before and after Sen2Cor. It generates
+            tif files summarizing the scenario spread and hence
             relative standard uncertainty. In addition, it produces
             some maps useful for visually analyzing the results and
             extracts the uncertainty for the single regions of
@@ -20,28 +20,29 @@ from datetime import date
 from pathlib import Path
 import geopandas as gpd
 import rasterio as rio
+import rasterio.mask
 import numpy as np
 from scipy.stats import mode
 from shapely.geometry import Polygon
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-from matplotlib.ticker import FormatStrFormatter
 import matplotlib.ticker as ticker
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import colors
+from typing import Optional
+from typing import Tuple
+from typing import Union
+from typing import Dict
+from rasterio.transform import Affine
 
-from agrisatpy.processing.extraction.utils import raster2table
-from agrisatpy.processing.extraction.sentinel2 import S2singlebands2table
-from copy import deepcopy
-from pip._vendor.pkg_resources import PathMetadata
 
-
+# define plotting styles
+plt.style.use('ggplot')
 plt.rcParams['xtick.labelsize'] = 11
 plt.rcParams['ytick.labelsize'] = 11
 
 plt.rcParams['axes.titlesize'] = 15
 gain_factor_refl = 0.01
 
+# define S2 band properties
 band_dict_l1c = {
     '10': {
         'B02': '*_B02.jp2',
@@ -92,12 +93,50 @@ band_dict_l2a = {
 }
 
 
+def pixel_to_img_coords(
+        point_coords: Tuple[Union[int,float]],
+        img_transform: Affine
+    ) -> Dict[str,int]:
+    """
+    Takes a tuple of point coordinates and translate
+    it into the corresponding row and column in an image.
+    Therefore, the point_coords must be in the same projection
+    as the image.
+
+    NOTE: The method does not check for out-of-bounds issues
+    when the point is not located within the image!
+
+    :param point_coords:
+        coordinate tuple in the form (x,y) denoting a point
+        in the image
+    :param img_transform:
+        Affine transformation defining the extent and pixel size
+        of the image
+    :return:
+        dictionary with the image row and column.
+    """
+    # point coordinates
+    utm_x = point_coords[0]
+    utm_y = point_coords[1]
+    # image coordinates
+    pix_res_x = img_transform[0]
+    pix_res_y = img_transform[4]
+    img_ulx = img_transform[2]
+    img_uly = img_transform[5]
+    # map into pixel coordinates (row, column)
+    sel_col = int(np.around((utm_x - img_ulx) / pix_res_x))
+    sel_row = int(np.around((utm_y - img_uly) / pix_res_y))
+
+    return {'row': sel_row, 'col': sel_col}
+
+
 def analyze_scenarios_spatial(
         unc_scenario_dir: Path,
         in_file_shp: Path,
         out_dir: Path,
         processing_level: str,
-        **kwargs
+        select_random_pixels: Optional[bool]=True,
+        n_random_pixels: Optional[int]=5
     ):
     """
     Extracts a region of interest (ROI) from a series of
@@ -116,6 +155,12 @@ def analyze_scenarios_spatial(
     :param processing_level:
         either 'L1C' or 'L2A' for identifying the S2 processing level
         (before and after atmospheric correction)
+    :param select_random_pixels:
+        if set to True (Default) generates histograms of randomly chosen
+        pixels showing the histograms obtained from the scenarios
+    :param n_random_pixels:
+        if select_random_pixels is True a user-defined number of pixels
+        is analyzed. The default is 5 pixels
     """
     # check processing level
     if processing_level == 'L1C':
@@ -127,6 +172,15 @@ def analyze_scenarios_spatial(
 
     # read shapefile
     gdf = gpd.read_file(in_file_shp)
+
+    # extract random pixels if selected within the ROI bounds
+    # works only if the shapefile is in the same projection as the sat data
+    if select_random_pixels:
+        left, bottom, right, top = gdf.iloc[0]['geometry'].bounds
+        # sample across rows and columns
+        col_samples = np.random.uniform(left, right, n_random_pixels)
+        row_samples = np.random.uniform(bottom, top, n_random_pixels)
+        coord_samples = list(zip(col_samples, row_samples))
 
     # loop over single bands and extract data from scenario runs
     for spatial_res in band_dict_s2.keys():
@@ -141,8 +195,11 @@ def analyze_scenarios_spatial(
         # loop over scenarios of the current band and extract ROIs
         for band in band_dict.keys():
 
-            print(f'Extracting {band} from {spatial_res}m spatial resolution')
+            print(
+                f'Extracting {band} from {spatial_res}m spatial resolution ({processing_level})'
+            )
 
+            # find scenario files
             scenario_files = glob.glob(
                 str(unc_scenario_dir.joinpath(search_expr + band_dict[band]))
             )
@@ -151,7 +208,6 @@ def analyze_scenarios_spatial(
             # check CRS between ROI and raster
             sat_crs = rio.open(scenario_files[0]).crs
             gdf_reprojected = gdf.to_crs(sat_crs)
-
             feature = gdf_reprojected.iloc[0]
 
             # loop over scenario members
@@ -179,7 +235,7 @@ def analyze_scenarios_spatial(
                 data_arr[idx,:,:] = out_band[0,:,:]
 
             # analysis: calculate min, max, mean and standard deviation per pixel
-            # (does not apply to SCL - here the majority vote will be analysis)
+            # (does not apply to SCL - here the majority vote will be analyzed)
             if band == 'SCL':
                 count = 2
             else:
@@ -187,9 +243,93 @@ def analyze_scenarios_spatial(
             meta.update(
                 {
                     "count": count,
-                    "dtype": np.float64
-                 }
+                    "dtype": np.float32
+                }
             )
+
+            # if random pixels shall be analyzed then plot their histogram
+            if select_random_pixels:
+                # calculate the image coordinates for the coordinate tuples
+                for coord_tuple in coord_samples:
+                    # point coordinates
+                    rand_coords = pixel_to_img_coords(
+                        point_coords=coord_tuple,
+                        img_transform=meta['transform']
+                    )
+                    # extract pixel value in all scenarios
+                    pixel_vals = data_arr[:,rand_coords['row'],rand_coords['col']]
+                    # plot histogram using true percentage values of reflectance
+                    if band != 'SCL':
+                        pixel_vals *= 0.01
+                        # TODO: check gain factor for WVL and AOT!
+                    # plot the histogram of values
+                    fig = plt.figure(figsize=(6,8))
+                    ax = fig.add_subplot(111)
+                    
+                    ax.hist(pixel_vals, bins=30, color='cornflowerblue')
+                    x = int(np.around(coord_tuple[0]))
+                    y = int(np.around(coord_tuple[1]))
+                    epsg = sat_crs.to_epsg()
+
+                    if band == 'SCL':
+                        title_str = 'Scene Classification Layer Samples '
+                        xlabel = 'Scene Classifcation Class'
+                    elif band == 'WVP':
+                        # TODO
+                        pass
+                    elif band == 'AOT':
+                        # TODO
+                        pass
+                    else:
+                        if processing_level == 'L1C':
+                            title_str = r'$\rho_{TOA}$ Samples '
+                            xlabel = r'$\rho_{TOA}$ Reflectance Factor [%]'
+                        else:
+                            title_str = r'$\rho_{BOA}$ Samples '
+                            xlabel = r'$\rho_{TOA}$ Reflectance Factor [%]'
+
+                    ax.set_title(
+                        title_str + f'{band} (N={n_scenarios})\nx = {x}m, y = {y}m (EPSG:{epsg})',
+                        fontsize=16
+                    )
+                    ax.set_ylabel('Absolute Frequency [-]', fontsize=14)
+                    ax.set_xlabel(xlabel, fontsize=14)
+                    if band != 'SCL':
+                        avg = np.mean(pixel_vals)
+                        std = np.std(pixel_vals)
+                        ymax = ax.get_ylim()[1]
+                        ax.vlines(
+                            x=avg,
+                            ymin=0,
+                            ymax=ymax,
+                            color='firebrick',
+                            linewidth=4,
+                            label='Mean'
+                        )
+                        ax.vlines(
+                            x=avg-std,
+                            ymin=0,
+                            ymax=ymax,
+                            color='lightcoral',
+                            linewidth=4,
+                            linestyle='dashed',
+                            label=r'$\pm$ 1 Std-Dev'
+                        )
+                        ax.vlines(
+                            x=avg+std,
+                            ymin=0,
+                            ymax=ymax,
+                            color='lightcoral',
+                            linewidth=4,
+                            linestyle='dashed',
+                        )
+                        ax.legend(fontsize=14)
+                    # save plots
+                    fname_plot = out_dir.joinpath(
+                        f'{processing_level}_{band}_{spatial_res}m_{x}_{y}_histogram.png'
+                    )
+                    fig.savefig(fname_plot, bbox_inches='tight')
+                    plt.close(fig)
 
             fname = f'{processing_level}_{band}_{spatial_res}m_{in_file_shp.name.split(".")[0]}.tif'
 
@@ -598,11 +738,13 @@ def main(
 
         unc_scenario_dir = unc_scenario_dir_home.joinpath(scene)
         out_dir = out_dir_home.joinpath(scene)
+        if not out_dir.exists():
+            out_dir.mkdir()
 
-        print(f'** Analyzing Uncertainty of: {unc_scenario_dir.name}')
+        print(f'Analyzing Uncertainty of {unc_scenario_dir.name}')
 
         # processing levels of the data; we analyze L1C and L2A
-        processing_levels = ['L1C', 'L2A']
+        processing_levels = ['L1C'] # ['L1C', 'L2A']
     
         #    STEP_1      ANALYZE THE SCENARIOS BY READING ALL REALIZATIONS
         #                FOR YOUR STUDY AREA
@@ -611,8 +753,7 @@ def main(
         #    RESULTS IN A NEW RASTER FILE WITH 5 BANDS CONTAINING THE MIN,
         #    MAX, MEAN, STD AND STANDARD UNCERTAINTY DENOTING THE SPREAD
         #    AMONG THE SCENARIO MEMBERS
-        #    TODO: SCL
-    
+
         for processing_level in processing_levels:
         
             analyze_scenarios_spatial(
@@ -676,7 +817,6 @@ if __name__ == '__main__':
     ### user inputs
     
     # shapefile (or other vector format) defining the extent of the study area
-    # should be a bit smaller than the ROI defined for sampling (TODO)
     in_file_shp = Path(
         './../shp/AOI_Esch_EPSG32632.shp'
     )

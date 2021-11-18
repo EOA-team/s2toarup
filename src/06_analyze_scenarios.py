@@ -26,6 +26,7 @@ from scipy.stats import mode
 from shapely.geometry import Polygon
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import colors
 from typing import Optional
 from typing import Tuple
@@ -275,18 +276,18 @@ def analyze_scenarios_spatial(
                         title_str = 'Scene Classification Layer Samples '
                         xlabel = 'Scene Classifcation Class'
                     elif band == 'WVP':
-                        # TODO
-                        pass
+                        title_str = 'Atmospheric Water Vapor Column'
+                        xlabel = 'Water Vapor Column [cm]'
                     elif band == 'AOT':
-                        # TODO
-                        pass
+                        title_str = 'Aerosol Optical Thickness @550nm'
+                        xlabel = 'Aerosol Optical Thichkness [-]'
                     else:
                         if processing_level == 'L1C':
                             title_str = r'$\rho_{TOA}$ Samples '
                             xlabel = r'$\rho_{TOA}$ Reflectance Factor [%]'
                         else:
                             title_str = r'$\rho_{BOA}$ Samples '
-                            xlabel = r'$\rho_{TOA}$ Reflectance Factor [%]'
+                            xlabel = r'$\rho_{BOA}$ Reflectance Factor [%]'
 
                     ax.set_title(
                         title_str + f'{band} (N={n_scenarios})\nx = {x}m, y = {y}m (EPSG:{epsg})',
@@ -325,7 +326,9 @@ def analyze_scenarios_spatial(
                         )
                         ax.legend(fontsize=14)
                     # save plots
-                    fname_plot = out_dir.joinpath(
+                    histo_dir = out_dir.joinpath('pixel_histograms')
+                    if not histo_dir.exists(): histo_dir.mkdir()
+                    fname_plot = histo_dir.joinpath(
                         f'{processing_level}_{band}_{spatial_res}m_{x}_{y}_histogram.png'
                     )
                     fig.savefig(fname_plot, bbox_inches='tight')
@@ -367,10 +370,10 @@ def analyze_scenarios_spatial(
                     dst.write_band(4, np.nanstd(data_arr, axis=0))
     
                     # standard uncertainty -> normalize stack of scenarios
-                    data_arr_norm = data_arr / np.linalg.norm(data_arr)
                     dst.set_band_description(5, 'rel_std_unc')
                     rel_std = np.nanstd(data_arr, axis=0) / np.nanmean(data_arr, axis=0)
                     dst.write_band(5, rel_std * 100)
+
 
 def unc_maps(
         analysis_results_l1c: str,
@@ -441,36 +444,37 @@ def unc_maps(
             epsg = meta['crs'].to_epsg()
     
             # for colormap: find minimum of minima & maximum of maxima
-            minmin = math.trunc(np.nanmin([np.min(l1c_data), np.nanmin(l2a_data)]))
-            maxmax = np.round(np.nanmax([np.max(l1c_data), np.nanmax(l2a_data)]),0)
+            minmin_l1c = np.round(np.nanmin([np.min(l1c_data), np.nanmin(l1c_data)]), 0)
+            maxmax_l1c = np.round(np.nanmax([np.max(l1c_data), np.nanmax(l1c_data)]), 0)
+            minmin_l2a = np.round(np.nanmin([np.min(l2a_data), np.nanmin(l2a_data)]), 0)
+            maxmax_l2a = np.round(np.nanmax([np.max(l2a_data), np.nanmax(l2a_data)]), 0)
     
-            # cut values higher than 10%, otherwise there is not much to see in the L1C image
+            # cut values higher than 10%, otherwise there is not much to see in the image
             labelpad = 20
-            if maxmax > 10.:
-                maxmax = 10
+            if maxmax_l2a > 10.:
+                maxmax_l2a = 10
     
             # map
             im_l1c = single_axs[0].imshow(
-                l1c_data, vmin=minmin, vmax=maxmax, cmap='bwr', interpolation='none',
+                l1c_data, vmin=minmin_l1c, vmax=maxmax_l1c, cmap='bwr', interpolation='none',
                 extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
             )
             single_axs[0].title.set_text(f'L1C TOA {band}')
             im_l2a = single_axs[1].imshow(
-                l2a_data, vmin=minmin, vmax=maxmax, cmap='bwr', interpolation='none',
+                l2a_data, vmin=minmin_l2a, vmax=maxmax_l2a, cmap='bwr', interpolation='none',
                 extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
             )
-            single_axs[1].title.set_text(f'L2A TOC {band}')
+            single_axs[1].title.set_text(f'L2A BOA {band}')
     
             # add colormap: add_axes[left, bottom, width, heigth)
-            cbar_ax = single_fig.add_axes([0.92, 0.39, 0.04, 0.21])
-            n_ticks = int((maxmax - minmin) + 1)
-            v1 = np.linspace(minmin, maxmax, n_ticks, endpoint=True)
-            cbar_ticks_text = [int(i) for i in v1]
-            cbar_ticks_text[-1] = f'>{cbar_ticks_text[-1]}'
-            cbar = single_fig.colorbar(im_l2a, cax=cbar_ax)
-            cbar.ax.set_yticklabels(cbar_ticks_text)
-            cbar.set_label('Uncertainty [%] (k=1)', rotation=270, fontsize=16,
-                           labelpad=labelpad, y=0.45)
+            divider = make_axes_locatable(single_axs[0])
+            cax = divider.append_axes('right', size='5%', pad=0.05)
+            single_fig.colorbar(im_l1c, cax=cax, orientation='vertical')
+            divider = make_axes_locatable(single_axs[1])
+            cax = divider.append_axes('right', size='5%', pad=0.05)
+            cbar_l2a = single_fig.colorbar(im_l2a, cax=cax, orientation='vertical')
+            cbar_l2a.set_label('Relative Uncertainty [%] (k=1)', rotation=270, fontsize=16,
+                           labelpad=labelpad, y=0.5)
     
             single_axs[0].set_xlabel(f'X [m] (EPSG:{epsg})', fontsize=14)
             single_axs[1].set_xlabel(f'X [m] (EPSG:{epsg})', fontsize=14)
@@ -482,6 +486,8 @@ def unc_maps(
             single_axs[0].yaxis.set_major_formatter(ticker.FormatStrFormatter('%0.0f'))
             single_axs[1].yaxis.set_ticks(np.arange(bounds.bottom, bounds.top, 5000))
             single_axs[1].set_yticklabels([])
+            single_axs[0].grid(False)
+            single_axs[1].grid(False)
 
         elif band in atmospheric_parameters:
             
@@ -497,10 +503,11 @@ def unc_maps(
                     bounds = src.bounds
 
             single_fig, single_axs = plt.subplots(1, 1, figsize=(10,10))
+            single_axs.grid(False)
             epsg = meta['crs'].to_epsg()
     
             # for colormap: find minimum of minima & maximum of maxima
-            minmin = math.trunc(np.nanmin(atm_data))
+            minmin = np.round(np.nanmin(atm_data), 0)
             maxmax = np.round(np.nanmax(atm_data),0)
     
             # cut values higher than 10%, otherwise there is not much to see in the L1C image
@@ -539,6 +546,8 @@ def unc_maps(
                 bounds = src.bounds
             
             single_fig, single_axs = plt.subplots(1, 2, figsize=(10,20))
+            single_axs[0].grid(False)
+            single_axs[1].grid(False)
             epsg = meta['crs'].to_epsg()
 
             cmap = colors.ListedColormap(
@@ -744,7 +753,7 @@ def main(
         print(f'Analyzing Uncertainty of {unc_scenario_dir.name}')
 
         # processing levels of the data; we analyze L1C and L2A
-        processing_levels = ['L1C'] # ['L1C', 'L2A']
+        processing_levels = ['L1C', 'L2A']
     
         #    STEP_1      ANALYZE THE SCENARIOS BY READING ALL REALIZATIONS
         #                FOR YOUR STUDY AREA
@@ -827,7 +836,7 @@ if __name__ == '__main__':
 
     # directory containing the raster realizations
     unc_scenario_dir_home = Path(
-        './../S2A_MSIL1C_RUT-Scenarios'
+        '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_RUT-Scenarios/batch_1'
     )
     # directory where to save the resulting files to
     out_dir_home = Path(

@@ -13,7 +13,6 @@
 
 import os
 import glob
-import math
 import pandas as pd
 import datetime
 from datetime import date
@@ -85,6 +84,7 @@ band_dict_l2a = {
         'WVP': '*_WVP_20m.jp2',
         'SCL': '*_SCL_20m.jp2'
     },
+
     '60': {
         'AOT': '*_AOT_60m.jp2',
         'B01': '*_B01_60m.jp2',
@@ -110,7 +110,8 @@ def pixel_to_img_coords(
     :param point_coords:
         coordinate tuple in the form (x,y) denoting a point
         in the image
-    :param img_transform:
+    :param img_transform:from mpl_toolkits.axes_grid1 import make_axes_locatable
+
         Affine transformation defining the extent and pixel size
         of the image
     :return:
@@ -262,7 +263,6 @@ def analyze_scenarios_spatial(
                     # plot histogram using true percentage values of reflectance
                     if band != 'SCL':
                         pixel_vals *= 0.01
-                        # TODO: check gain factor for WVL and AOT!
                     # plot the histogram of values
                     fig = plt.figure(figsize=(6,8))
                     ax = fig.add_subplot(111)

@@ -10,6 +10,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from agrisatpy.processing.resampling.sentinel2 import resample_and_stack_S2
 
+# TODO: Do we want to keep only those indices that do not require resampling??
 
 # map the Sentinel-2 bands to be used for index calculation
 s2_band_mapping = {
@@ -17,6 +18,7 @@ s2_band_mapping = {
     'B03': 'green',
     'B04': 'red',
     'B05': 'red_edge_1',
+    'B06': 'red_edge_2',
     'B07': 'red_edge_3',
     'B08': 'nir'
 }
@@ -67,7 +69,7 @@ def EVI(
 
 def MSAVI(
         red: np.array,
-        red_edge_3: np.array
+        nir: np.array
     ) -> np.array:
     """
     Calculates the Modified Soil-Adjusted Vegetation Index
@@ -77,18 +79,17 @@ def MSAVI(
     :param red:
         reflectance in the red band (Sentinel-2 B04)
     :param red_edge_3:
-       reflectance in the red edge 3 band (Sentinel-2 B07)
+       reflectance in the NIR band (Sentinel-2 B08)
     :return:
         MSAVI values
     """
-
-    return 0.5 * (2*red_edge_3 + 1 - np.sqrt((2*red_edge_3 + 1)**2 - 8*(red_edge_3 - red)))
+    return 0.5 * (2*nir + 1 - np.sqrt((2*nir + 1)**2 - 8*(nir - red)))
 
 
 def CI_green(
         green: np.array,
         nir: np.array 
-    ):
+    ) -> np.array:
     """
     Calculates the green chlorophyll index (CI_green) using
     Sentinel-2 bands 3 (green) and 8 (nir) as suggested by Clevers
@@ -102,6 +103,23 @@ def CI_green(
     """
 
     return (nir / green) - 1
+
+
+def NDRE(
+        red_edge_1: np.array,
+        red_edge_2: np.array
+    ) -> np.array:
+    """
+    Calculates the Normalized Difference Red Edge (NDRE)
+    using Sentinel-2 bands 5 and 6
+
+    :param red_edge_1:
+        reflectance in the red edge 1 band (Sentinel-2 B05)
+    :param red_edge_2:
+        reflectance in the red edge 2 band (Sentinel-2 B06)
+    """
+
+    return (red_edge_2 - red_edge_1) / (red_edge_2 + red_edge_1)
 
 
 def TCARI_OSAVI(
@@ -175,6 +193,7 @@ def calc_indices(
     """
 
     # open the file and read those bands required for calculating the indices
+    # TODO: 10 and 20m band_data dict
     s2_band_data = {}
     with rio.open(in_file, 'r') as src:
         # get geo-referencation information
@@ -257,7 +276,7 @@ def calc_indices(
     vis['MSAVI'] = {
         'data': MSAVI(
             red=s2_band_data['red'],
-            red_edge_3=s2_band_data['red_edge_3']
+            nir=s2_band_data['nir']
         ),
         'fname': f'{fname_base}_MSAVI.tif'
     }
@@ -334,6 +353,7 @@ def main(
             # place results in the root of the scenario
             out_dir = Path(orig_dataset).parent
 
+            # TODO: one 10m bandstack, one 20m bandstack???
             # bandstack, mask and resample the data
             path_bandstack = resample_and_stack_S2(
                 in_dir=Path(orig_dataset),
@@ -355,7 +375,7 @@ def main(
 
 if __name__ == '__main__':
 
-    # scenario_dir = Path('./../S2A_MSIL1C_RUT-Scenarios')
+    # scenario_dir = Path('./../S2A_MSIL1C_RUT-Scenarios/batch_*')
     scenario_dir = Path('/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_RUT-Scenarios/batch_1')
     shapefile_study_area = './../shp/AOI_Esch_EPSG32632.shp'
 

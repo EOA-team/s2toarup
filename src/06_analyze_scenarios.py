@@ -665,7 +665,6 @@ def extract_roi_unc(
     wvp = glob.glob(analysis_results_wvp.as_posix())[0]
 
     l1c_band_idx = 5
-    l2a_band_idx = 5
 
     # read ROIs from file into a GeoDataFrame
     gdf = gpd.read_file(shapefile_rois)

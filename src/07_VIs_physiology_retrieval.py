@@ -1,5 +1,22 @@
 # -*- coding: utf-8 -*-
 
+'''
+@author:    Lukas Graf (D-USYS, ETHZ)
+
+@purpose:   This script is used to calculate widely-used
+            vegetation indices (VIs) for each L2A scenario outcome.
+            To do so, the S2 L2A outputs after Sen2Cor are
+            clipped (masked) to the study area and bandstacked
+            into a single geoTiff file. The spatial resolution of the
+            20m bands is therefore increased to 10m without
+            modifying the spectral data since the spatial resampling
+            procedure comes along with its own uncertainty.
+            The VIs are stored as geoTiff files in the uncertainty directories
+            (thus, per scenario). In addition, a preview plot of all
+            VIs and the corresponding RGB preview is generated.
+'''
+
+
 import glob
 import rasterio as rio
 import numpy as np
@@ -9,6 +26,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from agrisatpy.processing.resampling.sentinel2 import resample_and_stack_S2
+
 
 # TODO: Do we want to keep only those indices that do not require resampling??
 
@@ -105,23 +123,6 @@ def CI_green(
     return (nir / green) - 1
 
 
-def NDRE(
-        red_edge_1: np.array,
-        red_edge_2: np.array
-    ) -> np.array:
-    """
-    Calculates the Normalized Difference Red Edge (NDRE)
-    using Sentinel-2 bands 5 and 6
-
-    :param red_edge_1:
-        reflectance in the red edge 1 band (Sentinel-2 B05)
-    :param red_edge_2:
-        reflectance in the red edge 2 band (Sentinel-2 B06)
-    """
-
-    return (red_edge_2 - red_edge_1) / (red_edge_2 + red_edge_1)
-
-
 def TCARI_OSAVI(
         green: np.array,
         red: np.array,
@@ -149,10 +150,27 @@ def TCARI_OSAVI(
     TCARI = 3*((red_edge_1 - red) - 0.2*(red_edge_1 - green) * (red_edge_1 / red))
     OSAVI = (1 + 0.16) * (red_edge_3 - red) / (red_edge_3 + red + 0.16)
     tcari_osavi = TCARI/OSAVI
-    # clip values to range between 0 and 1 (division by zero might cause inf)
+    # clip values to range between 0 and 1 (division by zero might cause infinity)
     tcari_osavi[tcari_osavi < 0.] = 0.
     tcari_osavi[tcari_osavi > 1.] = 1.
     return tcari_osavi
+
+
+def NDRE(
+        red_edge_1: np.array,
+        red_edge_3: np.array
+    ) -> np.array:
+    """
+    Calculates the Normalized Difference Red Edge (NDRE). It extends
+    the capabilities of the NDVI for middle and late season crops.
+
+    :param red_edge_1:
+        reflectance in the red edge 1 band (Sentinel-2 B05)
+    :param red_edge_3:
+        reflectance in the red edge 3 band (Sentinel-2 B07)
+    """
+    
+    return (red_edge_3 - red_edge_1) / (red_edge_3 + red_edge_1)
 
 
 def MCARI(
@@ -193,7 +211,6 @@ def calc_indices(
     """
 
     # open the file and read those bands required for calculating the indices
-    # TODO: 10 and 20m band_data dict
     s2_band_data = {}
     with rio.open(in_file, 'r') as src:
         # get geo-referencation information
@@ -219,7 +236,7 @@ def calc_indices(
 
     # the actual index calculation starts here
 
-    vis_names = ['NDVI', 'EVI', 'TCARI/OSAVI', 'MCARI', 'MSAVI', 'CI_green']
+    vis_names = ['RGB', 'NDVI', 'EVI', 'TCARI/OSAVI', 'MCARI', 'MSAVI', 'CI_green', 'NDRE']
     vis = dict.fromkeys(vis_names)
 
     ###########    Indices commonly used to describe LSP    #############
@@ -238,6 +255,13 @@ def calc_indices(
             nir=s2_band_data['nir']
         ),
         'fname': f'{fname_base}_EVI.tif'
+    }
+
+    vis['NDRE'] = {
+        'data': NDRE(
+            red_edge_1=s2_band_data['red_edge_1'],
+            red_edge_3=s2_band_data['red_edge_3']
+        )
     }
 
     ###########    Indices with physiological sensitivity   #############
@@ -282,24 +306,39 @@ def calc_indices(
     }
 
     #### plotting ####
-    n_rows, n_cols = 2, 3
-    single_fig, single_axs = plt.subplots(n_rows, n_cols, figsize=(20,20))
+    n_rows, n_cols = 2, 4
+    single_fig, single_axs = plt.subplots(n_rows, n_cols, figsize=(15,6))
     vi_idx = 0
     for row in range(n_rows):
         for col in range(n_cols):
-            current_vi = vis[vis_names[vi_idx]]
-            upper = np.quantile(current_vi['data'], 0.95) # 95% percentile
-            lower = np.quantile(current_vi['data'], 0.05) # 5% percentile
-            im_vi = single_axs[row, col].imshow(
-                current_vi['data'], vmin=lower, vmax=upper, cmap='summer',
-                extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
-            )
-            # add colormap: add_axes[left, bottom, width, heigth)
-            divider = make_axes_locatable(single_axs[row,col])
-            cax = divider.append_axes('right', size='5%', pad=0.05)
-            single_fig.colorbar(im_vi, cax=cax, orientation='vertical')
-            single_axs[row,col].title.set_text(vis_names[vi_idx])
+            # RGB preview
+            if vis_names[vi_idx] == 'RGB':
+                # read RGB preview created by AgriSatPy
+                parent_dir = in_file.parent
+                rgb_fname = in_file.name.replace('.tiff', '.png')
+                rgb_preview = parent_dir.joinpath('rgb_previews').joinpath(rgb_fname)
+                rgb = plt.imread(rgb_preview)
+                im_vi = single_axs[row, col].imshow(
+                    rgb,
+                    extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
+                )
+                single_axs[row,col].title.set_text(vis_names[vi_idx])
+            # Vegetation Indices
+            else:
+                current_vi = vis[vis_names[vi_idx]]
+                upper = np.quantile(current_vi['data'], 0.95) # 95% percentile
+                lower = np.quantile(current_vi['data'], 0.05) # 5% percentile
+                im_vi = single_axs[row, col].imshow(
+                    current_vi['data'], vmin=lower, vmax=upper, cmap='summer',
+                    extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
+                )
+                # add colormap
+                divider = make_axes_locatable(single_axs[row,col])
+                cax = divider.append_axes('right', size='5%', pad=0.05)
+                single_fig.colorbar(im_vi, cax=cax, orientation='vertical')
+                single_axs[row,col].title.set_text(vis_names[vi_idx])
 
+            # add axes labels
             if row == n_rows - 1:
                 single_axs[row,col].set_xlabel(f'X [m] (EPSG:{epsg})', fontsize=14)
                 single_axs[row,col].xaxis.set_ticks(np.arange(bounds.left, bounds.right, 5000))
@@ -320,7 +359,8 @@ def calc_indices(
     single_fig.savefig(f'{fname_base}_maps.png', bbox_inches='tight')
     plt.close(single_fig)
 
-    # write indices to output
+    # write indices to output ignoring the RGB data (is already available)
+    vis.pop('RGB')
     for vi in vis.values():
         with rio.open(vi['fname'], 'w', **meta) as dst:
             dst.write(vi['data'], 1)
@@ -353,8 +393,9 @@ def main(
             # place results in the root of the scenario
             out_dir = Path(orig_dataset).parent
 
-            # TODO: one 10m bandstack, one 20m bandstack???
-            # bandstack, mask and resample the data
+            # bandstack and mask the data
+            # we "resample" the data using "pixel_division" which only increases
+            # the pixel resolution without changing the spectral values
             path_bandstack = resample_and_stack_S2(
                 in_dir=Path(orig_dataset),
                 out_dir=out_dir,
@@ -364,7 +405,7 @@ def main(
                 is_L2A=True,
                 **processing_options
             )
-            # path_bandstack = Path(orig_dataset).parent.joinpath('20190420_T32TMT_MSIL2A_S2A_pixel_division_10m.tiff')
+            path_bandstack = Path(orig_dataset).parent.joinpath('20190420_T32TMT_MSIL2A_S2A_pixel_division_10m.tiff')
 
             # calculate the spectral indices using the resampled data
             calc_indices(

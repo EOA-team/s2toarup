@@ -137,8 +137,7 @@ def analyze_scenarios_spatial(
         in_file_shp: Path,
         out_dir: Path,
         processing_level: str,
-        select_random_pixels: Optional[bool]=True,
-        n_random_pixels: Optional[int]=5
+        **kwargs
     ):
     """
     Extracts a region of interest (ROI) from a series of
@@ -157,13 +156,23 @@ def analyze_scenarios_spatial(
     :param processing_level:
         either 'L1C' or 'L2A' for identifying the S2 processing level
         (before and after atmospheric correction)
-    :param select_random_pixels:
+    :kwargs:
+    select_random_pixels:
         if set to True (Default) generates histograms of randomly chosen
         pixels showing the histograms obtained from the scenarios
-    :param n_random_pixels:
+    n_random_pixels:
         if select_random_pixels is True a user-defined number of pixels
         is analyzed. The default is 5 pixels
+    orig_dataset_directory:
+        directory with the original dataset in L1C or L2A processing level
+        to be used when plotting the histograms of the randomly selected
+        pixels.
     """
+
+    select_random_pixels = kwargs.get('select_random_pixels', True)
+    n_random_pixels = kwargs.get('n_random_pixels', 5)
+    orig_dataset_directory = kwargs.get('orig_dataset_directory', None)
+
     # check processing level
     if processing_level == 'L1C':
         band_dict_s2 = band_dict_l1c
@@ -190,8 +199,10 @@ def analyze_scenarios_spatial(
         # construct search expression for finding the files
         if processing_level == 'L1C':
             search_expr = f'*/*_{abbrev}_*/GRANULE/*/IMG_DATA/'
+            search_expr_orig = 'GRANULE/*/IMG_DATA/'
         elif processing_level == 'L2A':
             search_expr = f'*/*_{abbrev}_*/GRANULE/*/IMG_DATA/R{spatial_res}m/'
+            search_expr_orig = f'GRANULE/*/IMG_DATA/R{spatial_res}m/'
         band_dict = band_dict_s2[spatial_res]
 
         # loop over scenarios of the current band and extract ROIs
@@ -211,6 +222,33 @@ def analyze_scenarios_spatial(
             sat_crs = rio.open(scenario_files[0]).crs
             gdf_reprojected = gdf.to_crs(sat_crs)
             feature = gdf_reprojected.iloc[0]
+
+            # read original L1C and L2A data in case random pixel are selected
+            if select_random_pixels:
+                if processing_level == 'L1C':
+                    # original scene has the same name as the scenario directory + .SAFE
+                    orig_dataset = orig_dataset_directory.joinpath(
+                        f'{unc_scenario_dir.name}.SAFE'
+                    )
+                elif processing_level == 'L2A':
+                    # the L2A dataset has a bit different name but parts of the name are the same
+                    date_str = unc_scenario_dir.name.split('_')[2]
+                    tile_str = unc_scenario_dir.name.split('_')[5]
+                    orig_dataset = glob.glob(
+                        orig_dataset_directory.joinpath(
+                            f'S2*_{abbrev}*_{date_str}_*_{tile_str}_*.SAFE'
+                        ).as_posix()
+                    )[0]
+                orig_file = glob.glob(
+                    str(Path(orig_dataset).joinpath(search_expr_orig + band_dict[band]))
+                )[0]
+                with rio.open(orig_file, 'r') as src:
+                    orig_arr, _ = rio.mask.mask(
+                            src,
+                            [feature["geometry"]],
+                            crop=True, 
+                            all_touched=True # IMPORTANT!
+                    )
 
             # loop over scenario members
             n_scenarios = len(scenario_files)
@@ -260,9 +298,13 @@ def analyze_scenarios_spatial(
                     )
                     # extract pixel value in all scenarios
                     pixel_vals = data_arr[:,rand_coords['row'],rand_coords['col']]
+                    # extract also the "original" value
+                    orig_val = orig_arr[0,rand_coords['row'],rand_coords['col']]
+
                     # plot histogram using true percentage values of reflectance
                     if band != 'SCL':
                         pixel_vals *= 0.01
+                        orig_val *= 0.01
                     # plot the histogram of values
                     fig = plt.figure(figsize=(6,8))
                     ax = fig.add_subplot(111)
@@ -312,7 +354,7 @@ def analyze_scenarios_spatial(
                             ymin=0,
                             ymax=ymax,
                             color='lightcoral',
-                            linewidth=4,
+                            linewidth=3,
                             linestyle='dashed',
                             label=r'$\pm$ 1 Std-Dev'
                         )
@@ -321,8 +363,16 @@ def analyze_scenarios_spatial(
                             ymin=0,
                             ymax=ymax,
                             color='lightcoral',
-                            linewidth=4,
+                            linewidth=3,
                             linestyle='dashed',
+                        )
+                        ax.vlines(
+                            x=orig_val,
+                            ymin=0,
+                            ymax=ymax,
+                            linewidth=4,
+                            color='orange',
+                            label='Original Value'
                         )
                         ax.legend(fontsize=14)
                     # save plots
@@ -697,7 +747,7 @@ def extract_roi_unc(
             # get raster for the band
             if band not in atmospheric_parameters:
                 l2a_raster = [x for x in l2a_scenarios if Path(x).name.split('_')[1] == band][0]
-                l1c_raster = [x for x in l1c_scenarios if Path(x).name.split('_')[1] == band][0]
+                l1c_raster = l1c_raster = [x for x in l1c_scenarios if Path(x).name.split('_')[1] == band][0]
     
                 # get ROI mean of the band
                 band_res_l1c[band] = _get_roi_mean(
@@ -732,7 +782,8 @@ def main(
         out_dir_home: Path,
         in_file_shp: Path,
         in_file_shp_rois: Path,
-        id_column: str
+        id_column: str,
+        **kwargs
     ) -> None:
     """
     main executable function calling all other functions
@@ -768,7 +819,8 @@ def main(
                 unc_scenario_dir=unc_scenario_dir,
                 in_file_shp=in_file_shp,
                 out_dir=out_dir,
-                processing_level=processing_level
+                processing_level=processing_level,
+                **kwargs
             )
     
         #    STEP_2        ANALYSIS AND VISUALIZATION OF UNCERTAINTY
@@ -842,10 +894,17 @@ if __name__ == '__main__':
         './../S2A_MSIL2A_Analysis'
     )
 
+    options = {
+        'orig_dataset_directory': Path(
+            '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_orig'
+        )
+    }
+
     main(
         unc_scenario_dir_home=unc_scenario_dir_home,
         out_dir_home=out_dir_home,
         in_file_shp=in_file_shp,
         in_file_shp_rois=in_file_shp_rois,
-        id_column=id_column
+        id_column=id_column,
+        **options
     )

@@ -26,9 +26,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from agrisatpy.processing.resampling.sentinel2 import resample_and_stack_S2
+from agrisatpy.processing.resampling.sentinel2 import scl_10m_resampling
 
-
-# TODO: Do we want to keep only those indices that do not require resampling??
 
 # map the Sentinel-2 bands to be used for index calculation
 s2_band_mapping = {
@@ -38,7 +37,8 @@ s2_band_mapping = {
     'B05': 'red_edge_1',
     'B06': 'red_edge_2',
     'B07': 'red_edge_3',
-    'B08': 'nir'
+    'B08': 'nir',
+    'B11': 'swir_1'
 }
 
 
@@ -83,6 +83,27 @@ def EVI(
     """
 
     return 2.5 * (nir - red) / (nir + 6*red - 7.5*blue + 1)
+
+
+def AVI(
+        red: np.array,
+        nir: np.array
+    ) -> np.array:
+    """
+    Calculates the Advanced Vegetation Index (AVI) using Sentinel-2 bands
+    4 (red) and 8 (nir)
+
+    :param red:
+        reflectance in the red band (Sentinel-2 B04)
+    :param nir:
+        reflectance in the near infrared band (Sentinel-2 B08)
+        spectrum
+    :return:
+        AVI values
+    """
+
+    expr = nir * (1 - red) * (nir - red)
+    return np.power(expr, (1./3.))
 
 
 def MSAVI(
@@ -194,6 +215,29 @@ def MCARI(
     return ((red_edge_1 - red) - 0.2 * (red_edge_1 - green)) * (red_edge_1 / red)
 
 
+def BSI(
+        blue: np.array,
+        red: np.array,
+        nir: np.array,
+        swir_1: np.array
+    ):
+    """
+    Calculates the Bare Soil Index (BSI) using Sentinel-2 bands
+    2 (blue), 4 (red), and 11 (SWIR 1)
+
+    :param green:
+        reflectance in the blue band (Sentinel-2 B02)
+    :param red:
+        reflectance in the red band (Sentinel-2 B04)
+    :param nir:
+        reflectance in the NIR band (Sentinel-2 B08)
+    :param swir_1:
+        reflectance in the SWIR band (Sentinel-2 11)
+    """
+
+    return ((swir_1 + red) - (nir + blue)) / ((swir_1 + red) + (nir + blue))
+
+
 def calc_indices(
         in_file: Path,
         out_dir: Path
@@ -232,11 +276,15 @@ def calc_indices(
     epsg = meta['crs'].to_epsg()
 
     # define output file name
-    fname_base = out_dir.joinpath(f'VI_{in_file.name.split(".")[0]}').as_posix()
+    vis_dir = out_dir.joinpath('Vegetation_Indices')
+    if not vis_dir.exists():
+        vis_dir.mkdir()
+    fname_base = vis_dir.joinpath(f'VI_{in_file.name.split(".")[0]}').as_posix()
 
     # the actual index calculation starts here
-
-    vis_names = ['RGB', 'NDVI', 'EVI', 'TCARI/OSAVI', 'MCARI', 'MSAVI', 'CI_green', 'NDRE']
+    vis_names = [
+        'RGB', 'NDVI', 'EVI', 'TCARI/OSAVI', 'MCARI', 'MSAVI', 'CI_green', 'NDRE', 'BSI', 'AVI'
+    ]
     vis = dict.fromkeys(vis_names)
 
     ###########    Indices commonly used to describe LSP    #############
@@ -261,7 +309,16 @@ def calc_indices(
         'data': NDRE(
             red_edge_1=s2_band_data['red_edge_1'],
             red_edge_3=s2_band_data['red_edge_3']
-        )
+        ),
+        'fname': f'{fname_base}_NDRE.tif'
+    }
+
+    vis['AVI'] = {
+        'data': AVI(
+            red=s2_band_data['red'],
+            nir=s2_band_data['nir']
+        ),
+        'fname': f'{fname_base}_AVI.tif'
     }
 
     ###########    Indices with physiological sensitivity   #############
@@ -305,9 +362,20 @@ def calc_indices(
         'fname': f'{fname_base}_MSAVI.tif'
     }
 
+    ###########    Indices for Soil Mapping   #############
+    vis['BSI'] = {
+        'data': BSI(
+            blue=s2_band_data['blue'],
+            red=s2_band_data['red'],
+            nir=s2_band_data['nir'],
+            swir_1=s2_band_data['swir_1']
+        ),
+        'fname': f'{fname_base}_BSI.tif'
+    }
+
     #### plotting ####
-    n_rows, n_cols = 2, 4
-    single_fig, single_axs = plt.subplots(n_rows, n_cols, figsize=(15,6))
+    n_rows, n_cols = 2, 5
+    single_fig, single_axs = plt.subplots(n_rows, n_cols, figsize=(16,6.5))
     vi_idx = 0
     for row in range(n_rows):
         for col in range(n_cols):
@@ -405,9 +473,19 @@ def main(
                 is_L2A=True,
                 **processing_options
             )
-            path_bandstack = Path(orig_dataset).parent.joinpath('20190420_T32TMT_MSIL2A_S2A_pixel_division_10m.tiff')
+
+            # get scene-classification layer for the study region
+            _ = scl_10m_resampling(
+                in_dir=Path(orig_dataset),
+                out_dir=out_dir,
+                masking=True,
+                **processing_options
+            )
+
+            # path_bandstack = Path(orig_dataset).parent.joinpath('20190420_T32TMT_MSIL2A_S2A_pixel_division_10m.tiff')
 
             # calculate the spectral indices using the resampled data
+            # and write them to a separate sub-directory
             calc_indices(
                 in_file=path_bandstack,
                 out_dir=out_dir

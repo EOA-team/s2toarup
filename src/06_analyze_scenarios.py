@@ -885,13 +885,9 @@ if __name__ == '__main__':
     )
     id_column = 'crop_type'
 
-    # directory containing the raster realizations
-    unc_scenario_dir_home = Path(
-        '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_RUT-Scenarios/batch_1'
-    )
     # directory where to save the resulting files to
     out_dir_home = Path(
-        './../S2A_MSIL2A_Analysis'
+        '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL2A_Analysis'
     )
 
     options = {
@@ -900,11 +896,20 @@ if __name__ == '__main__':
         )
     }
 
-    main(
-        unc_scenario_dir_home=unc_scenario_dir_home,
-        out_dir_home=out_dir_home,
-        in_file_shp=in_file_shp,
-        in_file_shp_rois=in_file_shp_rois,
-        id_column=id_column,
-        **options
-    )
+    # loop over batches containing Sen2Cor output from different runs
+    batches = [x for x in range(1,9)]
+
+    for batch in batches:
+        # directory containing the raster realizations
+        unc_scenario_dir_home = Path(
+            f'/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_RUT-Scenarios/batch_{batch}'
+        )
+
+        main(
+            unc_scenario_dir_home=unc_scenario_dir_home,
+            out_dir_home=out_dir_home,
+            in_file_shp=in_file_shp,
+            in_file_shp_rois=in_file_shp_rois,
+            id_column=id_column,
+            **options
+        )

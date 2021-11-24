@@ -375,7 +375,7 @@ def calc_indices(
 
     #### plotting ####
     n_rows, n_cols = 2, 5
-    single_fig, single_axs = plt.subplots(n_rows, n_cols, figsize=(16,6.5))
+    single_fig, single_axs = plt.subplots(n_rows, n_cols, figsize=(16,6.5), num=1, clear=True)
     vi_idx = 0
     for row in range(n_rows):
         for col in range(n_cols):
@@ -434,6 +434,7 @@ def calc_indices(
             dst.write(vi['data'], 1)
 
 
+# TODO: there seems to be a memory leak ...
 def main(
         scenario_dir: Path,
         shapefile_study_area: Path
@@ -495,10 +496,17 @@ def main(
 if __name__ == '__main__':
 
     # scenario_dir = Path('./../S2A_MSIL1C_RUT-Scenarios/batch_*')
-    scenario_dir = Path('/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_RUT-Scenarios/batch_1')
+    
     shapefile_study_area = './../shp/AOI_Esch_EPSG32632.shp'
+    batches = [x for x in range(7,9)]
 
-    main(
-        scenario_dir=scenario_dir,
-        shapefile_study_area=shapefile_study_area
-    )
+    for batch in batches:
+
+        scenario_dir = Path(
+            f'/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_RUT-Scenarios/batch_{batch}'
+        )
+
+        main(
+            scenario_dir=scenario_dir,
+            shapefile_study_area=shapefile_study_area
+        )

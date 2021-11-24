@@ -24,6 +24,7 @@ from pathlib import Path
 import matplotlib.ticker as ticker
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from typing import Optional
 
 from agrisatpy.processing.resampling.sentinel2 import resample_and_stack_S2
 from agrisatpy.processing.resampling.sentinel2 import scl_10m_resampling
@@ -437,10 +438,24 @@ def calc_indices(
 # TODO: there seems to be a memory leak ...
 def main(
         scenario_dir: Path,
-        shapefile_study_area: Path
+        shapefile_study_area: Path,
+        is_orig_data: Optional[bool] = False
     ):
+    """
+    Main executable method for calculating the S2 derived vegetation
+    indices.
+    There are two processing options:
+        a) calculating VIs for the scenario outcomes after Sen2Cor
+        b) calculating VIs for the original S2 datasets after Sen2Cor
+    Option a) is the default case. To run b) the variable `is_orig_data`
+    must be set to True
+    """
+
     # find scenes for which scenarios are available
-    scenarios = glob.glob(scenario_dir.joinpath('S2*_MSIL1C*').as_posix())
+    if not is_orig_data:
+        scenarios = glob.glob(scenario_dir.joinpath('S2*_MSIL1C*').as_posix())
+    else:
+        scenarios = ['dummy']
 
     # define spatial resolution to resample (all)
     processing_options = {
@@ -453,7 +468,10 @@ def main(
     for scenario in scenarios:
 
         # find L2A scenes
-        orig_datasets_l2a = glob.glob(Path(scenario).joinpath('*/S2*_MSIL2A*.SAFE').as_posix())
+        if not is_orig_data:
+            orig_datasets_l2a = glob.glob(Path(scenario).joinpath('*/S2*_MSIL2A*.SAFE').as_posix())
+        else:
+            orig_datasets_l2a = glob.glob(Path(scenario_dir).joinpath('S2*_MSIL2A*.SAFE').as_posix())
 
         # loop over scenes, resample them for the extent of the study area and
         # calculate the spectral indices
@@ -461,6 +479,9 @@ def main(
 
             # place results in the root of the scenario
             out_dir = Path(orig_dataset).parent
+            if is_orig_data:
+                out_dir = out_dir.joinpath(Path(orig_dataset).name.replace('.SAFE', '.VIs'))
+                out_dir.mkdir(exist_ok=True)
 
             # bandstack and mask the data
             # we "resample" the data using "pixel_division" which only increases
@@ -498,15 +519,28 @@ if __name__ == '__main__':
     # scenario_dir = Path('./../S2A_MSIL1C_RUT-Scenarios/batch_*')
     
     shapefile_study_area = './../shp/AOI_Esch_EPSG32632.shp'
-    batches = [x for x in range(7,9)]
-
+    batches = [x for x in range(1,9)]
+    
     for batch in batches:
-
+    
         scenario_dir = Path(
             f'/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_RUT-Scenarios/batch_{batch}'
         )
-
+    
         main(
             scenario_dir=scenario_dir,
             shapefile_study_area=shapefile_study_area
         )
+
+    # original Sentinel-2 L2A data
+    orig_l2a_data = Path(
+        '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_orig'
+    )
+    main(
+        scenario_dir=orig_l2a_data,
+        shapefile_study_area=shapefile_study_area,
+        is_orig_data=True
+    )
+    
+    
+    

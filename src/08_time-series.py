@@ -100,5 +100,4 @@ if __name__ == '__main__':
         output_dir=output_dir,
         roi_selection=roi_selection
     )
-
         

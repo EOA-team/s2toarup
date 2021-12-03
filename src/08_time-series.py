@@ -6,6 +6,7 @@ Created on Dec 1, 2021
 
 import glob
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 
 from datetime import datetime
@@ -22,9 +23,8 @@ def plot_uncertainty_ts(
         search_expression: Optional[str]='spectral-band_l1c-l2a-l3_uncertainty*.csv'
     ):
     """
-    Plots uncertainty extracted for selected small-scale regions of interest (ROIs)
-    (e.g., different agricultural field parcels) considering the different
-    processing levels available
+    Plots uncertainty extracted for selected land use classes (e.g., different
+    crop types) and its development over time.
 
     :param analysis_dir:
         directory where the uncertainty analysis results are stored
@@ -67,19 +67,21 @@ def plot_uncertainty_ts(
 
         # identify the quantities for which the uncertainty is available
         uncertainty_quantities = list(uncertainty_df_pl.columns)
-        values_to_remove = {'date', 'processing_level', 'ROI'}
+        values_to_remove = {'date', 'processing_level', 'ROI', 'area_km2'}
         uncertainty_quantities = [x for x in uncertainty_quantities if x not in values_to_remove]
 
         # plot ROI uncertainty per date and roi for each spectral band/ VI/ parameter
         for uncertainty_quantity in uncertainty_quantities:
-            q_df = uncertainty_df_pl[['date', 'ROI', uncertainty_quantity]].copy()
-            fig, ax = plt.subplots(1, 1, clear=True, num=1, figsize=(10,10))
+            q_df = uncertainty_df_pl[['date', 'ROI', 'area_km2', uncertainty_quantity]].copy()
+            fig, ax = plt.subplots(1, 1, clear=True, num=1, figsize=(15,10))
             for roi in rois:
                 q_df_roi = q_df[q_df.ROI == roi].copy()
-                ax.plot(q_df_roi.date, q_df_roi[uncertainty_quantity], label=roi)
-            ax.title.set_text(f'{processing_level} {uncertainty_quantity}')
+                label = f'{roi} ({np.round(q_df_roi.area_km2.values[0],2)}' + ' $km^2$)'
+                ax.plot(q_df_roi.date, q_df_roi[uncertainty_quantity], label=label)
+            ax.title.set_text(f'{processing_level} {uncertainty_quantity} Uncertainty Averaged per Crop Type')
             ax.set_ylabel('Relative Uncertainty (k=1) [%]', fontsize=14)
-            ax.legend()
+            # plot legend outside of plot
+            ax.legend(bbox_to_anchor=(1.04,1), loc="upper left")
             fname = output_dir.joinpath(f'{processing_level}_{uncertainty_quantity}_Rel-Uncertainty-TS.png')
             fig.savefig(fname, bbox_inches='tight')
             plt.close(fig)
@@ -94,10 +96,8 @@ if __name__ == '__main__':
     output_dir = analysis_dir.joinpath('uncertainty_ts_plots')
     if not output_dir.exists(): output_dir.mkdir()
 
-    roi_selection = ['winter rapeseed', 'sugar beet', 'silage maize', 'corn', 'winter wheat', 'winter barley']
     plot_uncertainty_ts(
         analysis_dir=analysis_dir,
-        output_dir=output_dir,
-        roi_selection=roi_selection
+        output_dir=output_dir
     )
         

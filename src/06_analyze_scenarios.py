@@ -31,6 +31,7 @@ from typing import Optional
 from typing import Tuple
 from typing import Union
 from typing import Dict
+from typing import List
 from rasterio.transform import Affine
 
 
@@ -711,7 +712,7 @@ def unc_maps(
 def _get_roi_mean(
         raster_file: str,
         band_idx: int,
-        geom: Polygon,
+        geom: List[Polygon],
         nodata_value: float
     ) -> float:
     """
@@ -720,7 +721,7 @@ def _get_roi_mean(
     with rio.open(raster_file, 'r') as src:
         out_band, _ = rio.mask.mask(
             src,
-            [geom],
+            geom,
             crop=True, 
             all_touched=True # IMPORTANT!
         )
@@ -794,8 +795,12 @@ def extract_roi_unc(
     vegetation_indices = list(band_dict_vis['10'].keys())
     band_list.extend(vegetation_indices)
 
+    # get unique crop types
+    unique_crop_types = gdf.crop_type.unique()
+
     res = []
-    for _, roi in gdf.iterrows():
+    # assess average uncertainty per crop type
+    for crop_type in unique_crop_types:
 
         # store results in dict
         band_res_l1c = {}
@@ -808,9 +813,17 @@ def extract_roi_unc(
         band_res_l1c['processing_level'] = 'L1C'
         band_res_l2a['processing_level'] = 'L2A'
         band_res_l3['processing_level'] = 'L3'
-        band_res_l1c['ROI'] = roi[id_column]
-        band_res_l2a['ROI'] = roi[id_column]
-        band_res_l3['ROI'] = roi[id_column]
+        band_res_l1c['ROI'] = crop_type
+        band_res_l2a['ROI'] = crop_type
+        band_res_l3['ROI'] = crop_type
+
+        # get geometries of the crop type
+        crop_df = gdf[gdf.crop_type == crop_type].copy()
+
+        crop_areas = crop_df.geometry.area # area in sqm covered by crop type
+        band_res_l1c['area_km2'] = crop_areas.sum() / 10**6 # overall area in km2
+        band_res_l2a['area_km2'] = crop_areas.sum() / 10**6
+        band_res_l3['area_km2'] = crop_areas.sum() / 10**6
 
         for band in band_list:
 
@@ -823,21 +836,21 @@ def extract_roi_unc(
                 band_res_l1c[band] = _get_roi_mean(
                     raster_file=l1c_raster,
                     band_idx=l1c_band_idx,
-                    geom=roi['geometry'],
+                    geom=crop_df['geometry'],
                     nodata_value=0.
                 )
     
                 band_res_l2a[band] = _get_roi_mean(
                     raster_file=l2a_raster,
                     band_idx=l1c_band_idx,
-                    geom=roi['geometry'],
+                    geom=crop_df['geometry'],
                     nodata_value=0.
                 )
             elif band in atmospheric_parameters:
                 band_res_l2a[band] = _get_roi_mean(
                     raster_file=atmospheric_dict[band],
                     band_idx=l1c_band_idx,
-                    geom=roi['geometry'],
+                    geom=crop_df['geometry'],
                     nodata_value=0.
                 )
             elif band in vegetation_indices:
@@ -854,7 +867,7 @@ def extract_roi_unc(
                 band_res_l3[band] = _get_roi_mean(
                     raster_file=vi_raster,
                     band_idx=l1c_band_idx,
-                    geom=roi['geometry'],
+                    geom=crop_df['geometry'],
                     nodata_value=0.
                 )
 
@@ -891,7 +904,7 @@ def main(
         print(f'Analyzing Uncertainty of {unc_scenario_dir.name}')
 
         # processing levels of the data; we analyze L1C and L2A
-        processing_levels = ['L3'] # ['L1C', 'L2A', 'L3']
+        processing_levels = ['L1C', 'L2A', 'L3']
     
         #    STEP_1      ANALYZE THE SCENARIOS BY READING ALL REALIZATIONS
         #                FOR YOUR STUDY AREA
@@ -901,16 +914,17 @@ def main(
         #    MAX, MEAN, STD AND STANDARD UNCERTAINTY DENOTING THE SPREAD
         #    AMONG THE SCENARIO MEMBERS
 
-        for processing_level in processing_levels:
-        
-            analyze_scenarios_spatial(
-                unc_scenario_dir=unc_scenario_dir,
-                in_file_shp=in_file_shp,
-                out_dir=out_dir,
-                processing_level=processing_level,
-                **kwargs
-            )
-    
+        # for processing_level in processing_levels:
+        #
+        #     analyze_scenarios_spatial(
+        #         unc_scenario_dir=unc_scenario_dir,
+        #         in_file_shp=in_file_shp,
+        #         out_dir=out_dir,
+        #         processing_level=processing_level,
+        #         **kwargs
+        #     )
+        #
+
         #    STEP_2        ANALYSIS AND VISUALIZATION OF UNCERTAINTY
     
         # uncertainty maps
@@ -921,20 +935,21 @@ def main(
         analysis_results_scl = out_dir.joinpath('L2A_SCL*.tif')
         analysis_results_vis = out_dir.joinpath('L3_*.tif')
     
-        out_dir_maps = out_dir.joinpath('maps')
-        if not out_dir_maps.exists():
-            out_dir_maps.mkdir()
-    
-        unc_maps(
-            analysis_results_l1c=analysis_results_l1c,
-            analysis_results_l2a=analysis_results_l2a,
-            analysis_results_aot=analysis_results_aot,
-            analysis_results_wvp=analysis_results_wvp,
-            analysis_results_scl=analysis_results_scl,
-            analysis_results_vis=analysis_results_vis,
-            out_dir=out_dir_maps
-        )
-    
+        # out_dir_maps = out_dir.joinpath('maps')
+        # if not out_dir_maps.exists():
+        #     out_dir_maps.mkdir()
+        #
+        # unc_maps(
+        #     analysis_results_l1c=analysis_results_l1c,
+        #     analysis_results_l2a=analysis_results_l2a,
+        #     analysis_results_aot=analysis_results_aot,
+        #     analysis_results_wvp=analysis_results_wvp,
+        #     analysis_results_scl=analysis_results_scl,
+        #     analysis_results_vis=analysis_results_vis,
+        #     out_dir=out_dir_maps
+        # )
+        #
+
         # acquisition date of the S2 image
         img_date = datetime.datetime.strptime(
             unc_scenario_dir.name.split('_')[2].split('T')[0],
@@ -952,7 +967,7 @@ def main(
             id_column=id_column,
             img_date=img_date
         )
-    
+
         # save (backup) dataframe as csv
         csv_dir = out_dir.joinpath('csv')
         if not csv_dir.exists():
@@ -961,6 +976,9 @@ def main(
             f'spectral-band_l1c-l2a-l3_uncertainty_{in_file_shp_rois.name.split(".")[0]}.csv'
         )
         unc_roi_df.to_csv(fname_csv, index=False)
+
+        print(f'Finished Analyzing Uncertainty of {unc_scenario_dir.name}')
+
 
 
 if __name__ == '__main__':

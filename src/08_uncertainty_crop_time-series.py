@@ -1,7 +1,11 @@
 '''
 Created on Dec 1, 2021
 
-@author: graflu
+@author:    Lukas Graf (D-USYS, ETHZ)
+
+@purpose:   Plots relative uncertainty in the different processing levels
+            over time averaged per time point for the different crop types
+            to reveal general temporal pattern of uncertainty.
 '''
 
 import glob

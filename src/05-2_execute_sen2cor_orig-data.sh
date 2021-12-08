@@ -21,7 +21,7 @@
 orig_datasets="/nfs/nas12.ethz.ch/fs1202/green_groups_kp_public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_orig"
 
 # define directory where Sen2Cor is installed to
-sen2cor_install_dir="./../bin/Sen2Cor-02.09.00-Linux64"
+sen2cor_install_dir="./home/graflu/Downloads/Sen2Cor-02.09.00-Linux64/bin"
 source "$sen2cor_install_dir"/L2A_Bashrc
 
 cd "$orig_datasets" 

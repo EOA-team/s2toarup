@@ -7,13 +7,14 @@ Created on Dec 6, 2021
 import cv2
 import glob
 import pandas as pd
+import numpy as np
 
 from pathlib import Path
 from datetime import datetime
 from uncertainties import unumpy
+from typing import Tuple
 
 from agrisatpy.io import Sat_Data_Reader
-from agrisatpy.io import Sat_Data_Creator
 from agrisatpy.io.sentinel2 import S2_Band_Reader
 from agrisatpy.utils.constants.sentinel2 import ProcessingLevels
 
@@ -80,7 +81,7 @@ def read_data_and_uncertainty(
         in_file_aoi: Path,
         vi_name: str,
         out_dir_plots: Path
-    ) -> pd.DataFrame:
+    ) -> Tuple[pd.DataFrame, np.array]:
     """
     This function reads the selected vegetation index (computed on the fly)
     and the associated standard uncertainty in a uarray (from uncertainties)
@@ -103,7 +104,7 @@ def read_data_and_uncertainty(
     # loop over datasets (single acquisition dates) and read the data
     # (vegetation index/ parameter + standard uncertainty)
     update_list = []
-    ts_stack = Sat_Data_Creator(is_timeseries=True)
+    ts_stack_list = []
 
     for _, record in data_df.iterrows():
 
@@ -183,24 +184,21 @@ def read_data_and_uncertainty(
             nominal_values=s2_stack.data[vi_name],
             std_devs=uncertainty_band.data['abs_stddev']
         )
-        
-        # save vegetation index/ parameter to Sat_Data class
-        band_name = record.date.strftime('%Y-%m-%d')
-        ts_stack.add_band(
-            band_name=band_name,
-            band_data=uarray
-        )
+        ts_stack_list.append(uarray)
 
         update_list.append({
             'date': record.date,
             'cloudy_pixel_percentage': cloud_coverage
         })
 
+    # stack arrays
+    stack_ts = np.dstack(ts_stack_list)
+
     # added update columns to input data frame
     update_df = pd.DataFrame(update_list)
     merged = pd.merge(data_df, update_df, on='date')
 
-    return merged
+    return merged, stack_ts
 
 
 def get_pixel(stack_df):

@@ -33,6 +33,7 @@ from typing import Union
 from typing import Dict
 from typing import List
 from rasterio.transform import Affine
+from numpy import absolute
 
 
 # define plotting styles
@@ -158,7 +159,8 @@ def analyze_scenarios_spatial(
     Extracts a region of interest (ROI) from a series of
     uncertainty scenarios, stacks them, and compiles the mean and
     standard deviation among all scenarios per pixel. Thus, it is
-    possible to obtain spatial (relative) uncertainty information.
+    possible to obtain spatial (absolute & relative) uncertainty
+    information.
 
     :param unc_scenario_dir:
         directory with Sen2Cor runs (L2A) or radiometric uncertainty
@@ -484,13 +486,15 @@ def unc_maps(
         analysis_results_wvp: Path,
         analysis_results_scl: Path,
         analysis_results_vis: Path,
-        out_dir: Path
+        out_dir: Path,
+        absolute_uncertainty: Optional[bool] = True
     ) -> None:
     """
     Maps raster values of L1C and L2A uncertainty values to reveal
     spatial pattern of uncertainty and their land cover/ use dependency
 
     TODO: update doc string
+    TODO: check gain factor for absolute uncertainty
     """
 
     # get files
@@ -501,8 +505,13 @@ def unc_maps(
     scl = glob.glob(analysis_results_scl.as_posix())[0]
     vis = glob.glob(analysis_results_vis.as_posix())
 
-    l1c_band_idx = 5
-    l2a_band_idx = 5
+    # absolute (default) or relative uncertainty
+    if absolute_uncertainty:
+        l1c_band_idx = 4
+        l2a_band_idx = 4
+    else:
+        l1c_band_idx = 5
+        l2a_band_idx = 5
 
     # loop over bands
     band_list = ['B01', 'B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B8A', 'B09', 'B11', 'B12']
@@ -539,15 +548,26 @@ def unc_maps(
             epsg = meta['crs'].to_epsg()
     
             # for colormap: find minimum of minima & maximum of maxima
-            minmin_l1c = np.round(np.nanmin([np.min(l1c_data), np.nanmin(l1c_data)]), 0)
-            maxmax_l1c = np.round(np.nanmax([np.max(l1c_data), np.nanmax(l1c_data)]), 0)
-            minmin_l2a = np.round(np.nanmin([np.min(l2a_data), np.nanmin(l2a_data)]), 0)
-            maxmax_l2a = np.round(np.nanmax([np.max(l2a_data), np.nanmax(l2a_data)]), 0)
+            # absolute uncertainties have similar magnitudes therefore norm the color legends
+            # in the same manner to make plots fully comparable
+            minmin_l1c = np.round(np.nanmin(l1c_data), 0)
+            maxmax_l1c = np.round(np.nanmax(l1c_data), 0)
+            minmin_l2a = np.round(np.nanmin(l2a_data), 0)
+            maxmax_l2a = np.round(np.nanmax(l2a_data), 0)
+
+            if absolute_uncertainty:
+                abs_min = np.min([minmin_l1c, minmin_l2a])
+                minmin_l1c = abs_min
+                minmin_l2a = abs_min
+                abs_max = np.max([maxmax_l1c, maxmax_l2a])
+                maxmax_l1c = abs_max
+                maxmax_l2a = abs_max
     
             # cut values higher than 10%, otherwise there is not much to see in the image
             labelpad = 20
-            if maxmax_l2a > 10.:
-                maxmax_l2a = 10
+            if not absolute_uncertainty:
+                if maxmax_l2a > 10.:
+                    maxmax_l2a = 10
     
             # map
             im_l1c = single_axs[0].imshow(
@@ -568,7 +588,11 @@ def unc_maps(
             divider = make_axes_locatable(single_axs[1])
             cax = divider.append_axes('right', size='5%', pad=0.05)
             cbar_l2a = single_fig.colorbar(im_l2a, cax=cax, orientation='vertical')
-            cbar_l2a.set_label('Relative Uncertainty [%] (k=1)', rotation=270, fontsize=16,
+
+            label_text = 'Absolute Uncertainty (k=1)'
+            if not absolute_uncertainty:
+                label_text = 'Relative Uncertainty [%] (k=1)'
+            cbar_l2a.set_label(label_text, rotation=270, fontsize=16,
                            labelpad=labelpad, y=0.5)
     
             single_axs[0].set_xlabel(f'X [m] (EPSG:{epsg})', fontsize=14)
@@ -619,6 +643,9 @@ def unc_maps(
             # for colormap: find minimum of minima & maximum of maxima
             minmin = np.round(np.nanmin(atm_data), 0)
             maxmax = np.round(np.nanmax(atm_data), 0)
+            if absolute_uncertainty and band in vegetation_indices:
+                minmin = np.nanmin(atm_data)
+                maxmax = np.nanmax(atm_data)
 
             # cut values higher than 10%, otherwise there is not much to see in the L1C image
             labelpad = 20
@@ -634,14 +661,13 @@ def unc_maps(
                 single_axs.title.set_text(f'L2A Atmospheric {band}')
     
             # add colormap: add_axes[left, bottom, width, heigth)
-            cbar_ax = single_fig.add_axes([0.92, 0.39, 0.04, 0.21])
-            n_ticks = int((maxmax - minmin) + 1)
-            v1 = np.linspace(minmin, maxmax, n_ticks, endpoint=True)
-            cbar_ticks_text = [int(i) for i in v1]
-            cbar_ticks_text[-1] = f'>{cbar_ticks_text[-1]}'
-            cbar = single_fig.colorbar(im_l2a, cax=cbar_ax)
-            cbar.ax.set_yticklabels(cbar_ticks_text)
-            cbar.set_label('Uncertainty [%] (k=1)', rotation=270, fontsize=16,
+            divider = make_axes_locatable(single_axs)
+            cax = divider.append_axes('right', size='5%', pad=0.05)
+            cbar = single_fig.colorbar(im_l1c, cax=cax, orientation='vertical')
+
+            if band in vegetation_indices and absolute_uncertainty:
+                label_text = 'Absolute Uncertainty(k=1)'
+            cbar.set_label(label_text, rotation=270, fontsize=16,
                            labelpad=labelpad, y=0.45)
     
             single_axs.set_xlabel(f'X [m] (EPSG:{epsg})', fontsize=14)
@@ -704,7 +730,10 @@ def unc_maps(
 
 
         # save figure
-        fname = out_dir.joinpath(f'{band}_l1c-l2a_uncertainty-map.png')
+        if absolute_uncertainty:
+            fname = out_dir.joinpath(f'{band}_l1c-l2a_absolute-uncertainty-map.png')
+        else:
+            fname = out_dir.joinpath(f'{band}_l1c-l2a_relative-uncertainty-map.png')
         single_fig.savefig(fname, bbox_inches='tight')
         plt.close(single_fig)
 
@@ -738,7 +767,8 @@ def extract_roi_unc(
         analysis_results_vis: Path,
         shapefile_rois: Path,
         id_column: str,
-        img_date: date
+        img_date: date,
+        absolute_uncertainty: Optional[bool]=True
     ) -> pd.DataFrame:
     """
     Once the study areas has been extracted and the statistics per pixel
@@ -779,7 +809,10 @@ def extract_roi_unc(
     wvp = glob.glob(analysis_results_wvp.as_posix())[0]
     vis = glob.glob(analysis_results_vis.as_posix())
 
-    l1c_band_idx = 5
+    if absolute_uncertainty:
+        l1c_band_idx = 4
+    else:
+        l1c_band_idx = 5
 
     # read ROIs from file into a GeoDataFrame
     gdf = gpd.read_file(shapefile_rois)
@@ -884,6 +917,7 @@ def main(
         in_file_shp: Path,
         in_file_shp_rois: Path,
         id_column: str,
+        absolute_uncertainty: Optional[bool] = True,
         **kwargs
     ) -> None:
     """
@@ -935,20 +969,20 @@ def main(
         analysis_results_scl = out_dir.joinpath('L2A_SCL*.tif')
         analysis_results_vis = out_dir.joinpath('L3_*.tif')
     
-        # out_dir_maps = out_dir.joinpath('maps')
-        # if not out_dir_maps.exists():
-        #     out_dir_maps.mkdir()
-        #
-        # unc_maps(
-        #     analysis_results_l1c=analysis_results_l1c,
-        #     analysis_results_l2a=analysis_results_l2a,
-        #     analysis_results_aot=analysis_results_aot,
-        #     analysis_results_wvp=analysis_results_wvp,
-        #     analysis_results_scl=analysis_results_scl,
-        #     analysis_results_vis=analysis_results_vis,
-        #     out_dir=out_dir_maps
-        # )
-        #
+        out_dir_maps = out_dir.joinpath('maps')
+        if not out_dir_maps.exists():
+            out_dir_maps.mkdir()
+        
+        unc_maps(
+            analysis_results_l1c=analysis_results_l1c,
+            analysis_results_l2a=analysis_results_l2a,
+            analysis_results_aot=analysis_results_aot,
+            analysis_results_wvp=analysis_results_wvp,
+            analysis_results_scl=analysis_results_scl,
+            analysis_results_vis=analysis_results_vis,
+            out_dir=out_dir_maps,
+            absolute_uncertainty=absolute_uncertainty
+        ) 
 
         # acquisition date of the S2 image
         img_date = datetime.datetime.strptime(
@@ -965,19 +999,27 @@ def main(
             analysis_results_vis=analysis_results_vis,
             shapefile_rois=in_file_shp_rois,
             id_column=id_column,
-            img_date=img_date
+            img_date=img_date,
+            absolute_uncertainty=absolute_uncertainty
         )
 
         # save (backup) dataframe as csv
         csv_dir = out_dir.joinpath('csv')
         if not csv_dir.exists():
             csv_dir.mkdir()
-        fname_csv = csv_dir.joinpath(
-            f'spectral-band_l1c-l2a-l3_uncertainty_{in_file_shp_rois.name.split(".")[0]}.csv'
-        )
+        if absolute_uncertainty:
+            fname_csv = csv_dir.joinpath(
+                f'spectral-band_l1c-l2a-l3_absolute-uncertainty_{in_file_shp_rois.name.split(".")[0]}.csv'
+            )
+            msg = f'Finished Analyzing Absolute Uncertainty of {unc_scenario_dir.name}'
+        else:
+            fname_csv = csv_dir.joinpath(
+                f'spectral-band_l1c-l2a-l3_relative-uncertainty_{in_file_shp_rois.name.split(".")[0]}.csv'
+            )
+            msg = f'Finished Analyzing Relative Uncertainty of {unc_scenario_dir.name}'
         unc_roi_df.to_csv(fname_csv, index=False)
 
-        print(f'Finished Analyzing Uncertainty of {unc_scenario_dir.name}')
+        print(msg)
 
 
 
@@ -1014,11 +1056,23 @@ if __name__ == '__main__':
             f'/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_RUT-Scenarios/batch_{batch}'
         )
 
+        # absolute uncertainty
         main(
             unc_scenario_dir_home=unc_scenario_dir_home,
             out_dir_home=out_dir_home,
             in_file_shp=in_file_shp,
             in_file_shp_rois=in_file_shp_rois,
             id_column=id_column,
+            **options
+        )
+
+        # relative uncertainty
+        main(
+            unc_scenario_dir_home=unc_scenario_dir_home,
+            out_dir_home=out_dir_home,
+            in_file_shp=in_file_shp,
+            in_file_shp_rois=in_file_shp_rois,
+            id_column=id_column,
+            absolute_uncertainty=False,
             **options
         )

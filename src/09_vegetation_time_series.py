@@ -13,10 +13,115 @@ from pathlib import Path
 from datetime import datetime
 from uncertainties import unumpy
 from typing import Tuple
+from typing import Optional
+from copy import deepcopy
+from scipy.interpolate import interp1d
 
 from agrisatpy.io import Sat_Data_Reader
 from agrisatpy.io.sentinel2 import S2_Band_Reader
 from agrisatpy.utils.constants.sentinel2 import ProcessingLevels
+
+
+def ts_temporal_compositing(
+        ts_values: np.array,
+        dates: pd.Series,
+        composite_length: Optional[int]=10,
+        composition_unit: Optional[str]='d',
+        method: Optional[str]='max',
+    ) -> pd.DataFrame:
+    """
+    creates a temporal composite of a time series by aggregating
+    (irregularly spaced) time series data at regular temporal units
+    (e.g., every 10 days) using one of the following aggregation
+    methods:
+    
+    * mean
+    * min
+    * max
+    * median
+    
+    If no data points are located within one of the aggregation
+    periods, NaN is inserted.
+
+    IMPORTANT: The dataframe must be sorted by date (asc) before
+    passing it to this function!
+
+    :param ts_df:
+        dataframe containing the temporal information and time
+        series data to smooth
+    :param colname_values:
+        name of the column holding the time series
+        values (e.g., NDVI)
+    :param composite_length:
+        length of the composite in terms if the specified
+        temporal unit (see composition_unit)
+    :param colname_time:
+        name of the column holding the temporal
+        dimension (e.g., dates or timestamps) if not already in index
+    :param composition_unit:
+        temporal unit to be used for creating the composite.
+        Default is d(ays).
+    :param method:
+        aggregation method for creating the composite. Must be
+        one out of 'min', 'max', 'mean', 'median'. The default
+        is 'max'
+    """
+
+    # the creation of the composite starts at the first timestamp available
+    local = pd.DataFrame({'date': dates, 'values': ts_values})
+    local.index = pd.to_datetime(local.date)
+    local.drop('date', inplace=True, axis=1)
+
+    local= local['values'].resample(
+        f'{composite_length}{composition_unit}', closed='right'
+    ).agg([method])
+    # add offset to resampled time stamps since the time series is shifted
+    # otherwise to the "left"
+    local.index = local.index + pd.DateOffset(int(0.5*composite_length))
+    return local
+
+
+def lin_interpol(
+            ts_df: pd.Dataframe
+        ) -> None:
+        """
+        linear interpolation of time series data
+        points
+        """
+
+        # reindex dataframe between start and end date and interpolate
+        rng = pd.date_range(ts_df.index.min(), ts_df.index.max())
+        return ts_df.reindex(rng).interpolate()
+
+
+def moving_average_smooting(
+        ts_df: pd.DataFrame,
+        colname_values: str,
+        window_size: int,
+        colname_time: Optional[str]=None,
+    ) -> pd.DataFrame:
+    """
+    Applies a moving average to a time series to smooth
+    it using a user-defined window size.
+
+    :param ts_df:
+        dataframe containing the temporal information and time
+        series data to smooth
+    :param colname_values:
+        name of the column holding the time series
+        values (e.g., NDVI)
+    :param window_size:
+        size of the moving window in the temporal unit provided
+        in the time column (usually days)
+    :param colname_time:
+        name of the column holding the temporal
+        dimension (e.g., dates or timestamps) if not already in index
+    """
+    local = deepcopy(ts_df)
+    if colname_time is not None:
+        local.index = pd.to_datetime(local[colname_time])
+        local.drop(colname_time, inplace=True, axis=1)
+    return local[colname_values].rolling(window=window_size).mean().iloc[window_size-1:].values
 
 
 def get_data_and_uncertainty_files(
@@ -75,7 +180,31 @@ def get_data_and_uncertainty_files(
 
     return df
 
+def threshold_based_phenology(ts_df, colname_values, colname_time, amplitude_threshold):
+    
+    res = {}
+    pos_idx = np.argmax(ts_df[colname_values])
+    res['POS'] = ts_df[colname_time].iloc[pos_idx]
 
+    # define amplitude as min-max spread
+    amplitude = np.max(ts_df[colname_values]) - \
+        np.min(ts_df[colname_values])
+
+    # define upward branch as located "left" from the POS index
+    amplitude_critical = amplitude *  amplitude_threshold / 100.
+    sos_idx = np.where(
+        ts_df[colname_values].iloc[0:pos_idx] > amplitude_critical)[0][0]
+    res['SOS'] = ts_df[colname_time].iloc[sos_idx]
+    # and downward right from it
+    eos_idx = pos_idx + np.where(
+        ts_df[colname_values].iloc[pos_idx+1:] > amplitude_critical)[0][-1]
+    res['EOS'] = ts_df[colname_time].iloc[eos_idx]
+
+    res['LENGTH'] = (res['EOS'] - res['SOS']).days
+
+    return res
+
+    
 def read_data_and_uncertainty(
         data_df: pd.DataFrame,
         in_file_aoi: Path,
@@ -98,7 +227,8 @@ def read_data_and_uncertainty(
         directory where to save the resulting plots to
         (are stored per image acquisition date)
     :return:
-        input dataframe with read data + standard uncertainty
+        input dataframe with read data + raster stack (including
+        standard uncertainty)
     """
 
     # loop over datasets (single acquisition dates) and read the data
@@ -201,8 +331,70 @@ def read_data_and_uncertainty(
     return merged, stack_ts
 
 
-def get_pixel(stack_df):
-    pass
+def phenological_uncertainty(
+        dates: pd.Series,
+        stack_ts: np.array
+    ):
+    """
+    
+    """
+
+    nrows, ncols = stack_ts.shape[0], stack_ts.shape[1]
+
+    for nrow in range(nrows):
+        for ncol in range(ncols):
+            pixel_ts = stack_ts[nrow,ncol,:].data
+            pixel_ts_vals = np.array([x.n for x in pixel_ts])
+            pixel_ts_unc = np.array([x.s for x in pixel_ts])
+
+            pixel_phenology_uncertainty(dates, pixel_ts_vals, pixel_ts_unc)
+
+
+def pixel_phenology_uncertainty(
+        dates: pd.Series,
+        pixel_ts_vals: np.array,
+        pixel_ts_unc: np.array,
+        n_scenarios: Optional[int] = 1000
+    ):
+    """
+    Function to calculate the uncertainty of key phenological metrics
+    using a set of vegetation index/ parameter observations from different
+    points in time and their standard uncertainty to generate `n_scenarios`` 
+    of pixel time series.
+    """
+
+    n_dates = len(dates)
+
+    for scenario in n_scenarios:
+
+        # generate sample from normal distribution
+        error_samples = np.random.normal(
+            loc=0,
+            scale=pixel_ts_unc,
+            size=n_dates
+        )
+        ts_scenario = pixel_ts_vals + error_samples
+
+        # maximum value 10-day composite
+        ts_df = ts_temporal_compositing(
+            ts_values=ts_scenario,
+            dates=dates
+        )
+
+        # linear interpolation
+        ts_df_lin = lin_interpol(ts_df=ts_df)
+
+        # moving average smoothing
+        ts_df_sm = moving_average_smooting(
+            ts_df=ts_df,
+            colname_values='values',
+            window_size=11,
+            colname_time='date'
+        )
+
+        # extract phenological metrics
+        
+
 
 if __name__ == '__main__':
     # original Sentinel-2 scenes with vegetation indices
@@ -231,11 +423,13 @@ if __name__ == '__main__':
     if not out_dir_plots.exists():
         out_dir_plots.mkdir()
 
-    unc_df = read_data_and_uncertainty(
+    unc_df, stack_ts = read_data_and_uncertainty(
         data_df=data_df,
         vi_name=vi_name,
         in_file_aoi=in_file_aoi,
         out_dir_plots=out_dir_plots
     )
+
+    dates = unc_df.date
 
       

@@ -8,14 +8,15 @@ import cv2
 import glob
 import pandas as pd
 import numpy as np
+import rasterio as rio
 
 from pathlib import Path
 from datetime import datetime
 from uncertainties import unumpy
 from typing import Tuple
 from typing import Optional
+from typing import Dict
 from copy import deepcopy
-from scipy.interpolate import interp1d
 
 from agrisatpy.io import Sat_Data_Reader
 from agrisatpy.io.sentinel2 import S2_Band_Reader
@@ -46,18 +47,13 @@ def ts_temporal_compositing(
     IMPORTANT: The dataframe must be sorted by date (asc) before
     passing it to this function!
 
-    :param ts_df:
-        dataframe containing the temporal information and time
-        series data to smooth
-    :param colname_values:
-        name of the column holding the time series
-        values (e.g., NDVI)
+    :param ts_values:
+        time series values to process
+    :param dates:
+        correspod
     :param composite_length:
         length of the composite in terms if the specified
         temporal unit (see composition_unit)
-    :param colname_time:
-        name of the column holding the temporal
-        dimension (e.g., dates or timestamps) if not already in index
     :param composition_unit:
         temporal unit to be used for creating the composite.
         Default is d(ays).
@@ -82,7 +78,7 @@ def ts_temporal_compositing(
 
 
 def lin_interpol(
-            ts_df: pd.Dataframe
+            ts_df: pd.DataFrame
         ) -> None:
         """
         linear interpolation of time series data
@@ -98,8 +94,7 @@ def moving_average_smooting(
         ts_df: pd.DataFrame,
         colname_values: str,
         window_size: int,
-        colname_time: Optional[str]=None,
-    ) -> pd.DataFrame:
+    ) -> pd.Series:
     """
     Applies a moving average to a time series to smooth
     it using a user-defined window size.
@@ -118,10 +113,7 @@ def moving_average_smooting(
         dimension (e.g., dates or timestamps) if not already in index
     """
     local = deepcopy(ts_df)
-    if colname_time is not None:
-        local.index = pd.to_datetime(local[colname_time])
-        local.drop(colname_time, inplace=True, axis=1)
-    return local[colname_values].rolling(window=window_size).mean().iloc[window_size-1:].values
+    return local[colname_values].rolling(window=window_size).mean().iloc[window_size-1:]
 
 
 def get_data_and_uncertainty_files(
@@ -180,27 +172,64 @@ def get_data_and_uncertainty_files(
 
     return df
 
-def threshold_based_phenology(ts_df, colname_values, colname_time, amplitude_threshold):
-    
+
+def threshold_based_phenology(
+        ts_df: pd.Series,
+        amplitude_threshold: int
+    ):
+    """
+    Extracts timing and vegetation parameter/ index value of start, peak,
+    end of season (SOS, POS, EOS). In addition, calculates the length of
+    the growing season (time difference between EOS and SOS in days) as well
+    as the area under the curve (vegetation parameter/ index values above
+    the selected amplitude threshold summed between SOS and EOS).
+    """
+
+    local = deepcopy(ts_df)
+
     res = {}
-    pos_idx = np.argmax(ts_df[colname_values])
-    res['POS'] = ts_df[colname_time].iloc[pos_idx]
+    pos_idx = np.argmax(local.values)
+    res['POS'] = local.index[pos_idx].date()
+    res['POS_Value'] = local.iloc[pos_idx]
 
     # define amplitude as min-max spread
-    amplitude = np.max(ts_df[colname_values]) - \
-        np.min(ts_df[colname_values])
+    amplitude = np.max(local) - np.min(local)
 
     # define upward branch as located "left" from the POS index
-    amplitude_critical = amplitude *  amplitude_threshold / 100.
-    sos_idx = np.where(
-        ts_df[colname_values].iloc[0:pos_idx] > amplitude_critical)[0][0]
-    res['SOS'] = ts_df[colname_time].iloc[sos_idx]
+    amplitude_critical = np.min(local) + amplitude *  amplitude_threshold / 100.
+    try:
+        sos_idx = np.where(
+            local.iloc[0:pos_idx] > amplitude_critical
+        )[0][0]
+    except IndexError:
+        # no SOS index found use same as POS
+        sos_idx = pos_idx
+    res['SOS'] = local.index[sos_idx].date()
+    res['SOS_Value'] = local.iloc[sos_idx]
     # and downward right from it
-    eos_idx = pos_idx + np.where(
-        ts_df[colname_values].iloc[pos_idx+1:] > amplitude_critical)[0][-1]
-    res['EOS'] = ts_df[colname_time].iloc[eos_idx]
+    try:
+        eos_idx = pos_idx + np.where(
+            local.iloc[pos_idx+1:] > amplitude_critical
+        )[0][-1]
+    except IndexError:
+        # no EOS index found, use same as POS
+        eos_idx = pos_idx
+    res['EOS'] = local.index[eos_idx].date()
+    res['EOS_Value'] = local.iloc[eos_idx]
 
     res['LENGTH'] = (res['EOS'] - res['SOS']).days
+
+    # approximate area under the curve by summing up values between SOS and EOS
+    # larger than the critical amplitude
+    local_df = pd.DataFrame(local)
+    colname_values = local_df.columns[0]
+    local_df['daily_amplitude'] = local_df[colname_values].apply(
+        lambda x, amplitude_critical=amplitude_critical:
+            x - amplitude_critical if x > amplitude_critical else 0.
+    )
+    if eos_idx < local.shape[0] -1:
+        eos_idx += 1
+    res['AUC'] = np.sum(local_df['daily_amplitude'].iloc[sos_idx:eos_idx])
 
     return res
 
@@ -328,15 +357,25 @@ def read_data_and_uncertainty(
     update_df = pd.DataFrame(update_list)
     merged = pd.merge(data_df, update_df, on='date')
 
-    return merged, stack_ts
+    # backup met
+    merged.to_csv(out_dir_plots.joinpath('metadata.csv'), index=False)
+
+    # write stack_ts to disk for backup
+    # take meta-information from one of the input images and update it
+    meta = s2_stack.get_meta(band_name='NDVI')
+
+    return merged, stack_ts, meta
 
 
 def phenological_uncertainty(
         dates: pd.Series,
-        stack_ts: np.array
+        stack_ts: np.array,
+        meta: dict,
+        out_file: Path
     ):
     """
-    
+    loop over raster stack and extract phenological metrics per
+    pixel.
     """
 
     nrows, ncols = stack_ts.shape[0], stack_ts.shape[1]
@@ -347,7 +386,40 @@ def phenological_uncertainty(
             pixel_ts_vals = np.array([x.n for x in pixel_ts])
             pixel_ts_unc = np.array([x.s for x in pixel_ts])
 
-            pixel_phenology_uncertainty(dates, pixel_ts_vals, pixel_ts_unc)
+            # determine uncertainty of the phenological stages
+            pixel_pheno_unc = pixel_phenology_uncertainty(
+                dates=dates,
+                pixel_ts_vals=pixel_ts_vals,
+                pixel_ts_unc=pixel_ts_unc
+            )
+
+            if pixel_pheno_unc is None:
+                print(f'Phenology was None row,col:  {nrow},{ncol}')
+                continue
+
+            # add to array
+            if nrow == 0 and ncol == 0:
+                band_names = list(pixel_pheno_unc.keys())
+                pheno_unc = np.ndarray(
+                    shape=(len(pixel_pheno_unc.keys()), nrows, ncols)
+                )
+
+            for idx, metric in enumerate(pixel_pheno_unc.keys()):
+                pheno_unc[idx, nrow, ncol] = pixel_pheno_unc[metric]
+
+            print(f'[Row: {nrow} | Col {ncol}]')
+
+    meta.update(
+        {
+            'count': pheno_unc.shape[0],
+            'type': 'float64'
+        }
+    )
+
+    with rio.open(out_file, 'w', **meta) as dst:
+        for idx in range(pheno_unc.shape[0]):
+            dst.set_band_description(idx+1, band_names[idx])
+            dst.write(pheno_unc[idx,:,:], idx+1)
 
 
 def pixel_phenology_uncertainty(
@@ -355,7 +427,7 @@ def pixel_phenology_uncertainty(
         pixel_ts_vals: np.array,
         pixel_ts_unc: np.array,
         n_scenarios: Optional[int] = 1000
-    ):
+    ) -> Dict[str, float]:
     """
     Function to calculate the uncertainty of key phenological metrics
     using a set of vegetation index/ parameter observations from different
@@ -364,8 +436,9 @@ def pixel_phenology_uncertainty(
     """
 
     n_dates = len(dates)
+    pheno_metrics = []
 
-    for scenario in n_scenarios:
+    for scenario in range(n_scenarios):
 
         # generate sample from normal distribution
         error_samples = np.random.normal(
@@ -385,15 +458,42 @@ def pixel_phenology_uncertainty(
         ts_df_lin = lin_interpol(ts_df=ts_df)
 
         # moving average smoothing
-        ts_df_sm = moving_average_smooting(
-            ts_df=ts_df,
-            colname_values='values',
-            window_size=11,
-            colname_time='date'
+        ts_df_lin_smoothed = moving_average_smooting(
+            ts_df=ts_df_lin,
+            colname_values='max',
+            window_size=11
         )
 
         # extract phenological metrics
-        
+        res_pheno = threshold_based_phenology(
+            ts_df=ts_df_lin_smoothed,
+            amplitude_threshold=30
+        )
+        pheno_metrics.append(res_pheno)
+
+        # print(f'Run scenario {scenario}/{n_scenarios}')
+
+    # combine scenarios to get error statistics
+    pheno_df = pd.DataFrame(pheno_metrics)
+
+    metrics = pheno_df.columns
+    pixel_pheno_unc = {}
+
+    # get standard deviation of the parameters
+    for metric in metrics:
+
+        metric_data = pheno_df[metric]
+
+        # check if metric contains numeric or date data
+        # dates are converted to day of year
+        if metric_data.dtype == 'O':
+            doys = pd.to_datetime(metric_data.values).day_of_year
+            stddev = np.std(doys)
+        else:
+            stddev = np.std(metric_data)
+        pixel_pheno_unc[metric] = stddev
+
+    return pixel_pheno_unc
 
 
 if __name__ == '__main__':
@@ -423,13 +523,16 @@ if __name__ == '__main__':
     if not out_dir_plots.exists():
         out_dir_plots.mkdir()
 
-    unc_df, stack_ts = read_data_and_uncertainty(
+    unc_df, stack_ts, meta = read_data_and_uncertainty(
         data_df=data_df,
         vi_name=vi_name,
         in_file_aoi=in_file_aoi,
         out_dir_plots=out_dir_plots
     )
 
+    out_file = uncertainty_analysis_dir.joinpath('Uncertainty_Phenology_NDVI.tif')
     dates = unc_df.date
+    
 
+    phenological_uncertainty(dates=dates, stack_ts=stack_ts, meta=meta, out_file=out_file)
       

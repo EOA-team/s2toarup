@@ -23,8 +23,9 @@ plt.style.use('ggplot')
 def plot_uncertainty_ts(
         analysis_dir: Path,
         output_dir: Path,
-        roi_selection: Optional[List[str]]=None,
-        search_expression: Optional[str]='spectral-band_l1c-l2a-l3_uncertainty*.csv'
+        roi_selection: Optional[List[str]] = None,
+        search_expression: Optional[str]='spectral-band_l1c-l2a-l3*',
+        absolute_uncertainy: Optional[bool] = True
     ):
     """
     Plots uncertainty extracted for selected land use classes (e.g., different
@@ -41,7 +42,13 @@ def plot_uncertainty_ts(
 
     # search for CSV files with uncertainty values. These are stored per scene
     # (starting with S2*) in a sub-directory named 'csv'
-    search_wildcard = analysis_dir.joinpath(f'S2*/csv/{search_expression}').as_posix()
+    if absolute_uncertainy:
+        search_wildcard = analysis_dir.joinpath(
+            f'S2*/csv/{search_expression}absolute-uncertainty*.csv').as_posix()
+    else:
+        search_wildcard = analysis_dir.joinpath(
+            f'S2*/csv/{search_expression}relative-uncertainty*.csv').as_posix()
+    
     csv_files = glob.glob(search_wildcard)
 
     # loop over files and read them into a list of pandas dataframes
@@ -81,12 +88,18 @@ def plot_uncertainty_ts(
             for roi in rois:
                 q_df_roi = q_df[q_df.ROI == roi].copy()
                 label = f'{roi} ({np.round(q_df_roi.area_km2.values[0],2)}' + ' $km^2$)'
-                ax.plot(q_df_roi.date, q_df_roi[uncertainty_quantity], label=label)
+                ax.plot(q_df_roi.date, q_df_roi[uncertainty_quantity], label=label, marker='x')
             ax.title.set_text(f'{processing_level} {uncertainty_quantity} Uncertainty Averaged per Crop Type')
-            ax.set_ylabel('Relative Uncertainty (k=1) [%]', fontsize=14)
+            if absolute_uncertainy:
+                label_text = 'Absolute Uncertainty (k=1)'
+                fname_base = f'{processing_level}_{uncertainty_quantity}_absolute-uncertainty-TS.png'
+            else:
+                label_text = 'Relative Uncertainty (k=1) [%]'
+                fname_base = f'{processing_level}_{uncertainty_quantity}_relative-uncertainty-TS.png'
+            ax.set_ylabel(label_text, fontsize=14)
             # plot legend outside of plot
             ax.legend(bbox_to_anchor=(1.04,1), loc="upper left")
-            fname = output_dir.joinpath(f'{processing_level}_{uncertainty_quantity}_Rel-Uncertainty-TS.png')
+            fname = output_dir.joinpath(fname_base)
             fig.savefig(fname, bbox_inches='tight')
             plt.close(fig)
 
@@ -100,8 +113,16 @@ if __name__ == '__main__':
     output_dir = analysis_dir.joinpath('uncertainty_ts_plots')
     if not output_dir.exists(): output_dir.mkdir()
 
+    # absolute uncertainties
     plot_uncertainty_ts(
         analysis_dir=analysis_dir,
         output_dir=output_dir
+    )
+
+    # relative uncertainties
+    plot_uncertainty_ts(
+        analysis_dir=analysis_dir,
+        output_dir=output_dir,
+        absolute_uncertainy=False
     )
         

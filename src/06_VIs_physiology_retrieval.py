@@ -52,13 +52,12 @@ def calc_indices(
     vis_dir = out_dir.joinpath('Vegetation_Indices')
     if not vis_dir.exists():
         vis_dir.mkdir()
-    fname_base = vis_dir.joinpath(f'VI_{in_file.name.split(".")[0]}').as_posix()
 
     # the actual index calculation starts here
     vi_names = ['NDVI', 'EVI']
     for vi_name in vi_names:
         handler.calc_vi(vi_name)
-        vi_fname = vis_dir.joinpath(f'{fname_base}_{vi_name.upper()}.tif')
+        vi_fname = vis_dir.joinpath(f'VI_{in_file.name.split(".")[0]}_{vi_name.upper()}.tif').as_posix()
         # save to raster
         handler.write_bands(
             out_file=vi_fname,
@@ -121,7 +120,7 @@ def main(
             # we "resample" the data using "pixel_division" which only increases
             # the pixel resolution without changing the spectral values
             file_dict = resample_and_stack_s2(
-                in_dir=orig_dataset,
+                in_dir=Path(orig_dataset),
                 out_dir=out_dir,
                 pixel_division=True
             )
@@ -139,7 +138,7 @@ if __name__ == '__main__':
 
     scenario_dir = Path('../S2A_MSIL1C_RUT-Scenarios')
     
-    shapefile_study_area = '../shp/AOI_Esch_EPSG32632.shp'
+    shapefile_study_area = Path('../shp/AOI_Esch_EPSG32632.shp')
     
     # vegetation indices on scenarios
     main(

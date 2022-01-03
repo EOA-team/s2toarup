@@ -1,2 +1,6 @@
 S2*/
+*.png
+*.xml
+scene_quicklooks/
+uncertainty_ts_plots/
 

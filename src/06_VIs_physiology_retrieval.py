@@ -17,52 +17,8 @@ import glob
 from pathlib import Path
 from typing import Optional
 
-from agrisatpy.spatial_resampling.sentinel2 import resample_and_stack_s2
+from agrisatpy.spatial_resampling.sentinel2.resample_and_stack import _get_output_file_names
 from agrisatpy.io.sentinel2 import Sentinel2Handler
-
-
-def calc_indices(
-        in_file: Path,
-        out_dir: Path,
-        shapefile_study_area: Path
-    ) -> None:
-    """
-    Calculates the NDVI and EVI for a band-stacked,
-    resampled Sentinel-2 geoTiff file
-
-    :param in_file:
-        file-path to the resampled, band-stacked geoTiff file
-    :param out_dir:
-        directory where to write the results to. These have the
-        same name as the input plus the name of the index calculated:
-        <in_file.name>_<index>.tif
-    :param shapefile_study_area:
-        shapefile defining the extent of our study area for clipping the data to
-    """
-
-    # open the file and read those bands required for calculating the indices
-    handler = Sentinel2Handler()
-    handler.read_from_bandstack(
-        fname_bandstack=in_file,
-        in_file_aoi=shapefile_study_area,
-        band_selection=['B02','B03','B04','B08']
-    )
-
-    # define output directory
-    vis_dir = out_dir.joinpath('Vegetation_Indices')
-    if not vis_dir.exists():
-        vis_dir.mkdir()
-
-    # the actual index calculation starts here
-    vi_names = ['NDVI', 'EVI']
-    for vi_name in vi_names:
-        handler.calc_vi(vi_name)
-        vi_fname = vis_dir.joinpath(f'VI_{in_file.name.split(".")[0]}_{vi_name.upper()}.tif').as_posix()
-        # save to raster
-        handler.write_bands(
-            out_file=vi_fname,
-            band_names=[vi_name]
-        )
 
 
 def main(
@@ -116,22 +72,36 @@ def main(
                 out_dir = out_dir.joinpath(Path(orig_dataset).name.replace('.SAFE', '.VIs'))
                 out_dir.mkdir(exist_ok=True)
 
-            # bandstack and mask the data
-            # we "resample" the data using "pixel_division" which only increases
-            # the pixel resolution without changing the spectral values
-            file_dict = resample_and_stack_s2(
+            # read data from SAFE; we only need the bands for the EVI and NDVI
+            handler = Sentinel2Handler()
+            handler.read_from_safe(
+                in_dir=Path(orig_dataset), 
+                band_selection=['B02','B04','B08'],
+                in_file_aoi=shapefile_study_area,
+                read_scl=False
+            )
+            # calculate the spectral indices
+            # define output directory
+            vis_dir = out_dir.joinpath('Vegetation_Indices')
+            if not vis_dir.exists():
+                vis_dir.mkdir()
+
+            # the actual index calculation starts here
+            vi_names = ['NDVI', 'EVI']
+            fnames = _get_output_file_names(
                 in_dir=Path(orig_dataset),
-                out_dir=out_dir,
-                pixel_division=True
+                resampling_method='None',
+                target_resolution=10
             )
-            
-            # calculate the spectral indices using the resampled data
-            # and write them to a separate sub-directory
-            calc_indices(
-                in_file=file_dict['bandstack'],
-                out_dir=out_dir,
-                shapefile_study_area=shapefile_study_area
-            )
+            in_file = fnames['bandstack']
+            for vi_name in vi_names:
+                handler.calc_vi(vi_name)
+                vi_fname = vis_dir.joinpath(f'VI_{in_file.split(".")[0]}_{vi_name.upper()}.tif').as_posix()
+                # save to raster
+                handler.write_bands(
+                    out_file=vi_fname,
+                    band_names=[vi_name]
+                )
 
 
 if __name__ == '__main__':

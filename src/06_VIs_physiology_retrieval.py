@@ -137,26 +137,18 @@ def main(
 
 if __name__ == '__main__':
 
-    # scenario_dir = Path('./../S2A_MSIL1C_RUT-Scenarios/batch_*')
+    scenario_dir = Path('../S2A_MSIL1C_RUT-Scenarios')
     
-    shapefile_study_area = '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/shp/AOI_Esch_EPSG32632.shp'
-    batches = [x for x in range(1,9)]
+    shapefile_study_area = '../shp/AOI_Esch_EPSG32632.shp'
     
-    for batch in batches:
-    
-        scenario_dir = Path(
-            f'/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_RUT-Scenarios/batch_{batch}'
-        )
-    
-        main(
-            scenario_dir=scenario_dir,
-            shapefile_study_area=shapefile_study_area
-        )
+    # vegetation indices on scenarios
+    main(
+        scenario_dir=scenario_dir,
+        shapefile_study_area=shapefile_study_area
+    )
 
     # original Sentinel-2 L2A data
-    orig_l2a_data = Path(
-        '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_orig'
-    )
+    orig_l2a_data = Path('../S2A_MSIL1C_orig')
     main(
         scenario_dir=orig_l2a_data,
         shapefile_study_area=shapefile_study_area,

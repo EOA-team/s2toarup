@@ -396,10 +396,10 @@ if __name__ == '__main__':
     )
 
     # vegetation index to consider
-    vi_name = 'NDVI'
+    vi_names = ['NDVI','EVI']
 
     # directory where to save phenological metrics to
-    out_dir_scenarios = Path(f'../S2_TimeSeries_Analysis/{vi_name}')
+    out_dir_scenarios = Path(f'../S2_TimeSeries_Analysis')
     if not out_dir_scenarios.exists():
         out_dir_scenarios.mkdir()
 
@@ -409,6 +409,10 @@ if __name__ == '__main__':
         out_dir_plots.mkdir()
     
     # number of scenarios to generate
-    n_scenarios = 10
+    n_scenarios = 1000
 
-    main(vi_dir, uncertainty_analysis_dir, in_file_aoi, out_dir_scenarios, out_dir_plots, n_scenarios, vi_name)
+    for vi_name in vi_names:
+        out_dir_scenarios = out_dir_scenarios.joinpath(vi_name)
+        if not out_dir_scenarios.exists():
+            out_dir_scenarios.mkdir()
+        main(vi_dir, uncertainty_analysis_dir, in_file_aoi, out_dir_scenarios, out_dir_plots, n_scenarios, vi_name)

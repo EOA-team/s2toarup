@@ -18,8 +18,8 @@ from typing import Optional
 from typing import Dict
 from copy import deepcopy
 
-from agrisatpy.io import Sat_Data_Reader
-from agrisatpy.io.sentinel2 import S2_Band_Reader
+from agrisatpy.io import SatDataHandler
+from agrisatpy.io.sentinel2 import Sentinel2Handler
 from agrisatpy.utils.constants.sentinel2 import ProcessingLevels
 
 
@@ -268,7 +268,7 @@ def read_data_and_uncertainty(
     for _, record in data_df.iterrows():
 
         # read S2 bandstack data (including scene classification layer, SCL)
-        s2_stack = S2_Band_Reader()
+        s2_stack = Sentinel2Handler()
         s2_stack.read_from_safe(
             in_dir=Path(record.filename_orig),
             processing_level=ProcessingLevels.L2A,
@@ -317,7 +317,7 @@ def read_data_and_uncertainty(
         s2_stack.mask_clouds_and_shadows(bands_to_mask=[vi_name])
 
         # read uncertainty data
-        uncertainty_band = Sat_Data_Reader()
+        uncertainty_band = SatDataHandler()
         uncertainty_band.read_from_bandstack(fname_bandstack=record.filename_unc)
 
         fig_unc = uncertainty_band.plot_band(

@@ -518,7 +518,7 @@ if __name__ == '__main__':
 
     # scenario_dir = Path('./../S2A_MSIL1C_RUT-Scenarios/batch_*')
     
-    shapefile_study_area = './../shp/AOI_Esch_EPSG32632.shp'
+    shapefile_study_area = '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/shp/AOI_Esch_EPSG32632.shp'
     batches = [x for x in range(1,9)]
     
     for batch in batches:

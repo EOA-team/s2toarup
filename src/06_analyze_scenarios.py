@@ -640,12 +640,9 @@ def unc_maps(
             single_axs.grid(False)
             epsg = meta['crs'].to_epsg()
     
-            # for colormap: find minimum of minima & maximum of maxima
-            minmin = np.round(np.nanmin(atm_data), 0)
-            maxmax = np.round(np.nanmax(atm_data), 0)
-            if absolute_uncertainty and band in vegetation_indices:
-                minmin = np.nanmin(atm_data)
-                maxmax = np.nanmax(atm_data)
+            # for colormap: find upper and lower 5% quantiles
+            minmin = np.nanquantile(atm_data, 0.05)
+            maxmax = np.nanquantile(atm_data, 0.95)
 
             # cut values higher than 10%, otherwise there is not much to see in the L1C image
             labelpad = 20
@@ -870,21 +867,21 @@ def extract_roi_unc(
                     raster_file=l1c_raster,
                     band_idx=l1c_band_idx,
                     geom=crop_df['geometry'],
-                    nodata_value=0.
+                    nodata_value=0.  # reflectance values are > 0
                 )
     
                 band_res_l2a[band] = _get_roi_mean(
                     raster_file=l2a_raster,
                     band_idx=l1c_band_idx,
                     geom=crop_df['geometry'],
-                    nodata_value=0.
+                    nodata_value=0.  # reflectance values are > 0
                 )
             elif band in atmospheric_parameters:
                 band_res_l2a[band] = _get_roi_mean(
                     raster_file=atmospheric_dict[band],
                     band_idx=l1c_band_idx,
                     geom=crop_df['geometry'],
-                    nodata_value=0.
+                    nodata_value=0.  # AOT and WVP are > 0
                 )
             elif band in vegetation_indices:
                 # special case TCARI_OSAVI (it has an underscore)
@@ -901,7 +898,7 @@ def extract_roi_unc(
                     raster_file=vi_raster,
                     band_idx=l1c_band_idx,
                     geom=crop_df['geometry'],
-                    nodata_value=0.
+                    nodata_value=-9999.  # VIs can take also negative values and be zero
                 )
 
         res.append(band_res_l1c)
@@ -973,16 +970,16 @@ def main(
         if not out_dir_maps.exists():
             out_dir_maps.mkdir()
         
-        unc_maps(
-            analysis_results_l1c=analysis_results_l1c,
-            analysis_results_l2a=analysis_results_l2a,
-            analysis_results_aot=analysis_results_aot,
-            analysis_results_wvp=analysis_results_wvp,
-            analysis_results_scl=analysis_results_scl,
-            analysis_results_vis=analysis_results_vis,
-            out_dir=out_dir_maps,
-            absolute_uncertainty=absolute_uncertainty
-        ) 
+        # unc_maps(
+        #     analysis_results_l1c=analysis_results_l1c,
+        #     analysis_results_l2a=analysis_results_l2a,
+        #     analysis_results_aot=analysis_results_aot,
+        #     analysis_results_wvp=analysis_results_wvp,
+        #     analysis_results_scl=analysis_results_scl,
+        #     analysis_results_vis=analysis_results_vis,
+        #     out_dir=out_dir_maps,
+        #     absolute_uncertainty=absolute_uncertainty
+        # ) 
 
         # acquisition date of the S2 image
         img_date = datetime.datetime.strptime(
@@ -1029,10 +1026,10 @@ if __name__ == '__main__':
     
     # shapefile (or other vector format) defining the extent of the study area
     in_file_shp = Path(
-        './../shp/AOI_Esch_EPSG32632.shp'
+        '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/shp/AOI_Esch_EPSG32632.shp'
     )
     in_file_shp_rois = Path(
-        './../shp/ZH_Polygons_2019_EPSG32632_selected-crops.shp'
+        '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/shp/ZH_Polygons_2019_EPSG32632_selected-crops.shp'
     )
     id_column = 'crop_type'
 

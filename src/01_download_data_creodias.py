@@ -1,21 +1,16 @@
 #!/usr/bin/python
 
 """
-
-@author:    Lukas Graf (D-USYS, ETHZ)
-
-@purpose:   This script shows how to download Sentinel-2 data
-            from Creodias for a given region of interest, date range,
-            cloud coverage and processing level.
+This script shows how to download Sentinel-2 data from Creodias for a given
+region of interest, date range, cloud coverage and processing level.
             
-            It requires an account at Creodias (https://creodias.eu/) and
-            the account's username and password set in the environmental
-            variables as (example for Win)
+It requires an account at Creodias (https://creodias.eu/) and the account's
+username and password set in the environmental variables as
             
-            SET CREODIAS_USER=<your-username>
-            SET CREODIAS_PASSWORD0<your-password>
+    SET CREODIAS_USER=<your-username>
+    SET CREODIAS_PASSWORD0<your-password>
 
-            It is the FIRST script in the uncertainty processing chain
+It is the FIRST script in the uncertainty processing chain
 """
 
 import geopandas as gpd
@@ -25,13 +20,14 @@ from typing import Optional
 
 from agrisatpy.downloader.sentinel2.creodias import query_creodias
 from agrisatpy.downloader.sentinel2.creodias import download_datasets
-from agrisatpy.downloader.sentinel2.creodias import ProcessingLevels
 from agrisatpy.downloader.sentinel2.utils import unzip_datasets
+from agrisatpy.utils.constants import ProcessingLevels
+
 
 def main(
         start_date: date,
         end_date: date,
-        processing_level: processing_level,
+        processing_level: ProcessingLevels,
         cloud_cover_threshold: int,
         aoi_file: Path,
         download_dir: Path,

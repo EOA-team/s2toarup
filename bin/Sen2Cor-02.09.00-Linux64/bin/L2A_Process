@@ -1,6 +1,0 @@
-#!/bin/sh
-
-. /mnt/ides/Lukas/software/Sen2Cor-02.09.00-Linux64/L2A_Bashrc
-
-/mnt/ides/Lukas/software/Sen2Cor-02.09.00-Linux64/bin/python2.7 -s /mnt/ides/Lukas/software/Sen2Cor-02.09.00-Linux64/lib/python2.7/site-packages/sen2cor/L2A_Process.py  "$@"
-

@@ -1,7 +1,6 @@
 '''
-Created on Dec 3, 2021
-
-@author: graflu
+Translation of the attributes of the shapefile containing the main crop types
+from German into English.
 '''
 
 import geopandas as gpd
@@ -27,6 +26,6 @@ translation_dict = {
 
 gdf['crop_type'] = gdf.NUTZUNG.apply(lambda x, translation_dict=translation_dict: translation_dict[x])
 
-fname_out = '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/shp/ZH_Polygons_2019_EPSG32632_selected-crops.shp'
+fname_out = './../shp/ZH_Polygons_2019_EPSG32632_selected-crops.shp'
 
 gdf.to_file(fname_out)

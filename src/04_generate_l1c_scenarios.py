@@ -2,38 +2,34 @@
 
 """
 
-@author:    Lukas Graf (D-USYS, ETHZ)
-            with some support and inspirations by Javier Gorroño
-            (Universitat Politècnica de València)
+This scripts implements the error correlation in the
+spectral, temporal (along-track), and spatial (across-track)
+dimension among the uncertainty contributors available from the
+S2 L1C-RUT runs per single uncertainty contributor to get a
+user-defined (>=100, ideally) number of L1C TOA scenarios using
+Monte Carlo (MC).
+In short, each L1C TOA scenario generated reflects the radiometric uncertainty
+taking into account that the uncertainty contributors might be
+correlated in one or more out of the three dimensions (multiple
+combinations as well as strength levels of correlation are possible).
 
-@purpose:   This scripts implements the error correlation in the
-            spectral, temporal (along-track), and spatial (across-track)
-            dimension among the uncertainty contributors available from the
-            S2 L1C-RUT runs per single uncertainty contributor to get a
-            user-defined (>=100, ideally) number of L1C TOA scenarios using
-            Monte Carlo (MC).
-            In short, each L1C TOA scenario generated reflects the radiometric uncertainty
-            taking into account that the uncertainty contributors might be
-            correlated in one or more out of the three dimensions (multiple
-            combinations as well as strength levels of correlation are possible).
+NOTE: The uncertainty scenarios will only cover the selected study area
+(in the script termed region of interest, ROI). The ROI MUST have a quadratic
+shape and should have a number of pixels in the 10m band that can be divided by
+6 (because of the 60m S2 bands).
+In our example we use a region of interest of 1200 by 1200 10m pixels (12 by 12 km)
+that equals 600 by 600 20m pixels and 200 by 200 60m pixels.
 
-            NOTE: The uncertainty scenarios will only cover the selected study area
-            (in the script termed region of interest, ROI). The ROI MUST have a quadratic
-            shape and should have a number of pixels in the 10m band that can be divided by
-            6 (because of the 60m S2 bands).
-            In our example we use a region of interest of 1200 by 1200 10m pixels (12 by 12 km)
-            that equals 600 by 600 20m pixels and 200 by 200 60m pixels.
+The information about the error correlation is taken from the
+paper by Gorroño et al. (2018, https://doi.org/10.1080/22797254.2018.1471739),
+Table 1. The script has been developed based on an intensive exchange of
+ideas and support by Javier Gorroño (Nov. 2021) which is gratefully
+acknowledged.
 
-            The information about the error correlation is taken from the
-            paper by Gorroño et al. (2018, https://doi.org/10.1080/22797254.2018.1471739),
-            Table 1. The script has been developed based on an intensive exchange of
-            ideas and support by Javier Gorroño (Nov. 2021) which is gratefully
-            acknowledged.
-
-            It took the idea of the MC framework from the Python script written by
-            Javier Gorroño to support their 2018 publication. The script is available here:
-            https://github.com/senbox-org/snap-rut/blob/master/src/test/python/s2roiunc_test.py
-            (link accessed latest: 7th Nov 2021)
+It took the idea of the MC framework from the Python script written by
+Javier Gorroño to support their 2018 publication. The script is available here:
+https://github.com/senbox-org/snap-rut/blob/master/src/test/python/s2roiunc_test.py
+(link accessed latest: 7th Nov 2021)
 
 """
 
@@ -655,7 +651,7 @@ def gen_rad_unc_scenarios(
         ######################################################################
 
         # combine the original L1C band data and the uncertainty (error) term
-        # band_data_scenario = band_data_toa * erro_data_band + band_data_toa
+        # band_data_scenario = band_data_toa * error_data_band + band_data_toa
 
         for s2_band in s2_bands:
 
@@ -818,7 +814,7 @@ if __name__ == '__main__':
     #     './../debug/template'
     # )
     # n_scenarios = 1
-    # roi_bounds_10m = [7000,8200,4000,5200] # pixel coordinates!
+    # roi_bounds_10m = [7200,8400,4200,5400]  # pixel coordinates (i.e., rows and columns)
     #
     # gen_rad_unc_scenarios(orig_dataset_path, unc_dataset_path, scenario_path, template_path, n_scenarios, roi_bounds_10m)
     #

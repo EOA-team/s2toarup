@@ -1,20 +1,9 @@
 #!/usr/bin/env bash
 
 #
-#	@author		Lukas Graf (D-USYS, ETHZ)
-#
-#	@purpose	script to run Sen2Cor (Sentinel-2 atmospheric correction)
-#				on each the original L1C scenes.
-#				The resulting L2A data is stored in the same directory as the
-#				input L1C datasets, i.e., in the single scenario folders.
-#
-#				NOTE: To speed things up, it might be useful to run several
-#				instances of Sen2Cor in parallel. In this case, the variable
-#				$unc_scenarios (L#28) might have when the scenarios are located
-#				at different locations on the file system.
-#
-#	@requires	Sen2Cor (atmospheric correction and scene classification software).
-#				In our case, version 2.09.00 is used.
+#	This shell script has the same purpose as 05_execute_sen2cor.sh but runs
+#	on the original data and not on the L1C scenarios generated. The resulting L2A
+#	products serve as reference products.
 #
 
 # define directory where the L1C realizations are located

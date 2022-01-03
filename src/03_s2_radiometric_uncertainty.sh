@@ -1,17 +1,15 @@
 #!/usr/bin/env bash
 
 #
-#	@author:	Lukas Graf (D-USYS, ETHZ)
-#
-#	@purpose:	Calls the Sentinel-2 Radiometric Uncertainty Toolbox
-#				(S2-RUT) using the Graph Processing Tool (GPT) of
-#				SNAP (Sentinel Application Platform). See the README
-#				about how to get it running.
-#				The script loops over all L1C scenes found and calculates
-#				the radiometric uncertainty for each band and uncertainty 
-#				contributor separately.
-#				The results are stored in a sub-directory named as the original
-#				scene but ending with *.RUT instead of *.SAFE
+#	Calls the Sentinel-2 Radiometric Uncertainty Toolbox
+#	(S2-RUT) using the Graph Processing Tool (GPT) of
+#	SNAP (Sentinel Application Platform). See the README
+#	about how to get it running.
+#	The script loops over all L1C scenes found and calculates
+#	the radiometric uncertainty for each band and uncertainty 
+#	contributor separately.
+#	The results are stored in a sub-directory named as the original
+#	scene but ending with *.RUT instead of *.SAFE
 #
 
 dot_safe_dir="./../S2A_MSIL1C_orig"

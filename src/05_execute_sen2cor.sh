@@ -1,27 +1,23 @@
 #!/usr/bin/env bash
 
+
 #
-#	@author		Lukas Graf (D-USYS, ETHZ)
+#	script to run Sen2Cor (Sentinel-2 atmospheric correction)
+#	on each L1C realization drawn from the radiometric uncertainty
+#	modelling approach.
+#	The resulting L2A data is stored in the same directory as the
+#	input L1C datasets, i.e., in the single scenario folders.
 #
-#	@purpose	script to run Sen2Cor (Sentinel-2 atmospheric correction)
-#				on each L1C realization drawn from the radiometric uncertainty
-#				modelling approach.
-#				The resulting L2A data is stored in the same directory as the
-#				input L1C datasets, i.e., in the single scenario folders.
+#	NOTE: To speed things up, it might be useful to run several
+#	instances of Sen2Cor in parallel. In this case, the variable
+#	$unc_scenarios (L#28) might have when the scenarios are located
+#	at different locations on the file system.
 #
-#				NOTE: To speed things up, it might be useful to run several
-#				instances of Sen2Cor in parallel. In this case, the variable
-#				$unc_scenarios (L#28) might have when the scenarios are located
-#				at different locations on the file system.
-#
-#	@requires	Sen2Cor (atmospheric correction and scene classification software).
-#				In our case, version 2.09.00 is used. An executable (Linux)
-#				is placed in the /bin directory of this Git-Repository which
-#				should run without any additional installation requirements.
-#				If another Sen2Cor version should be used, place it either in the
-#				/bin directory and replace the version in the $sen2cor_install_dir
-#				variable or place at any location you like and adopt the complete
-#				path. Make sure that the L2A_Bashrc file can be found and sourced!
+#	Requires Sen2Cor (atmospheric correction and scene classification software).
+#	In our case, version 2.09.00 is used.
+#   Make sure that the L2A_Bashrc file can be found and sourced! We placed it
+#	in the ../bin directory but other locations (usually in your home directory) are
+#	possible as well. In this case replace the path in line 29 of this script.
 #
 
 # define directory where the L1C realizations are located

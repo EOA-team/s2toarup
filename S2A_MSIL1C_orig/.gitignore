@@ -1,0 +1,9 @@
+*.tif
+*.tiff
+*.png
+*.csv
+*.SAFE/
+*.VIs/
+*.RUT/
+*.10m/
+

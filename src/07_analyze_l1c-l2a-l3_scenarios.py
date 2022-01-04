@@ -761,7 +761,6 @@ def extract_roi_unc(
         analysis_results_wvp: Path,
         analysis_results_vis: Path,
         shapefile_rois: Path,
-        id_column: str,
         img_date: date,
         absolute_uncertainty: Optional[bool]=True
     ) -> pd.DataFrame:
@@ -788,8 +787,6 @@ def extract_roi_unc(
     :param shapefile_rois:
         shapefile with polygons defining the single ROIs (each ROI is a feature
         in the file).
-    :param id_column:
-        name of the column with the unique identifier of each ROI
     :param date:
         acquisition date of the original S2 image (helps to track uncertainty
         over time)

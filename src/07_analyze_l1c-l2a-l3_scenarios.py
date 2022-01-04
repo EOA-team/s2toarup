@@ -940,16 +940,16 @@ def main(
         #    MAX, MEAN, STD AND STANDARD UNCERTAINTY DENOTING THE SPREAD
         #    AMONG THE SCENARIO MEMBERS
 
-        # for processing_level in processing_levels:
-        #
-        #     analyze_scenarios_spatial(
-        #         unc_scenario_dir=unc_scenario_dir,
-        #         in_file_shp=in_file_shp,
-        #         out_dir=out_dir,
-        #         processing_level=processing_level,
-        #         **kwargs
-        #     )
-        #
+        for processing_level in processing_levels:
+        
+            analyze_scenarios_spatial(
+                unc_scenario_dir=unc_scenario_dir,
+                in_file_shp=in_file_shp,
+                out_dir=out_dir,
+                processing_level=processing_level,
+                **kwargs
+            )
+        
 
         #    STEP_2        ANALYSIS AND VISUALIZATION OF UNCERTAINTY
     
@@ -965,16 +965,16 @@ def main(
         if not out_dir_maps.exists():
             out_dir_maps.mkdir()
         
-        # unc_maps(
-        #     analysis_results_l1c=analysis_results_l1c,
-        #     analysis_results_l2a=analysis_results_l2a,
-        #     analysis_results_aot=analysis_results_aot,
-        #     analysis_results_wvp=analysis_results_wvp,
-        #     analysis_results_scl=analysis_results_scl,
-        #     analysis_results_vis=analysis_results_vis,
-        #     out_dir=out_dir_maps,
-        #     absolute_uncertainty=absolute_uncertainty
-        # ) 
+        unc_maps(
+            analysis_results_l1c=analysis_results_l1c,
+            analysis_results_l2a=analysis_results_l2a,
+            analysis_results_aot=analysis_results_aot,
+            analysis_results_wvp=analysis_results_wvp,
+            analysis_results_scl=analysis_results_scl,
+            analysis_results_vis=analysis_results_vis,
+            out_dir=out_dir_maps,
+            absolute_uncertainty=absolute_uncertainty
+        ) 
 
         # acquisition date of the S2 image
         img_date = datetime.datetime.strptime(
@@ -1021,50 +1021,47 @@ if __name__ == '__main__':
     
     # shapefile (or other vector format) defining the extent of the study area
     in_file_shp = Path(
-        '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/shp/AOI_Esch_EPSG32632.shp'
+        '../shp/AOI_Esch_EPSG32632.shp'
     )
     in_file_shp_rois = Path(
-        '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/shp/ZH_Polygons_2019_EPSG32632_selected-crops.shp'
+        '../shp/ZH_Polygons_2019_EPSG32632_selected-crops.shp'
     )
     id_column = 'crop_type'
 
     # directory where to save the resulting files to
     out_dir_home = Path(
-        '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL2A_Analysis'
+        '../S2A_MSIL2A_Analysis'
     )
 
     options = {
         'orig_dataset_directory': Path(
-            '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_orig'
+            '../S2A_MSIL1C_orig'
         )
     }
 
-    # loop over batches containing Sen2Cor output from different runs
-    batches = [x for x in range(1,9)]
+    
+    # directory containing the raster realizations
+    unc_scenario_dir_home = Path(
+        f'../S2A_MSIL1C_RUT-Scenarios'
+    )
 
-    for batch in batches:
-        # directory containing the raster realizations
-        unc_scenario_dir_home = Path(
-            f'/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_RUT-Scenarios/batch_{batch}'
-        )
+    # absolute uncertainty
+    main(
+        unc_scenario_dir_home=unc_scenario_dir_home,
+        out_dir_home=out_dir_home,
+        in_file_shp=in_file_shp,
+        in_file_shp_rois=in_file_shp_rois,
+        id_column=id_column,
+        **options
+    )
 
-        # absolute uncertainty
-        main(
-            unc_scenario_dir_home=unc_scenario_dir_home,
-            out_dir_home=out_dir_home,
-            in_file_shp=in_file_shp,
-            in_file_shp_rois=in_file_shp_rois,
-            id_column=id_column,
-            **options
-        )
-
-        # relative uncertainty
-        main(
-            unc_scenario_dir_home=unc_scenario_dir_home,
-            out_dir_home=out_dir_home,
-            in_file_shp=in_file_shp,
-            in_file_shp_rois=in_file_shp_rois,
-            id_column=id_column,
-            absolute_uncertainty=False,
-            **options
-        )
+    # relative uncertainty
+    main(
+        unc_scenario_dir_home=unc_scenario_dir_home,
+        out_dir_home=out_dir_home,
+        in_file_shp=in_file_shp,
+        in_file_shp_rois=in_file_shp_rois,
+        id_column=id_column,
+        absolute_uncertainty=False,
+        **options
+    )

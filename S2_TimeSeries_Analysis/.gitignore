@@ -1,3 +1,6 @@
 *.tif
 *.tiff
+*.png
+Uncertainty_Maps/
+
 

@@ -53,24 +53,10 @@ from shapely.geometry import Polygon
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
+from logger import get_logger
 
 # setup logger -> will write log file to the /../log directory
-logger = logging.getLogger('l1c_monte-carlo')
-logger.setLevel(logging.INFO)
-# create file handler (has current timestamp in file name)
-now = datetime.now().strftime('%Y%m%d-%H%M%S')
-fh = logging.FileHandler(f'./../log/l1c_monte-carlo_{now}.log')
-fh.setLevel(logging.INFO)
-# create console handler
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-# create formatter and add it to the handlers
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-fh.setFormatter(formatter)
-ch.setFormatter(formatter)
-# add the handlers to the logger
-logger.addHandler(fh)
-logger.addHandler(ch)
+logger = get_logger('l1c-monte-carlo')
 
 
 # define L1C uncertainty contributors available from L1C-RUT

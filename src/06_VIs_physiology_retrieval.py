@@ -14,11 +14,17 @@ The VIs are stored as geoTiff files in the uncertainty directories
 '''
 
 import glob
+
 from pathlib import Path
 from typing import Optional
 
 from agrisatpy.spatial_resampling.sentinel2.resample_and_stack import _get_output_file_names
 from agrisatpy.io.sentinel2 import Sentinel2Handler
+
+from logger import get_logger
+
+# setup logger -> will write log file to the /../log directory
+logger = get_logger('l3_vegetation-indices')
 
 
 def main(
@@ -53,8 +59,10 @@ def main(
     else:
         scenarios = ['dummy']
 
-    # loop over scenarios
-    for scenario in scenarios:
+    # loop over scenes and their scenarios
+    for idx, scenario in enumerate(scenarios):
+
+        logger.info(f'Working on scene {scenario} ({idx+1}/{len(scenarios)})')
 
         # find L2A scenes
         if not is_orig_data:
@@ -64,8 +72,9 @@ def main(
 
         # loop over scenes, resample them for the extent of the study area and
         # calculate the spectral indices
-        for orig_dataset in orig_datasets_l2a:
+        for jdx, orig_dataset in enumerate(orig_datasets_l2a):
 
+            logger.info(f'Working on scenario {jdx+1}/{len(orig_datasets_l2a)} ({orig_dataset})')
             # place results in the root of the scenario
             out_dir = Path(orig_dataset).parent
             if is_orig_data:
@@ -73,35 +82,43 @@ def main(
                 out_dir.mkdir(exist_ok=True)
 
             # read data from SAFE; we only need the bands for the EVI and NDVI
-            handler = Sentinel2Handler()
-            handler.read_from_safe(
-                in_dir=Path(orig_dataset), 
-                band_selection=['B02','B04','B08'],
-                in_file_aoi=shapefile_study_area,
-                read_scl=False
-            )
-            # calculate the spectral indices
-            # define output directory
-            vis_dir = out_dir.joinpath('Vegetation_Indices')
-            if not vis_dir.exists():
-                vis_dir.mkdir()
-
-            # the actual index calculation starts here
-            vi_names = ['NDVI', 'EVI']
-            fnames = _get_output_file_names(
-                in_dir=Path(orig_dataset),
-                resampling_method='None',
-                target_resolution=10
-            )
-            in_file = fnames['bandstack']
-            for vi_name in vi_names:
-                handler.calc_vi(vi_name)
-                vi_fname = vis_dir.joinpath(f'VI_{in_file.split(".")[0]}_{vi_name.upper()}.tif').as_posix()
-                # save to raster
-                handler.write_bands(
-                    out_file=vi_fname,
-                    band_names=[vi_name]
+            try:
+                handler = Sentinel2Handler()
+                handler.read_from_safe(
+                    in_dir=Path(orig_dataset), 
+                    band_selection=['B02','B04','B08'],
+                    in_file_aoi=shapefile_study_area,
+                    read_scl=False
                 )
+                # calculate the spectral indices
+                # define output directory
+                vis_dir = out_dir.joinpath('Vegetation_Indices')
+                if not vis_dir.exists():
+                    vis_dir.mkdir()
+    
+                # the actual index calculation starts here
+                vi_names = ['NDVI', 'EVI']
+                fnames = _get_output_file_names(
+                    in_dir=Path(orig_dataset),
+                    resampling_method='None',
+                    target_resolution=10
+                )
+                in_file = fnames['bandstack']
+                for vi_name in vi_names:
+                    handler.calc_vi(vi_name)
+                    vi_fname = vis_dir.joinpath(f'VI_{in_file.split(".")[0]}_{vi_name.upper()}.tif').as_posix()
+                    # save to raster
+                    handler.write_bands(
+                        out_file=vi_fname,
+                        band_names=[vi_name]
+                    )
+                handler = None
+            except Exception as e:
+                logger.error(f'Scenario {jdx+1} failed ({orig_dataset}): {e}')
+                continue
+            logger.info(f'Finished scenario {jdx+1}/{len(orig_datasets_l2a)} ({orig_dataset})')
+
+        logger.info(f'Finshed scene {scenario} ({idx+1}/{len(scenarios)})')
 
 
 if __name__ == '__main__':

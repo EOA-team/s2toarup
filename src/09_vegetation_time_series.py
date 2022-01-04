@@ -28,24 +28,10 @@ from _phenolopy import calc_phenometrics
 from agrisatpy.io import SatDataHandler
 from agrisatpy.io.sentinel2 import Sentinel2Handler
 
+from logger import get_logger
 
 # setup logger -> will write log file to the /../log directory
-logger = logging.getLogger('l4_phenology')
-logger.setLevel(logging.INFO)
-# create file handler (has current timestamp in file name)
-now = datetime.now().strftime('%Y%m%d-%H%M%S')
-fh = logging.FileHandler(f'./../log/l4_phenology_{now}.log')
-fh.setLevel(logging.INFO)
-# create console handler
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-# create formatter and add it to the handlers
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-fh.setFormatter(formatter)
-ch.setFormatter(formatter)
-# add the handlers to the logger
-logger.addHandler(fh)
-logger.addHandler(ch)
+logger = get_logger('l4_phenology')
 
 
 def get_data_and_uncertainty_files(
@@ -412,7 +398,7 @@ if __name__ == '__main__':
     n_scenarios = 1000
 
     for vi_name in vi_names:
-        out_dir_scenarios = out_dir_scenarios.joinpath(vi_name)
-        if not out_dir_scenarios.exists():
-            out_dir_scenarios.mkdir()
-        main(vi_dir, uncertainty_analysis_dir, in_file_aoi, out_dir_scenarios, out_dir_plots, n_scenarios, vi_name)
+        out_dir_scenarios_vi = out_dir_scenarios.joinpath(vi_name)
+        if not out_dir_scenarios_vi.exists():
+            out_dir_scenarios_vi.mkdir()
+        main(vi_dir, uncertainty_analysis_dir, in_file_aoi, out_dir_scenarios_vi, out_dir_plots, n_scenarios, vi_name)

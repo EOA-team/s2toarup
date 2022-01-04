@@ -1,16 +1,9 @@
 # -*- coding: utf-8 -*-
 
 '''
-This script is used to calculate widely-used
-vegetation indices (VIs) for each L2A scenario outcome.
-To do so, the S2 L2A outputs after Sen2Cor are
-clipped (masked) to the study area and bandstacked
-into a single geoTiff file. The spatial resolution of the
-20m bands is therefore increased to 10m without
-modifying the spectral data since the spatial resampling
-procedure comes along with its own uncertainty.
-The VIs are stored as geoTiff files in the uncertainty directories
-(thus, per scenario).
+This script is used to calculate widely-used vegetation indices (VIs)
+for each L2A scenario outcome including the EVI (Enhanced Vegetation Index)
+and NDVI (Normalized Difference Vegetation Index)
 '''
 
 import glob

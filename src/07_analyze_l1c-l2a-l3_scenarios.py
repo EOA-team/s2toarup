@@ -201,12 +201,12 @@ def analyze_scenarios_spatial(
     if select_random_pixels:
 
         left, bottom, right, top = gdf.iloc[0]['geometry'].bounds
-        # sample across rows and columns
-        sampling_buffer = -20
+        # sample across rows and columns, leave buffer to avoid out-of-bounds errors
+        sampling_buffer = 60
         left += sampling_buffer
         bottom += sampling_buffer
-        right += sampling_buffer
-        top += sampling_buffer
+        right -= sampling_buffer
+        top -= sampling_buffer
 
         col_samples = np.random.uniform(left, right, n_random_pixels)
         row_samples = np.random.uniform(bottom, top, n_random_pixels)

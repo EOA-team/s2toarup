@@ -7,6 +7,7 @@ these phenological stages).
 import glob
 import numpy as np
 from pathlib import Path
+from typing import List
 
 from agrisatpy.io import SatDataHandler
 from logger import get_logger
@@ -19,7 +20,7 @@ def calc_l4_uncertainty(
         uncertainty_dir: Path,
         out_dir: Path,
         vi_name: str
-    ):
+    ) -> None:
     """
     Assesses the uncertainty in the phenological metrics derived in the
     previous step. Reports absolute uncertainties, only.
@@ -27,6 +28,10 @@ def calc_l4_uncertainty(
     :param uncertainty_dir:
         directory containing the phenometric results from the time series
         scenarios of the vegetation indices/ parameters analyzed
+    :param out_dir:
+        directory where to save the results of the uncertainty analysis to
+    :param vi_name:
+        name of the vegetation index/parameter to analyze
     """
 
     # search the scenarios, organized by vegetation index/ parameter
@@ -71,6 +76,65 @@ def calc_l4_uncertainty(
             band_names=[band_name]
         )
 
+
+def get_uncertainty_maps_and_histograms_by_croptype(
+        result_dir: Path,
+        vi_name: str,
+        pheno_metric: str,
+        shapefile_crops: Path,
+        column_crop_type: str,
+        crop_type_selection: List[int],
+        crop_type_aliases: List[str],
+        out_dir: Path
+    ):
+    """
+    Get uncertainty maps of a phenological metric for selected crop types
+    (considering all pixels labelled as these crop types), plus histograms of
+    the uncertainty values over all pixels of a crop type
+    """
+
+    # find the file with the phenological uncertainty estimates for the selected
+    # crop type
+    search_expr = f'{vi_name}_{pheno_metric}*uncertainty.tif'
+    unc_file = glob.glob(result_dir.joinpath(search_expr))
+
+    # read data
+    handler = SatDataHandler()
+    handler.read_from_bandstack(unc_file)
+
+    # add shapefile data with crop type codes
+    unc_band = handler.get_bandnames()[0]
+    handler.add_bands_from_vector(
+        in_file_vector=shapefile_crops,
+        snap_band=unc_band,
+        attribute_selection=[column_crop_type],
+        blackfill_value=-9999.
+    )
+
+    # mask out all other pixels (not having one of the selected crop types)
+    handler.mask(
+        name_mask_band=column_crop_type,
+        mask_values=-9999.,
+        bands_to_mask=[unc_band]
+    )
+
+    # plot the uncertainty band now masked to the crop selection
+    handler.plot_band(
+        band_name=unc_band,
+        colormap='coolwarm'
+    )
+
+    # convert to dataframe to compute histograms per crop types
+    gdf = handler.to_dataframe()
+
+    # drop nan's
+
+    # plot histograms by crop type
+
+
+
+def visualize_sample_time_series():
+    pass
 
 if __name__ == '__main__':
 

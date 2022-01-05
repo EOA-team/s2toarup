@@ -1,5 +1,5 @@
 '''
-Plots relative and aboslute uncertainty in the different processing levels
+Plots relative and absolute uncertainty in the different processing levels
 over time averaged per time point for the different crop types
 to reveal general temporal pattern of uncertainty.
 '''

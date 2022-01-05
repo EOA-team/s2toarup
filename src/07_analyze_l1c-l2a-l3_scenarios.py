@@ -2,10 +2,9 @@
 '''
 This script is used to analyze the uncertainty
 propagation outcomes before and after Sen2Cor. It generates
-tif files summarizing the scenario spread and hence
-relative standard uncertainty. In addition, it produces
-some maps useful for visually analyzing the results and
-extracts the uncertainty for the single regions of
+tif files summarizing the scenario spread and hence  standard uncertainty.
+In addition, it produces some maps useful for visually analyzing the
+results and extracts the uncertainty for the single regions of
 interest (ROI) into a handy CSV file format.
 '''
 

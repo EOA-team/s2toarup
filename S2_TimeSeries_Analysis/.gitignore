@@ -1,6 +1,6 @@
 *.tif
 *.tiff
 *.png
+*.csv
 Uncertainty_Maps/
 S2_TimeSeries_Analysis/
-

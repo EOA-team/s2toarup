@@ -96,14 +96,7 @@ band_dict_l2a = {
 band_dict_vis = {
     '10': {
         'NDVI': '*NDVI.tif',
-        'EVI': '*EVI.tif',
-        'BSI': '*BSI.tif',
-        'MCARI': '*MCARI.tif',
-        'MSAVI': '*MSAVI.tif',
-        'NDRE': '*NDRE.tif',
-        'TCARI_OSAVI': '*TCARI_OSAVI.tif',
-        'AVI': '*AVI.tif',
-        'CI-green': '*CI-GREEN.tif' 
+        'EVI': '*EVI.tif'
     }
 }
 

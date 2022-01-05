@@ -982,7 +982,6 @@ def main(
             analysis_results_wvp=analysis_results_wvp,
             analysis_results_vis=analysis_results_vis,
             shapefile_rois=in_file_shp_rois,
-            id_column=id_column,
             img_date=img_date,
             absolute_uncertainty=absolute_uncertainty
         )

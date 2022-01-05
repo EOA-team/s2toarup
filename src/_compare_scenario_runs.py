@@ -9,7 +9,7 @@ from pathlib import Path
 from agrisatpy.io import SatDataHandler
 
 
-def compare(file_1, file_2, out_dir):
+def compare(file_1, file_2, out_dir, vi_name):
     """compares uncertainty outcomes from different numbers of scenario runs"""
 
     handler_1 = SatDataHandler()
@@ -21,7 +21,7 @@ def compare(file_1, file_2, out_dir):
     diff_stats = []
     for band_name in handler_1.get_bandnames():
         
-        diff = handler_1.get_band(band_name) - handler_2.get_band(band_name)
+        diff = np.subtract(handler_1.get_band(band_name), handler_2.get_band(band_name))
         # add as band
         out_band_name = f'{band_name} DIFFERENCE'
         handler_2.add_band(
@@ -31,10 +31,10 @@ def compare(file_1, file_2, out_dir):
         # save as plot and geoTiff
         fname_out_base = out_dir.joinpath(f'{vi_name}_{band_name}_difference').as_posix()
         fig_diff = handler_2.plot_band(out_band_name)
-        fig_diff.savefig(f'{fname_out_base}.png', dpi=300, bbox_inches_tight=True)
+        fig_diff.savefig(f'{fname_out_base}.png', dpi=300, bbox_inches='tight')
         handler_2.write_bands(
             out_file=f'{fname_out_base}.tif',
-            band_names=out_band_name
+            band_names=[out_band_name]
         )
         # save statistics
         diff_stats.append(
@@ -49,8 +49,8 @@ def compare(file_1, file_2, out_dir):
                 'ninety-fifth-percentile_difference': np.nanquantile(diff, 0.95)
              }
         )
-    df = pd.concat(diff_stats)
-    fname_csv = out_dir.joinpath('difference_statistics.csv')
+    df = pd.DataFrame(diff_stats)
+    fname_csv = out_dir.joinpath(f'{vi_name}_difference_statistics.csv')
     df.to_csv(fname_csv, index=False)
     
 
@@ -75,11 +75,16 @@ if __name__ == '__main__':
         for vi_name in vi_names:
             # find the two uncertainty rasters
             search_expr = Path(scene).joinpath(f'L3_{vi_name}_*.tif')
-            file_150_scenarios = glob.glob(path_150.joinpath(search_expr).as_posix())
-            file_1000_scenarios = glob.glob(path_1000.joinpath(search_expr).as_posix())
+            file_150_scenarios = glob.glob(path_150.joinpath(search_expr).as_posix())[0]
+            file_1000_scenarios = glob.glob(path_1000.joinpath(search_expr).as_posix())[0]
             # compare them
             out_dir_scene = out_dir.joinpath(scene)
             if not out_dir_scene.exists():
                 out_dir_scene.mkdir()
-            compare(file_1=file_150_scenarios, file_2=file_1000_scenarios, out_dir=out_dir_scene)
+            compare(
+                file_1=file_150_scenarios,
+                file_2=file_1000_scenarios,
+                out_dir=out_dir_scene,
+                vi_name=vi_name
+            )
             

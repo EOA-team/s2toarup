@@ -5,9 +5,11 @@ these phenological stages).
 '''
 
 import glob
+import geopandas as gpd
+import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
-from typing import List
+from typing import Dict
 
 from agrisatpy.io import SatDataHandler
 from logger import get_logger
@@ -67,7 +69,13 @@ def calc_l4_uncertainty(
         unc_handler = deepcopy(handler_list[0])
         band_name = f'{pheno_metric} Uncertainty'
         unc_handler.add_band(band_name=band_name, band_data=standard_unc)
-        fig_unc = unc_handler.plot_band(band_name, colormap='summer')
+        fig_unc = unc_handler.plot_band(band_name, colormap='coolwarm')
+        ax = fig_unc.get_axes()[1]
+        if 'times' in pheno_metric:
+            unit = 'days'
+        else:
+            unit = '-'
+        ax.text(110, 0, f'Absolute Uncertainty (k=1) [{unit}]', fontsize=15, rotation=270)
         fname_out_fig = out_dir.joinpath(f'{vi_name}_{pheno_metric}_abs-uncertainty.png')
         fig_unc.savefig(fname_out_fig, dpi=300, bbox_inches='tight')
         fname_out_raster = fname_out_fig.as_posix().replace('.png','.tif')
@@ -81,10 +89,10 @@ def get_uncertainty_maps_and_histograms_by_croptype(
         result_dir: Path,
         vi_name: str,
         pheno_metric: str,
+        pheno_metric_alias: str,
         shapefile_crops: Path,
-        column_crop_type: str,
-        crop_type_selection: List[int],
-        crop_type_aliases: List[str],
+        column_crop_code: str,
+        crop_code_mapping: Dict[int, str],
         out_dir: Path
     ):
     """
@@ -95,41 +103,79 @@ def get_uncertainty_maps_and_histograms_by_croptype(
 
     # find the file with the phenological uncertainty estimates for the selected
     # crop type
-    search_expr = f'{vi_name}_{pheno_metric}*uncertainty.tif'
-    unc_file = glob.glob(result_dir.joinpath(search_expr))
+    plt.style.use('ggplot')
 
-    # read data
+    search_expr = f'{vi_name}_{pheno_metric}*uncertainty.tif'
+    unc_file = glob.glob(result_dir.joinpath(search_expr).as_posix())[0]
+
+    # read data, mask out all pixels not belonging to crop selection
     handler = SatDataHandler()
-    handler.read_from_bandstack(unc_file)
+    handler.read_from_bandstack(
+        fname_bandstack=unc_file,
+        in_file_aoi=shapefile_crops
+    )
 
     # add shapefile data with crop type codes
     unc_band = handler.get_bandnames()[0]
     handler.add_bands_from_vector(
         in_file_vector=shapefile_crops,
         snap_band=unc_band,
-        attribute_selection=[column_crop_type],
+        attribute_selection=[column_crop_code],
         blackfill_value=-9999.
     )
 
     # mask out all other pixels (not having one of the selected crop types)
     handler.mask(
-        name_mask_band=column_crop_type,
+        name_mask_band=column_crop_code,
         mask_values=-9999.,
         bands_to_mask=[unc_band]
     )
 
     # plot the uncertainty band now masked to the crop selection
-    handler.plot_band(
+    fig_unc = handler.plot_band(
         band_name=unc_band,
         colormap='coolwarm'
     )
+    ax = fig_unc.get_axes()[1]
+    if 'times' in pheno_metric:
+        unit = 'days'
+    else:
+        unit = '-'
+    ax.text(110, 0, f'Absolute Uncertainty (k=1) [{unit}]', fontsize=15, rotation=270)
+    fname_out_base = out_dir.joinpath(
+        f'{vi_name}_{pheno_metric}_abs-uncertainty_{shapefile_crops.name.split(".")[0]}'
+    ).as_posix()
+    fig_unc.savefig(f'{fname_out_base}.png', dpi=300, bbox_inches='tight')
+    plt.close(fig_unc)
 
     # convert to dataframe to compute histograms per crop types
     gdf = handler.to_dataframe()
 
     # drop nan's
+    gdf = gdf[~np.isnan(gdf[unc_band])]
 
-    # plot histograms by crop type
+    # plot histograms by crop type (add crop names first)
+    gdf['crop'] = gdf.crop_code.apply(
+        lambda x, crop_code_mapping=crop_code_mapping: crop_code_mapping[x]
+    )
+    # histogram of all crops
+    gdf[unc_band].hist(by=gdf['crop'], bins=50, sharex=True, sharey=True, density=True)
+    plt.suptitle(
+        f'{pheno_metric_alias.upper()} derived from {vi_name}:\nRelative Frequencies of Absolute Uncertainty (k=1) Values per Crop Type'
+    )
+    plt.subplots_adjust(top=0.85)
+    plt.savefig(
+        f'{fname_out_base}_histogram-uncertainties-all-crops.png',
+        dpi=300,
+        bbox_inches='tight'
+    )
+    plt.close()
+
+    # save dataframe to csv for future analysis
+    gdf['x'] = gdf.geometry.x
+    gdf['y'] = gdf.geometry.y
+    gdf.drop('geometry', axis=1, inplace=True)
+    gdf.to_csv(f'{fname_out_base}_data.csv', index=False)
 
 
 
@@ -142,13 +188,53 @@ if __name__ == '__main__':
     out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
     if not out_dir.exists():
         out_dir.mkdir()
+    result_dir = out_dir
+
+    out_dir_crops = out_dir.joinpath('selected_crops')
+    if not out_dir_crops.exists():
+        out_dir_crops.mkdir()
 
     vi_names = ['NDVI', 'EVI']
 
+    # pheno-metrics to analyze
+    pheno_metrics = [
+        'sos_times', 'pos_times', 'eos_times', 'sos_values', 'pos_values', 'eos_values'
+    ]
+    pheno_metrics_aliases = [
+        'SOS', 'POS', 'EOS', 'SOS Value', 'POS Value', 'EOS Value'
+    ]
+
+    # shapefile with crop type information for the single field parcels
+    shapefile_crops = Path('../shp/ZH_Polygons_2019_EPSG32632_selected-crops.shp')
+    column_crop_code = 'crop_code'
+    column_crop_names = 'crop_type'
+
+    # define mapping of "NUTZUNGSCODES" to crop types
+    gdf = gpd.read_file(shapefile_crops)
+    crop_code_mapping = dict(list(gdf.groupby([column_crop_code, column_crop_names]).groups))
+
     for vi_name in vi_names:
+
         calc_l4_uncertainty(
             uncertainty_dir=uncertainty_dir,
             out_dir=out_dir,
             vi_name=vi_name
         )
+
+        # create maps and histograms of phenometrics
+        for idx, pheno_metric in enumerate(pheno_metrics):
+            pheno_metric_alias = pheno_metrics_aliases[idx]
+            get_uncertainty_maps_and_histograms_by_croptype(
+                result_dir=result_dir,
+                vi_name=vi_name,
+                pheno_metric=pheno_metric,
+                pheno_metric_alias=pheno_metric_alias,
+                shapefile_crops=shapefile_crops,
+                column_crop_code=column_crop_code,
+                crop_code_mapping=crop_code_mapping,
+                out_dir=out_dir_crops
+            )
+            
+
+        
     

@@ -69,15 +69,22 @@ def calc_l4_uncertainty(
         unc_handler = deepcopy(handler_list[0])
         band_name = f'{pheno_metric} Uncertainty'
         unc_handler.add_band(band_name=band_name, band_data=standard_unc)
-        fig_unc = unc_handler.plot_band(band_name, colormap='coolwarm')
-        ax = fig_unc.get_axes()[1]
+
+        # plot as map
         if 'times' in pheno_metric:
             unit = 'days'
         else:
             unit = '-'
-        ax.text(110, 0, f'Absolute Uncertainty (k=1) [{unit}]', fontsize=15, rotation=270)
+        label = f'Absolute Uncertainty (k=1) [{unit}]'
+        fig_unc = unc_handler.plot_band(
+            band_name,
+            colormap='coolwarm',
+            colorbar_label=label
+        )
+
         fname_out_fig = out_dir.joinpath(f'{vi_name}_{pheno_metric}_abs-uncertainty.png')
         fig_unc.savefig(fname_out_fig, dpi=300, bbox_inches='tight')
+        plt.close(fig_unc)
         fname_out_raster = fname_out_fig.as_posix().replace('.png','.tif')
         unc_handler.write_bands(
             out_file=fname_out_raster,
@@ -132,16 +139,16 @@ def get_uncertainty_maps_and_histograms_by_croptype(
     )
 
     # plot the uncertainty band now masked to the crop selection
-    fig_unc = handler.plot_band(
-        band_name=unc_band,
-        colormap='coolwarm'
-    )
-    ax = fig_unc.get_axes()[1]
     if 'times' in pheno_metric:
         unit = 'days'
     else:
         unit = '-'
-    ax.text(110, 0, f'Absolute Uncertainty (k=1) [{unit}]', fontsize=15, rotation=270)
+    label = f'Absolute Uncertainty (k=1) [{unit}]'
+    fig_unc = handler.plot_band(
+        band_name=unc_band,
+        colormap='coolwarm',
+        colorbar_label=label
+    )
     fname_out_base = out_dir.joinpath(
         f'{vi_name}_{pheno_metric}_abs-uncertainty_{shapefile_crops.name.split(".")[0]}'
     ).as_posix()

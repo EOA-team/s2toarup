@@ -229,7 +229,7 @@ if __name__ == '__main__':
             vi_name=vi_name
         )
 
-        # create maps and histograms of phenometrics
+        create maps and histograms of phenometrics
         for idx, pheno_metric in enumerate(pheno_metrics):
             pheno_metric_alias = pheno_metrics_aliases[idx]
             get_uncertainty_maps_and_histograms_by_croptype(
@@ -242,7 +242,5 @@ if __name__ == '__main__':
                 crop_code_mapping=crop_code_mapping,
                 out_dir=out_dir_crops
             )
-            
-
         
     

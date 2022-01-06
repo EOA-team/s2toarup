@@ -36,6 +36,7 @@ def calc_l4_uncertainty(
         name of the vegetation index/parameter to analyze
     """
 
+    plt.style.use('default')
     # search the scenarios, organized by vegetation index/ parameter
     vi_uncertainty_dir = uncertainty_dir.joinpath(vi_name)
 

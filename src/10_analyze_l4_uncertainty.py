@@ -111,7 +111,7 @@ def get_uncertainty_maps_and_histograms_by_croptype(
 
     # find the file with the phenological uncertainty estimates for the selected
     # crop type
-    plt.style.use('ggplot')
+    plt.style.use('seaborn-colorblind')
 
     search_expr = f'{vi_name}_{pheno_metric}*uncertainty.tif'
     unc_file = glob.glob(result_dir.joinpath(search_expr).as_posix())[0]
@@ -223,13 +223,13 @@ if __name__ == '__main__':
 
     for vi_name in vi_names:
 
-        calc_l4_uncertainty(
-            uncertainty_dir=uncertainty_dir,
-            out_dir=out_dir,
-            vi_name=vi_name
-        )
+        # calc_l4_uncertainty(
+        #     uncertainty_dir=uncertainty_dir,
+        #     out_dir=out_dir,
+        #     vi_name=vi_name
+        # )
 
-        create maps and histograms of phenometrics
+        # create maps and histograms of phenometrics
         for idx, pheno_metric in enumerate(pheno_metrics):
             pheno_metric_alias = pheno_metrics_aliases[idx]
             get_uncertainty_maps_and_histograms_by_croptype(

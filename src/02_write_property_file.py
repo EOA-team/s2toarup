@@ -56,5 +56,5 @@ def write_properties(
 
 if __name__ == '__main__':
     
-    out_dir = Path('./../S2A_MSIL1C_orig')
+    out_dir = Path('./../S2A_MSIL1C_orig/autumn')
     write_properties(out_dir=out_dir)

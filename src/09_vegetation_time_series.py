@@ -613,9 +613,11 @@ if __name__ == '__main__':
     n_scenarios = 1000
 
     for vi_name in vi_names:
+
         out_dir_scenarios_vi = out_dir_scenarios.joinpath(vi_name)
         if not out_dir_scenarios_vi.exists():
             out_dir_scenarios_vi.mkdir()
+
         main(
             vi_dir=vi_dir,
             uncertainty_analysis_dir=uncertainty_analysis_dir,

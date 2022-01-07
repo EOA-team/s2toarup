@@ -5,6 +5,8 @@ these phenological stages).
 '''
 
 import glob
+import datetime
+import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,6 +18,8 @@ from logger import get_logger
 from copy import deepcopy
 
 logger = get_logger('l5_uncertainty')
+
+start_date = datetime.date(2019,1,1)
 
 
 def calc_l4_uncertainty(
@@ -187,8 +191,83 @@ def get_uncertainty_maps_and_histograms_by_croptype(
 
 
 
-def visualize_sample_time_series():
-    pass
+def visualize_sample_time_series(
+        sample_points_scenarios: Path,
+        sample_points_pheno_metrics_reference: Path,
+        pheno_metrics_uncertainty_dir: Path,
+        vi_name: str
+    ):
+    """
+    Plots the randomly extracted pixel time series, their scenario spread
+    and the pheno metrics SOS, POS, EOS alongside their uncertainty for the
+    selected pixel.
+
+    """
+
+    # read extracted pixel samples as dataframe
+    df = pd.read_csv(sample_points_scenarios)
+    # drop nans
+    df.dropna(inplace=True)
+    # convert back to geodataframe
+    gdf = gpd.GeoDataFrame(
+        df,
+        geometry=gpd.points_from_xy(df.x, df.y)
+    )
+    # set CRS (UTM zone 32N)
+    gdf.set_crs(epsg=32632, inplace=True)
+
+    # extract the timing of SOS, POS and EOS from the reference run
+    metrics = ['sos_times', 'pos_times', 'eos_times']
+    gdf = SatDataHandler.read_pixels(
+        point_features=gdf,
+        raster=sample_points_pheno_metrics_reference,
+        band_selection=metrics
+    )
+
+    # extract the uncertainty of the metrics
+    for metric in metrics:
+        metric_uncertainty_file = glob.glob(
+            pheno_metrics_uncertainty_dir.joinpath(
+                f'{vi_name}_{metric}_abs-uncertainty.tif'
+            ).as_posix()
+        )[0]
+        gdf = SatDataHandler.read_pixels(
+            point_features=gdf,
+            raster=metric_uncertainty_file
+        )
+
+    # loop over the point (using their unique id) and visualize the time series
+    unique_points = list(gdf.id.unique())
+
+    for point in unique_points:
+        
+        # get a copy of the slice of the dataframe denoting the point
+        point_gdf = gdf[gdf.id == point].copy()
+        point_gdf['date'] = pd.to_datetime(point_gdf['date'])
+
+        # plot the time series
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+
+        crop_type = point_gdf.crop_type.iloc[0]
+        coordinate_str = f'x={np.round(point_gdf.x.iloc[0])}m, y={np.round(point_gdf.y.iloc[0])}m'
+        title_str = f'{crop_type} Sample\n{coordinate_str}'
+
+        # plot original data
+        # time series
+        ax.plot(point_gdf.date, point_gdf[vi_name], 'ro', label='original')
+        ax.plot(point_gdf.date, point_gdf[f'{vi_name}_ts_sm'], label='original smoothed')
+        # phenological metrics. Need to be convert to dates since pheno metrics are provided
+        # as days-of-year (doys)
+        for metric in metrics:
+            pheno_metric_doy = int(point_gdf[metric].iloc[0])
+            pheno_metric_date = start_date + datetime.timedelta(days=pheno_metric_doy)
+            ax.vlines(x=pheno_metric_date, ymin=0, ymax=1, label='SOS', linestyles='dashed')
+
+        plt.show()
+        
+
+
 
 if __name__ == '__main__':
 
@@ -228,19 +307,41 @@ if __name__ == '__main__':
         #     out_dir=out_dir,
         #     vi_name=vi_name
         # )
+        #
+        # # create maps and histograms of phenometrics
+        # for idx, pheno_metric in enumerate(pheno_metrics):
+        #     pheno_metric_alias = pheno_metrics_aliases[idx]
+        #     get_uncertainty_maps_and_histograms_by_croptype(
+        #         result_dir=result_dir,
+        #         vi_name=vi_name,
+        #         pheno_metric=pheno_metric,
+        #         pheno_metric_alias=pheno_metric_alias,
+        #         shapefile_crops=shapefile_crops,
+        #         column_crop_code=column_crop_code,
+        #         crop_code_mapping=crop_code_mapping,
+        #         out_dir=out_dir_crops
+        #     )
 
-        # create maps and histograms of phenometrics
-        for idx, pheno_metric in enumerate(pheno_metrics):
-            pheno_metric_alias = pheno_metrics_aliases[idx]
-            get_uncertainty_maps_and_histograms_by_croptype(
-                result_dir=result_dir,
-                vi_name=vi_name,
-                pheno_metric=pheno_metric,
-                pheno_metric_alias=pheno_metric_alias,
-                shapefile_crops=shapefile_crops,
-                column_crop_code=column_crop_code,
-                crop_code_mapping=crop_code_mapping,
-                out_dir=out_dir_crops
-            )
+        # visualize the randomly selected pixel time series samples
+        vi_dir = uncertainty_dir.joinpath(vi_name)
+        # path to pixel samples
+        sample_points_scenarios = glob.glob(
+            vi_dir.joinpath(f'{vi_name}_*time_series.csv').as_posix()
+        )[0]
+
+        # path to reference pheno metric results (calculated on original time series data)
+        sample_points_pheno_metrics_reference = vi_dir.joinpath('reference').joinpath('pheno_metrics.tif')
+
+        visualize_sample_time_series(
+            sample_points_scenarios=sample_points_scenarios,
+            sample_points_pheno_metrics_reference=sample_points_pheno_metrics_reference,
+            pheno_metrics_uncertainty_dir=result_dir,
+            vi_name=vi_name
+        )
+        
+
+        
+
+
         
     

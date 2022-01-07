@@ -808,21 +808,21 @@ if __name__ == '__main__':
     ### define user inputs
     
     # directory with L1C data (.SAFE subdirectories)
-    orig_datasets_dir = Path('/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_orig')
+    orig_datasets_dir = Path('../S2A_MSIL1C_orig/autumn')
     
     # directory with radiometric uncertainty outputs (.RUT subdirectories)
     unc_datasets_dir = orig_datasets_dir
     
     # directory where to store the scenarios (a subdirectory will be created for each scene)
     # in which the actual scenarios are placed
-    scenario_dir = Path('/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2A_MSIL1C_RUT-Scenarios')
+    scenario_dir = Path('../S2A_MSIL1C_RUT-Scenarios')
     
     # define bounds of the study area (aka region of interest)
     # bounds col_min, col_max, row_min, row_max (image coordinates of the 10m raster)
     roi_bounds_10m = [7200,8400,4200,5400]
     
     # number of scenarios (each scenario is a possible realization of a S2 scene!)
-    n_scenarios = 1000
+    n_scenarios = 150
     
     main(
         orig_datasets_dir,

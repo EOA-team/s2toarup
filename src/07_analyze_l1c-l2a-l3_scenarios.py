@@ -1021,7 +1021,7 @@ if __name__ == '__main__':
 
     # directory where to save the resulting files to
     out_dir_home = Path(
-        '../S2A_MSIL2A_Analysis'
+        '../S2A_MSIL2A_Analysis/1000_scenarios'
     )
 
     options = {

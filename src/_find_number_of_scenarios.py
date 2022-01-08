@@ -49,9 +49,6 @@ def plot_uncertainty_number_of_scenarios(
             )
         gdf.rename(columns={vi_name: f'{vi_name}_{idx+1}'}, inplace=True)
 
-        if idx == 20:
-            break
-
     # loop over points and plot the derived absolute uncertainty in relation to the
     # the number of scenarios considered. Increase the number considered by steps of 10
     # and plot the result

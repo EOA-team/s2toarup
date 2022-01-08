@@ -815,7 +815,7 @@ if __name__ == '__main__':
     
     # directory where to store the scenarios (a subdirectory will be created for each scene)
     # in which the actual scenarios are placed
-    scenario_dir = Path('../S2A_MSIL1C_RUT-Scenarios')
+    scenario_dir = Path('../S2A_MSIL1C_RUT-Scenarios/autumn')
     
     # define bounds of the study area (aka region of interest)
     # bounds col_min, col_max, row_min, row_max (image coordinates of the 10m raster)

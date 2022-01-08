@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from agrisatpy.io import SatDataHandler
 
+plt.style.use('ggplot')
+
 
 def plot_uncertainty_number_of_scenarios(
         scenarios_scene_dir: Path,
@@ -18,11 +20,11 @@ def plot_uncertainty_number_of_scenarios(
     # search expression to find all scenario realizations
     search_expr = f'*/Vegetation_Indices/VI*_{vi_name}.tif'
     scenario_files = glob.glob(
-        scenarios_scene_dir.joinpath(search_expr)
+        scenarios_scene_dir.joinpath(search_expr).as_posix()
     )
 
     # read all scenario results at the selected point locations into a dataframe
-    for idx, scenario in scenario_files:
+    for idx, scenario in enumerate(scenario_files):
 
         if idx == 0:
             gdf = SatDataHandler.read_pixels(
@@ -34,7 +36,7 @@ def plot_uncertainty_number_of_scenarios(
                 point_features=gdf,
                 raster=scenario
             )
-        gdf.rename(columns={vi_name: f'{vi_name}_{scenario+1}'})
+        gdf.rename(columns={vi_name: f'{vi_name}_{idx+1}'}, inplace=True)
 
     # loop over points and plot the derived absolute uncertainty in relation to the
     # the number of scenarios considered. Increase the number considered by steps of 10
@@ -47,20 +49,20 @@ def plot_uncertainty_number_of_scenarios(
 
         # get scenario results at this location
         mask = point_gdf.columns.str.contains(f'{vi_name}_*')
-        scenario_values = point_gdf.loc[:,mask].values()
+        scenario_values = point_gdf.loc[:,mask].values
 
         # calculate the absolute uncertainties for increasing number of scenarios
         scenario_number = []
         abs_unc = []
         start_idx = 0
         increment = 10
-        n_batches = int(scenario_values.shape[0]/increment)
+        n_batches = int(scenario_values.shape[1]/increment)
 
         counter = 10
         for _ in range(n_batches):
             
             scenario_number.append(counter)
-            res = np.std(scenario_values[start_idx:counter])
+            res = np.std(scenario_values[0,start_idx:counter])
             abs_unc.append(res)
 
             # increment the counter
@@ -75,13 +77,13 @@ def plot_uncertainty_number_of_scenarios(
         crop_type = point_gdf.crop_type.iloc[0]
         title_str = f'{crop_type}\n {coord_str}'
     
-        ax.plot(scenario_number, abs_unc, 'o', label=f'{vi_name} Uncertainty')
+        ax.plot(scenario_number, abs_unc, '-x', label=f'{vi_name} Uncertainty')
         ax.set_xlabel('Number of scenarios', fontsize=16)
         ax.set_ylabel('Absolute Uncertainty (k=1)', fontsize=16)
-        ax.title(title_str, fontsize=14)
+        ax.set_title(title_str, fontsize=14)
         ax.legend(fontsize=14)
 
-        fname_out = out_dir.joinpath(f'{vi_name}_{crop_type}_{coord_str.replace(", "),("_")}.png')
+        fname_out = out_dir.joinpath(f'{vi_name}_{crop_type}_{coord_str.replace(", ","_")}.png')
         fig.savefig(fname_out, bbox_inches='tight')
 
     # save dataframe to CSV
@@ -95,5 +97,15 @@ if __name__ == '__main__':
     sample_points = Path('../shp/ZH_Points_2019_EPSG32632_selected-crops.shp')
     vi_names = ['NDVI', 'EVI']
     out_dir = Path('../S2A_MSIL2A_Analysis/how_many_scenarios')
-    
+
+    for vi_name in vi_names:
+        out_dir_vi = out_dir.joinpath(vi_name)
+        if not out_dir_vi.exists():
+            out_dir_vi.mkdir()
+        plot_uncertainty_number_of_scenarios(
+            scenarios_scene_dir=scenario_scene_dir,
+            sample_points=sample_points,
+            vi_name=vi_name,
+            out_dir=out_dir_vi
+        )
     

@@ -337,7 +337,7 @@ def analyze_scenarios_spatial(
                     orig_val = orig_arr[0,rand_coords['row'],rand_coords['col']]
 
                     # plot histogram using true percentage values of reflectance
-                    if band != 'SCL':
+                    if band != 'SCL' and processing_level != 'L3':
                         pixel_vals *= 0.01
                         orig_val *= 0.01
                     # plot the histogram of values

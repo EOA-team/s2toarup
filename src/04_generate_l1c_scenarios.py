@@ -41,7 +41,6 @@ import pandas as pd
 import rasterio as rio
 import rasterio.mask
 import itertools
-import logging
 from pathlib import Path
 from typing import Dict
 from typing import List
@@ -733,9 +732,6 @@ def main(
 
         orig_dataset_path = Path(orig_dataset)
         scene_name = orig_dataset_path.name
-
-        if scene_name != 'S2A_MSIL1C_20190818T103031_N0208_R108_T32TMT_20190818T124651.SAFE':
-            continue
 
         logger.info(f'Working on {scene_name} ({counter+1}/{n_datasets})')
 

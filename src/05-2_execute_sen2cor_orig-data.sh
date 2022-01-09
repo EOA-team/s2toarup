@@ -7,10 +7,10 @@
 #
 
 # define directory where the L1C realizations are located
-orig_datasets="/nfs/nas12.ethz.ch/fs1202/green_groups_kp_public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_orig"
+orig_datasets="/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2A_MSIL1C_orig/autumn"
 
 # define directory where Sen2Cor is installed to
-sen2cor_install_dir="./home/graflu/Downloads/Sen2Cor-02.09.00-Linux64/bin"
+sen2cor_install_dir="/home/graflu/Downloads/Sen2Cor-02.09.00-Linux64"
 source "$sen2cor_install_dir"/L2A_Bashrc
 
 cd "$orig_datasets" 
@@ -25,7 +25,7 @@ for orig_dataset in ${dataset_list[@]}; do
 	if [[ "$orig_dataset" == *SAFE ]]
 	then
 		# call Sen2Cor
-		echo L2A_Process --resolution 10 "${orig_dataset}"
+		L2A_Process --resolution 10 "${orig_dataset}"
 		echo Processed "${orig_dataset}"
 
 	fi

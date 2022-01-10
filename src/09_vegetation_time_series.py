@@ -35,7 +35,6 @@ from agrisatpy.io import SatDataHandler
 from agrisatpy.io.sentinel2 import Sentinel2Handler
 
 from logger import get_logger
-from agrisatpy.io.sat_data_handler import SatDataHandler
 
 # setup logger -> will write log file to the /../log directory
 logger = get_logger('l4_phenology')
@@ -237,7 +236,7 @@ def extract_uncertainty_crops(
         # read original (reference) data for the field polygons
         _date = record.date
         scene_handler = deepcopy(ts_stack_dict[_date])
-        scene_bands = scene_handler.get_bandnames()
+        # scene_bands = scene_handler.get_bandnames()
         scene_handler.add_bands_from_vector(
             in_file_vector=sample_polygons,
             snap_band=vi_name,
@@ -642,15 +641,15 @@ def main(
     )
 
     # actual phenological metrics scenarios
-    vegetation_time_series_scenarios(
-        ts_stack_dict=ts_stack_dict,
-        orig_vi_dict=orig_vi_dict,
-        unc_dict=unc_dict,
-        n_scenarios=n_scenarios,
-        out_dir_scenarios=out_dir_scenarios,
-        vi_name=vi_name,
-        sample_points=sample_points
-    )
+    # vegetation_time_series_scenarios(
+    #     ts_stack_dict=ts_stack_dict,
+    #     orig_vi_dict=orig_vi_dict,
+    #     unc_dict=unc_dict,
+    #     n_scenarios=n_scenarios,
+    #     out_dir_scenarios=out_dir_scenarios,
+    #     vi_name=vi_name,
+    #     sample_points=sample_points
+    # )
 
 
 if __name__ == '__main__':
@@ -661,7 +660,7 @@ if __name__ == '__main__':
     
     # directory with uncertainty analysis results
     uncertainty_analysis_dir = Path(
-        '../S2A_MSIL2A_Analysis'
+        '../S2A_MSIL2A_Analysis/150_scenarios'
     )
 
     # extent of study area

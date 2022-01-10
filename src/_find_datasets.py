@@ -42,7 +42,7 @@ def get_data_and_uncertainty_files(
         '*_pixel_division_10m.tiff'
     )
     search_expr_veg_par = vi_dir.joinpath(
-        Path('Vegetation_Indices').joinpath(f'VI_*_{vi_name.upper()}.tif')
+        Path('Vegetation_Indices').joinpath(f'VI_*None_10m_{vi_name.upper()}.tif')
     )
     search_expr_unc = uncertainty_analysis_dir.joinpath(
         f'S2*/L3_{vi_name.upper()}_*.tif'

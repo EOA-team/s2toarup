@@ -6,9 +6,11 @@ these phenological stages).
 
 import glob
 import datetime
+import matplotlib
 import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 import numpy as np
 from pathlib import Path
 from typing import Dict
@@ -81,6 +83,7 @@ def calc_l4_uncertainty(
         else:
             unit = '-'
         label = f'Absolute Uncertainty (k=1) [{unit}]'
+        # TODO: set vmin and vmax to colormap (agrisatpy option)
         fig_unc = unc_handler.plot_band(
             band_name,
             colormap='coolwarm',
@@ -195,13 +198,33 @@ def visualize_sample_time_series(
         sample_points_scenarios: Path,
         sample_points_pheno_metrics_reference: Path,
         pheno_metrics_uncertainty_dir: Path,
-        vi_name: str
+        vi_name: str,
+        ymin: int,
+        ymax: int,
+        out_dir: Path
     ):
     """
     Plots the randomly extracted pixel time series, their scenario spread
     and the pheno metrics SOS, POS, EOS alongside their uncertainty for the
     selected pixel.
 
+    :param sample_points_scenarios:
+        path to the csv file containing the different time series realizations
+        based on the underlying uncertainty in the vegetation index/parameter
+    :param sample_points_pheno_metrics:
+        path to the calculated pheno metrics for the original (reference) time
+        series data
+    :param pheno_metrics_uncertainty_dir:
+        directory where the uncertainty results of the single pheno metrics
+        are stored as geoTiff files
+    :param vi_name:
+        name of the vegetation index/parameter to analyze
+    :param ymin:
+        minimum y (index/parameter) value to use for displaying in plot
+    :param ymax:
+        maximum y (index/parameter) value to use for displaying in plot
+    :param out_dir:
+        directory where to save the plots to
     """
 
     # read extracted pixel samples as dataframe
@@ -246,27 +269,76 @@ def visualize_sample_time_series(
         point_gdf['date'] = pd.to_datetime(point_gdf['date'])
 
         # plot the time series
-        fig = plt.figure()
+        fig = plt.figure(figsize=(15,10))
         ax = fig.add_subplot(111)
 
         crop_type = point_gdf.crop_type.iloc[0]
         coordinate_str = f'x={np.round(point_gdf.x.iloc[0])}m, y={np.round(point_gdf.y.iloc[0])}m'
         title_str = f'{crop_type} Sample\n{coordinate_str}'
 
-        # plot original data
-        # time series
-        ax.plot(point_gdf.date, point_gdf[vi_name], 'ro', label='original')
-        ax.plot(point_gdf.date, point_gdf[f'{vi_name}_ts_sm'], label='original smoothed')
         # phenological metrics. Need to be convert to dates since pheno metrics are provided
         # as days-of-year (doys)
+        metric_color = 'grey'
         for metric in metrics:
             pheno_metric_doy = int(point_gdf[metric].iloc[0])
             pheno_metric_date = start_date + datetime.timedelta(days=pheno_metric_doy)
-            ax.vlines(x=pheno_metric_date, ymin=0, ymax=1, label='SOS', linestyles='dashed')
+            ax.vlines(x=pheno_metric_date, ymin=ymin, ymax=ymax,
+                      linestyles='dashed', color=metric_color, linewidth=3)
+            metric_text = metric.replace('_times', '').upper()
+            if metric_text == 'EOS':
+                time_delta = 3
+            else:
+                time_delta = -11
+            ax.text(pheno_metric_date+datetime.timedelta(time_delta),
+                    ymin+0.1, metric_text, fontsize=20)
 
-        plt.show()
+            # add uncertainty range around the metric (expressed in days)
+            # everything smaller than .5 days will be rounded to the next smaller int
+            # and vice versa
+            unc = int(np.round(point_gdf[f'{metric} Uncertainty'].iloc[0]))
+            unc_x1 = pheno_metric_date - datetime.timedelta(unc)
+
+            ax.add_patch(
+                patches.Rectangle(
+                    (unc_x1, ymin),
+                    datetime.timedelta(2*unc),
+                    ymax,
+                    edgecolor=metric_color,
+                    fill=False
+                )
+            )
+
+        # get a climpse of the time series scenarios and visualize their spread
+        mask = point_gdf.columns.str.contains(vi_name +'_\d')
+        scenarios = point_gdf.loc[:,mask].copy()
+        scenarios['min'] = scenarios.min(axis=1)
+        scenarios['max'] = scenarios.max(axis=1)
+        scenarios['std_plus'] = scenarios.mean(axis=1) + scenarios.std(axis=1)
+        scenarios['std_minus'] = scenarios.mean(axis=1) - scenarios.std(axis=1)
+
+        ax.fill_between(x=point_gdf.date, y1=scenarios['min'], y2=scenarios['max'],
+                        color='orange', alpha=0.4, label='Min-Max Scenarios')
+
+        ax.fill_between(x=point_gdf.date, y1=scenarios['std_minus'], y2=scenarios['std_plus'],
+                        color='red', alpha=0.45, label=r'$\pm$ 1 Stddev Scenarios')
+
+        # plot time series original data
+        ax.plot(point_gdf.date, point_gdf[vi_name], 'bo', label='original')
+        ax.plot(point_gdf.date, point_gdf[f'{vi_name}_ts_sm'], color='blue',
+                label='original smoothed')
+
+        ax.legend(fontsize=20)
+        ax.set_ylabel(f'{vi_name} [-]', fontsize=24)
+        ax.set_title(title_str, fontsize=24)
+        ax.set_ylim(ymin, ymax)
+
+        # save figure
+        fname = out_dir.joinpath(
+            f'{vi_name}_{crop_type}_{coordinate_str.replace("=","").replace(", ","_")}.png'
+        )
+        fig.savefig(fname, dpi=300, bbox_inches='tight')
+        plt.close(fig)
         
-
 
 
 if __name__ == '__main__':
@@ -281,7 +353,13 @@ if __name__ == '__main__':
     if not out_dir_crops.exists():
         out_dir_crops.mkdir()
 
+    out_dir_ts_plots = out_dir.joinpath('pixel_time_series')
+    if not out_dir_ts_plots.exists():
+        out_dir_ts_plots.mkdir()
+
     vi_names = ['NDVI', 'EVI']
+    ymins = {'NDVI': 0, 'EVI': 0}
+    ymaxs = {'NDVI': 1, 'EVI': 1}
 
     # pheno-metrics to analyze
     pheno_metrics = [
@@ -292,7 +370,7 @@ if __name__ == '__main__':
     ]
 
     # shapefile with crop type information for the single field parcels
-    shapefile_crops = Path('../shp/ZH_Polygons_2019_EPSG32632_selected-crops.shp')
+    shapefile_crops = Path('../shp/ZH_Polygons_2019_EPSG32632_selected-crops_buffered.shp')
     column_crop_code = 'crop_code'
     column_crop_names = 'crop_type'
 
@@ -300,27 +378,34 @@ if __name__ == '__main__':
     gdf = gpd.read_file(shapefile_crops)
     crop_code_mapping = dict(list(gdf.groupby([column_crop_code, column_crop_names]).groups))
 
-    for vi_name in vi_names:
+    # for vi_name in vi_names:
+    #
+    #     calc_l4_uncertainty(
+    #         uncertainty_dir=uncertainty_dir,
+    #         out_dir=out_dir,
+    #         vi_name=vi_name
+    #     )
+    #
+    #     create maps and histograms of phenometrics
+    #     for idx, pheno_metric in enumerate(pheno_metrics):
+    #         pheno_metric_alias = pheno_metrics_aliases[idx]
+    #         get_uncertainty_maps_and_histograms_by_croptype(
+    #             result_dir=result_dir,
+    #             vi_name=vi_name,
+    #             pheno_metric=pheno_metric,
+    #             pheno_metric_alias=pheno_metric_alias,
+    #             shapefile_crops=shapefile_crops,
+    #             column_crop_code=column_crop_code,
+    #             crop_code_mapping=crop_code_mapping,
+    #             out_dir=out_dir_crops
+    #         )
+        
+    # change plot style here to ggplot (therefore, use two different loops)
+    plt.style.use('ggplot')
+    matplotlib.rc('xtick', labelsize=20) 
+    matplotlib.rc('ytick', labelsize=20) 
 
-        # calc_l4_uncertainty(
-        #     uncertainty_dir=uncertainty_dir,
-        #     out_dir=out_dir,
-        #     vi_name=vi_name
-        # )
-        #
-        # # create maps and histograms of phenometrics
-        # for idx, pheno_metric in enumerate(pheno_metrics):
-        #     pheno_metric_alias = pheno_metrics_aliases[idx]
-        #     get_uncertainty_maps_and_histograms_by_croptype(
-        #         result_dir=result_dir,
-        #         vi_name=vi_name,
-        #         pheno_metric=pheno_metric,
-        #         pheno_metric_alias=pheno_metric_alias,
-        #         shapefile_crops=shapefile_crops,
-        #         column_crop_code=column_crop_code,
-        #         crop_code_mapping=crop_code_mapping,
-        #         out_dir=out_dir_crops
-        #     )
+    for vi_name in vi_names:
 
         # visualize the randomly selected pixel time series samples
         vi_dir = uncertainty_dir.joinpath(vi_name)
@@ -328,15 +413,24 @@ if __name__ == '__main__':
         sample_points_scenarios = glob.glob(
             vi_dir.joinpath(f'{vi_name}_*time_series.csv').as_posix()
         )[0]
-
+        
         # path to reference pheno metric results (calculated on original time series data)
-        sample_points_pheno_metrics_reference = vi_dir.joinpath('reference').joinpath('pheno_metrics.tif')
+        sample_points_pheno_metrics_reference = vi_dir.joinpath(
+            'reference').joinpath('pheno_metrics.tif'
+        )
 
+        out_dir_ts_plots_vi = out_dir_ts_plots.joinpath(vi_name)
+        if not out_dir_ts_plots_vi.exists():
+            out_dir_ts_plots_vi.mkdir()
+        
         visualize_sample_time_series(
             sample_points_scenarios=sample_points_scenarios,
             sample_points_pheno_metrics_reference=sample_points_pheno_metrics_reference,
             pheno_metrics_uncertainty_dir=result_dir,
-            vi_name=vi_name
+            vi_name=vi_name,
+            ymin=ymins[vi_name],
+            ymax=ymaxs[vi_name],
+            out_dir=out_dir_ts_plots_vi
         )
         
 

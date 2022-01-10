@@ -22,8 +22,10 @@ The sample points (ZH_Points_2019_EPSG32632_selected-crops.shp) were derived fro
 
 * First, we randomly generated 5000 points within the spatial extent covered by the polygons.
 * Second, we only kept those points laying within the field polygons features (ST_Within).
-* To avoid mixed pixel effects close the field boundaries we applied a 20m inward buffering to all polygon features before selecting the points.
+* To avoid mixed pixel effects close the field boundaries we applied a 20m inward buffering to all polygon features before selecting the points (ZH_Polygons_2019_EPSG32632_selected-crops.shp).
 * We then assigned the crop type information to the remaining points by spatial join.
 
 All vector pre-processing steps were carried out using QGIS 3.18.3-Zurich on Fedora34.
+
+The original crop type data has been obtained in EPSG:2056 (Swiss coordinates) and projected into EPSG:32632 (UTM Zone 32N, WGS84) to match the spatial reference system of the Sentinel-2 imagery.
 

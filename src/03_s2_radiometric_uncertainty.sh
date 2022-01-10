@@ -13,7 +13,7 @@
 #
 
 # TODO: find out how to specify a relative path here
-dot_safe_dir=/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2A_MSIL1C_orig/autumn
+dot_safe_dir=/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2A_MSIL1C_orig/spring
 cd "$dot_safe_dir"
 
 # find subdirectories and loop over them

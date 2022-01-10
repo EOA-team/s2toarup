@@ -69,7 +69,7 @@ if __name__ == '__main__':
     # processing level
     processing_level = ProcessingLevels.L1C
     # date range (1st March to 15th October)
-    start_date = date(2019,3,1)
+    start_date = date(2019,1,1)
     end_date = date(2019,10,15)
     # max_records defines the maximum number of datasets to download, increase if
     # necessary; however, CREODIAS might impose a limitation...
@@ -83,7 +83,10 @@ if __name__ == '__main__':
     aoi_file = Path(
         './../shp/AOI_Esch_EPSG32632.shp'
     )
-    download_dir = Path('./../S2A_MSIL1C_orig/autumn')
+    download_dir = Path('./../S2A_MSIL1C_orig/spring')
+
+    if not download_dir.exists():
+        download_dir.mkdir()
 
     main(
         start_date=start_date,

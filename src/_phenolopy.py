@@ -214,7 +214,7 @@ modifications.
    limitations under the License.
 
 '''
-num_none_type_geoms
+
 import xarray as xr
 import numpy as np
 

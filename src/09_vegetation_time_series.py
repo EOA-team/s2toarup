@@ -11,6 +11,7 @@ Many thanks @lewistrotter for providing Phenolopy
 
 import glob
 import logging
+import matplotlib
 import pandas as pd
 import numpy as np
 import xarray as xr
@@ -23,18 +24,25 @@ from typing import List
 from typing import Dict
 from copy import deepcopy
 import geopandas as gpd
+import matplotlib.pyplot as plt
 
 from _phenolopy import remove_outliers
 from _phenolopy import interpolate
 from _phenolopy import smooth
 from _phenolopy import calc_phenometrics
+from _find_datasets import get_data_and_uncertainty_files
 from agrisatpy.io import SatDataHandler
 from agrisatpy.io.sentinel2 import Sentinel2Handler
 
 from logger import get_logger
+from agrisatpy.io.sat_data_handler import SatDataHandler
 
 # setup logger -> will write log file to the /../log directory
 logger = get_logger('l4_phenology')
+
+plt.style.use('ggplot')
+matplotlib.rc('xtick', labelsize=20) 
+matplotlib.rc('ytick', labelsize=20)
 
 
 def _calc_pheno_metrics(xds: xr.Dataset) -> Dict[str, xr.Dataset]:
@@ -76,74 +84,6 @@ def _calc_pheno_metrics(xds: xr.Dataset) -> Dict[str, xr.Dataset]:
     )
 
     return {'pheno_metrics': pheno_ds, 'ds': ds}
-
-
-def get_data_and_uncertainty_files(
-        vi_dir: Path,
-        uncertainty_analysis_dir: Path,
-        vi_name: str
-    ) -> pd.DataFrame:
-    """
-    Searches the vegetation parameter/index generated from the original
-    Sentinel-2 data alongside with the corresponding relative uncertainty
-    information. Stores the files by acquisition date in a pandas dataframe.
-
-    :param vi_dir:
-        directory containing the vegetation indices/ parameters derived from the
-        original (i.e., non-scenario-based) datasets and the resampled original
-        Sentinel-2 data in L2A processing level
-    :param uncertainty_analysis_dir:
-        directory where the corresponding relative uncertainty for the index
-        or parameter is stored.
-    :param vi_name:
-        name of the vegetation index or parameter. It is used to find the
-        correct files
-    :return:
-        pandas dataframe with the file location of the bandstacks
-        and file with corresponding uncertainty for the selected vegetation
-        index/ parameter alongside with the (acquisition) date
-    """
-
-    # define search expressions
-    # vegetation parameter/ index
-    search_expression_bandstack = vi_dir.joinpath(
-        '*_pixel_division_10m.tiff'
-    )
-    search_expr_veg_par = vi_dir.joinpath(
-        Path('Vegetation_Indices').joinpath(f'VI_*_{vi_name.upper()}.tif')
-    )
-    search_expr_unc = uncertainty_analysis_dir.joinpath(
-        f'S2*/L3_{vi_name.upper()}_*.tif'
-    )
-
-    # get list of files
-    bandstack_list = glob.glob(search_expression_bandstack.as_posix())
-    veg_par_list = glob.glob(search_expr_veg_par.as_posix())
-    unc_file_list = glob.glob(search_expr_unc.as_posix())
-
-    # convert lists to dataframe
-    bandstack_file_df = pd.DataFrame(bandstack_list, columns=['filename_bandstack'])
-    veg_par_file_df = pd.DataFrame(veg_par_list, columns=['filename_veg_par'])
-    unc_file_df = pd.DataFrame(unc_file_list, columns=['filename_unc'])
-
-    # extract dates (files are matched and ordered by date)
-    veg_par_file_df['date'] = veg_par_file_df.filename_veg_par.apply(
-        lambda x: datetime.strptime(Path(x).name.split('_')[1], '%Y%m%d').date()
-    )
-    unc_file_df['date'] = unc_file_df.filename_unc.apply(
-        lambda x: datetime.strptime(Path(x).parent.name.split('_')[2][0:8], '%Y%m%d').date()
-    )
-    bandstack_file_df['date'] = bandstack_file_df.filename_bandstack.apply(
-        lambda x: datetime.strptime(Path(x).name.split('_')[0], '%Y%m%d').date()
-    )
-
-    # join dataframes on date
-    tmp_df = pd.merge(veg_par_file_df, unc_file_df, on='date')
-    df = pd.merge(bandstack_file_df, tmp_df, on='date')
-    # and sort by date
-    df.sort_values(by='date', inplace=True)
-
-    return df
 
 
 def read_data_and_uncertainty(
@@ -212,7 +152,8 @@ def read_data_and_uncertainty(
         handler = SatDataHandler()
         handler.read_from_bandstack(
             fname_bandstack=Path(record.filename_veg_par),
-            in_file_aoi=in_file_aoi
+            in_file_aoi=in_file_aoi,
+            full_bounding_box_only=True
         )
         handler.reset_bandnames(new_bandnames=[vi_name])
         fig_vi = handler.plot_band(band_name=vi_name, colormap='summer')
@@ -230,7 +171,8 @@ def read_data_and_uncertainty(
         handler.read_from_bandstack(
             fname_bandstack=Path(record.filename_unc),
             in_file_aoi=in_file_aoi,
-            band_selection=['abs_stddev']
+            band_selection=['abs_stddev'],
+            full_bounding_box_only=True
         )
 
         fig_unc = handler.plot_band(
@@ -273,6 +215,121 @@ def read_data_and_uncertainty(
     return merged, ts_stack_dict, orig_vi_dict, unc_dict
 
 
+def extract_uncertainty_crops(
+        file_df: pd.DataFrame,
+        ts_stack_dict: Dict[date, SatDataHandler],
+        sample_polygons: Path,
+        vi_name: str,
+        out_dir: Path,
+        ymin: float,
+        ymax: float
+    ) -> None:
+    """
+    Extracts the uncertainty information for the field parcel polygons.
+
+    """
+
+    # loop over scenes, rasterize the shapefile with the crops and convert it to
+    # geodataframe to allow for crop-type specific analysis
+    gdf_list = []
+    for idx, record in file_df.iterrows():
+
+        # read original (reference) data for the field polygons
+        _date = record.date
+        scene_handler = deepcopy(ts_stack_dict[_date])
+        scene_bands = scene_handler.get_bandnames()
+        scene_handler.add_bands_from_vector(
+            in_file_vector=sample_polygons,
+            snap_band=vi_name,
+            attribute_selection=['crop_code']
+        )
+        # # mask pixels not having a crop type
+        # mask_value = scene_handler.get_band_nodata('crop_code')
+        # scene_handler.mask(
+        #     name_mask_band='crop_code',
+        #     mask_values=[mask_value],
+        #     bands_to_mask=scene_bands
+        # )
+        # convert to geodataframe
+        gdf = scene_handler.to_dataframe()
+        # drop NaNs
+        gdf = gdf.dropna()
+        gdf['date'] = record.date
+        gdf_list.append(gdf)
+
+    # concat dataframes
+    gdf = pd.concat(gdf_list)
+
+    # add crop name from original shape file
+    gdf_polys = gpd.read_file(sample_polygons)
+
+    # loop over crop types and plot their VI curve and its uncertainty over time
+    crop_codes, pixel_counts = np.unique(gdf.crop_code, return_counts=True)
+
+    for crop_code, pixel_count in list(zip(crop_codes, pixel_counts)):
+
+        # get crop name
+        crop_name = gdf_polys[gdf_polys.crop_code == int(crop_code)]['crop_type'].iloc[0]
+
+        crop_gdf = gdf[gdf.crop_code == crop_code].copy()
+
+        # aggregate by date
+        crop_gdf_grouped = crop_gdf[['date', vi_name, f'{vi_name}_unc']].groupby('date').agg(
+            ['mean', 'min', 'max', 'std']
+        )
+        
+        # plot
+        fig, (ax1, ax2) = plt.subplots(2, sharex=True, figsize=(15,10))
+
+        # plot original time series showing spread between pixels (not scenarios!)
+        ax1.plot(crop_gdf_grouped[vi_name, 'mean'], color='blue', linewidth=3)
+        ax1.fill_between(
+            x=crop_gdf_grouped.index,
+            y1=crop_gdf_grouped[vi_name, 'min'],
+            y2=crop_gdf_grouped[vi_name, 'max'],
+            color='orange',
+            alpha=0.4
+        )
+        ax1.fill_between(
+            x=crop_gdf_grouped.index,
+            y1=crop_gdf_grouped[vi_name, 'mean']-crop_gdf_grouped[vi_name, 'std'],
+            y2=crop_gdf_grouped[vi_name, 'mean']+crop_gdf_grouped[vi_name, 'std'],
+            color='red',
+            alpha=0.45
+        )
+        ax1.set_title({vi_name}, fontsize=20)
+        ax1.set_ylabel(f'{vi_name} [-]', fontsize=24)
+        ax1.set_ylim(ymin, ymax)
+
+        # plot uncertainties
+        unc_name = vi_name + '_unc'
+        ax2.plot(crop_gdf_grouped[unc_name, 'mean'], label='Mean', color='blue', linewidth=3)
+        ax2.fill_between(
+            x=crop_gdf_grouped.index,
+            y1=crop_gdf_grouped[unc_name, 'min'],
+            y2=crop_gdf_grouped[unc_name, 'max'],
+            color='orange',
+            alpha=0.4,
+            label='Min-Max Spread'
+        )
+        ax2.fill_between(
+            x=crop_gdf_grouped.index,
+            y1=crop_gdf_grouped[unc_name, 'mean']-crop_gdf_grouped[unc_name, 'std'],
+            y2=crop_gdf_grouped[unc_name, 'mean']+crop_gdf_grouped[unc_name, 'std'],
+            color='red',
+            alpha=0.45,
+            label=r'$\pm$ Stddev'
+        )
+        ax2.set_title(f'Uncertainty in {vi_name}', fontsize=20)
+        ax2.set_ylabel(f'Absolute Uncertainty [-]', fontsize=24)
+        ax2.legend(loc="lower center", bbox_to_anchor=(0.5, -0.5), fontsize=20, ncol=3)
+
+        fig.suptitle(f'Time Series of {crop_name} (Pixels: {pixel_count})', fontsize=26)
+        fname = f'{vi_name}_{crop_name}_all-pixel-timeseries.png'
+        fig.savefig(out_dir.joinpath(fname), dpi=300, bbox_inches='tight')
+        
+
+
 def vegetation_time_series_scenarios(
         ts_stack_dict: Dict[date, Sentinel2Handler],
         orig_vi_dict: Dict[date, Path],
@@ -294,9 +351,13 @@ def vegetation_time_series_scenarios(
     (original data + smoothed time series from scenarios) is written to
     ``out_dir_scenarios``.
 
-    :param ts_stack_list:
-        list of ``SatDataHandler`` instances holding the vegetation parameter
-        as one band and its uncertainty as another band.
+    :param ts_stack_dict:
+        dictionary with ``SatDataHandler`` instances holding the vegetation parameter
+        as one band and its uncertainty as another band per scene date
+    :param orig_vi_dict:
+        dictionary with the original (reference) vegetation index/parameter values
+    :param unc_dict:
+        dictionary with the uncertainty images of the vegetation index/parameter
     :param n_scenarios:
         number of scenarios to generate
     :param out_dir_scenarios:
@@ -448,6 +509,7 @@ def vegetation_time_series_scenarios(
         # do the same for the reference run
         if scenario == 0:
             try:
+                # TODO: SCL masking it missing here!!!!
                 xds_ref = xr.Dataset(
                     orig_stack,
                     coords=coords,
@@ -542,7 +604,10 @@ def main(
         out_dir_plots: Path,
         n_scenarios: int,
         vi_name: str,
-        sample_points: Path
+        sample_points: Path,
+        sample_polygons: Path,
+        ymin: float,
+        ymax: float
     ):
     """
     main executable function of this module generating the scenarios for the
@@ -558,11 +623,22 @@ def main(
     )
 
     # read the data and mask clouds, shadows, and unclassified pixels based on SCL information
-    _, ts_stack_dict, orig_vi_dict, unc_dict = read_data_and_uncertainty(
+    file_df, ts_stack_dict, orig_vi_dict, unc_dict = read_data_and_uncertainty(
         data_df=data_df,
         vi_name=vi_name,
         in_file_aoi=in_file_aoi,
         out_dir_plots=out_dir_plots
+    )
+
+    # check uncertainty in different crop types over time
+    extract_uncertainty_crops(
+        file_df=file_df,
+        ts_stack_dict=ts_stack_dict,
+        sample_polygons=sample_polygons,
+        out_dir=out_dir_scenarios,
+        vi_name=vi_name,
+        ymin=ymin,
+        ymax=ymax
     )
 
     # actual phenological metrics scenarios
@@ -593,11 +669,16 @@ if __name__ == '__main__':
         '../shp/AOI_Esch_EPSG32632.shp'
     )
 
+    # define sample polygons (for visualizing the uncertainty per crop type over time)
+    sample_polygons = Path('../shp/ZH_Polygons_2019_EPSG32632_selected-crops_buffered.shp')
+
     # define point sampling locations for visualizing pixel time series
     sample_points = Path('../shp/ZH_Points_2019_EPSG32632_selected-crops.shp')
 
     # vegetation index to consider
     vi_names = ['NDVI','EVI']
+    ymins = {'NDVI': 0, 'EVI': 0}
+    ymaxs = {'NDVI': 1, 'EVI': 1}
 
     # directory where to save phenological metrics to
     out_dir_scenarios = Path(f'../S2_TimeSeries_Analysis')
@@ -626,5 +707,8 @@ if __name__ == '__main__':
             out_dir_plots=out_dir_plots,
             n_scenarios=n_scenarios,
             vi_name=vi_name,
-            sample_points=sample_points
+            sample_points=sample_points,
+            sample_polygons=sample_polygons,
+            ymin=ymins[vi_name],
+            ymax=ymaxs[vi_name]
         )

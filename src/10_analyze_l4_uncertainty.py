@@ -432,10 +432,3 @@ if __name__ == '__main__':
             ymax=ymaxs[vi_name],
             out_dir=out_dir_ts_plots_vi
         )
-        
-
-        
-
-
-        
-    

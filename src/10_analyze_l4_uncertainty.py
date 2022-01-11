@@ -74,11 +74,16 @@ def calc_l4_uncertainty(
         stack_list = [x.get_band(pheno_metric) for x in handler_list]
         stack_array = np.stack(stack_list)
         standard_unc = np.nanstd(stack_array, axis=0)
+        # calculate mean of scenarios
+        scenario_mean = np.nanmean(stack_array, axis=0)
 
         # save to raster files and create a preview plot
         unc_handler = deepcopy(handler_list[0])
-        band_name = f'{pheno_metric} Uncertainty'
+        band_names = [f'{pheno_metric} Uncertainty', f'{pheno_metric} Mean']
+        band_name = band_names[0]
         unc_handler.add_band(band_name=band_name, band_data=standard_unc)
+        band_name = band_names[1]
+        unc_handler.add_band(band_name=band_name, band_data=scenario_mean)
 
         # plot as map
         if 'times' in pheno_metric:
@@ -88,7 +93,7 @@ def calc_l4_uncertainty(
         label = f'Absolute Uncertainty (k=1) [{unit}]'
         # TODO: set vmin and vmax to colormap (agrisatpy option)
         fig_unc = unc_handler.plot_band(
-            band_name,
+            band_names[0],
             colormap='coolwarm',
             colorbar_label=label
         )
@@ -96,10 +101,11 @@ def calc_l4_uncertainty(
         fname_out_fig = out_dir.joinpath(f'{vi_name}_{pheno_metric}_abs-uncertainty.png')
         fig_unc.savefig(fname_out_fig, dpi=300, bbox_inches='tight')
         plt.close(fig_unc)
+
         fname_out_raster = fname_out_fig.as_posix().replace('.png','.tif')
         unc_handler.write_bands(
             out_file=fname_out_raster,
-            band_names=[band_name]
+            band_names=[band_names]
         )
 
 
@@ -134,7 +140,8 @@ def get_uncertainty_maps_and_histograms_by_croptype(
     )
 
     # add shapefile data with crop type codes
-    unc_band = handler.get_bandnames()[0]
+    band_names = handler.get_bandnames()
+    unc_band = band_names[0]
     handler.add_bands_from_vector(
         in_file_vector=shapefile_crops,
         snap_band=unc_band,
@@ -177,6 +184,7 @@ def get_uncertainty_maps_and_histograms_by_croptype(
         lambda x, crop_code_mapping=crop_code_mapping: crop_code_mapping[x]
     )
     # histogram of all crops
+    # TODO: plot means of metric
     gdf[unc_band].hist(by=gdf['crop'], bins=50, sharex=True, sharey=True, density=True)
     plt.suptitle(
         f'{pheno_metric_alias.upper()} derived from {vi_name}:\nRelative Frequencies of Absolute Uncertainty (k=1) Values per Crop Type'
@@ -250,7 +258,7 @@ def visualize_sample_time_series(
         band_selection=metrics
     )
 
-    # extract the uncertainty of the metrics
+    # extract the uncertainty and scenario means of the metrics
     for metric in metrics:
         metric_uncertainty_file = glob.glob(
             pheno_metrics_uncertainty_dir.joinpath(
@@ -421,8 +429,10 @@ if __name__ == '__main__':
         
         # path to reference pheno metric results (calculated on original time series data)
         sample_points_pheno_metrics_reference = vi_dir.joinpath(
-            'reference').joinpath('pheno_metrics.tif'
-        )
+            'reference'
+            ).joinpath(
+                'pheno_metrics.tif'
+            )
 
         out_dir_ts_plots_vi = out_dir_ts_plots.joinpath(vi_name)
         if not out_dir_ts_plots_vi.exists():

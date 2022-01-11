@@ -39,12 +39,18 @@ from agrisatpy.io.sentinel2 import Sentinel2Handler
 
 from logger import get_logger
 
+
 # setup logger -> will write log file to the /../log directory
 logger = get_logger('l4_phenology')
 
 plt.style.use('ggplot')
 matplotlib.rc('xtick', labelsize=20) 
 matplotlib.rc('ytick', labelsize=20)
+
+# define SCL classes to mask
+# see https://sentinels.copernicus.eu/web/sentinel/technical-guides/sentinel-2-msi/level-2a/algorithm
+# for a legend
+scl_mask_values = [1,2,3,7,8,9,10,11]
 
 
 def _calc_pheno_metrics(xds: xr.Dataset) -> Dict[str, xr.Dataset]:
@@ -189,18 +195,36 @@ def read_data_and_uncertainty(
         # information in the scene classification layer
         s2_stack.mask_clouds_and_shadows(
             bands_to_mask=[vi_name, f'{vi_name}_unc'],
-            cloud_classes=[2,3,7,8,9,10]
+            cloud_classes=scl_mask_values
         )
-
-        update_list.append({
-            'date': record.date,
-            'cloudy_pixel_percentage': cloud_coverage
-        })
 
         bands_to_drop = ['B02','B03','B04','B08','SCL']
         for band_to_drop in bands_to_drop:
             s2_stack.drop_band(band_to_drop)
         ts_stack_dict[record.date] = s2_stack
+
+        # save masked files to disk (thus, the reference run will also have the correct
+        # input)
+        vi_masked = record.filename_veg_par
+        vi_masked = Path(vi_masked.replace('.tif', '_scl-filtered.tif'))
+        s2_stack.write_bands(
+            out_file=vi_masked,
+            band_names=[vi_name]
+        )
+        vi_unc_masked = record.filename_unc
+        vi_unc_masked = Path(vi_unc_masked.replace('.tif', '_scl-filtered.tif'))
+        s2_stack.write_bands(
+            out_file=vi_unc_masked,
+            band_names=[f'{vi_name}_unc']
+        )
+
+        update_list.append({
+            'date': record.date,
+            'cloudy_pixel_percentage': cloud_coverage,
+            'filename_veg_par_scl': vi_masked,
+            'filename_unc_scl': vi_unc_masked
+        })
+
 
     # added update columns to input data frame
     update_df = pd.DataFrame(update_list)
@@ -435,10 +459,10 @@ def vegetation_time_series_scenarios(
             vi_unc = ts_stack_dict[_date].get_band(f'{vi_name}_unc').data
 
             # sample the test points
-            # sample original pixel values only in first scenario run
+            # sample original pixel (SCL classes have been masked) values only in first scenario run
             if scenario == 0:
                 
-                vegpar_file = file_df[file_df.date == date]['filename_veg_par'].iloc[0]
+                vegpar_file = file_df[file_df.date == _date]['filename_veg_par_scl'].iloc[0]
                 gdf_sample_data = SatDataHandler.read_pixels(
                     point_features=sample_points,
                     raster=vegpar_file
@@ -448,13 +472,13 @@ def vegetation_time_series_scenarios(
                     colnames[colnames.index(None)] = vi_name
                 gdf_sample_data.columns = colnames
                 
-                vegpar_unc = file_df[file_df.date == date]['filename_unc'].iloc[0]
+                vegpar_unc = file_df[file_df.date == _date]['filename_unc_scl'].iloc[0]
                 gdf_sample_unc = SatDataHandler.read_pixels(
                     point_features=sample_points,
                     raster=vegpar_unc,
-                    band_selection=['abs_stddev']
+                    band_selection=[f'{vi_name}_unc']
                 )
-                gdf_sample_unc.rename({'abs_stddev': 'unc'}, axis=1, inplace=True)
+                gdf_sample_unc.rename({f'{vi_name}_unc': 'unc'}, axis=1, inplace=True)
 
                 # join the data frames
                 gdf = pd.merge(
@@ -470,29 +494,6 @@ def vegetation_time_series_scenarios(
                     gdf_points[['id', 'row', 'col']],
                     on='id'
                 )
-
-                # read SCL file and save to dataframe in order to mask pixels classified as
-                # clouds, shadows, snow etc.
-                fname_bandstack = file_df[file_df.date == date]['filename_bandstack'].iloc[0]
-                s2_stack = Sentinel2Handler()
-                s2_stack.read_from_bandstack(
-                    fname_bandstack=fname_bandstack,
-                    in_file_aoi=in_file_aoi,
-                    band_selection=['B02']
-                )
-
-                scl = s2_stack.get_band('SCL')
-                gdf_joined['SCL'] = np.nan
-                unique_points = gdf_joined[['id','row', 'column']]
-                for _, unique_point in unique_points.iterrows():
-                    gdf_joined.loc[
-                        (gdf_joined.row == unique_point.row) & (gdf_joined.col == unique_point.col) & (gdf_joined.id == unique_point.id),
-                        'SCL'
-                    ] = scl[unique_point.row, unique_point.col]
-
-                # drop SCL classes [3, 8, 9, 10, 11]
-                scl_mask = [3, 8, 9, 10, 11]
-                gdf_joined = gdf_joined[~gdf_joined['SCL'].isin(scl_mask)]
 
                 gdf_list.append(gdf_joined)
 
@@ -539,11 +540,6 @@ def vegetation_time_series_scenarios(
         scenario_col = f'{vi_name}_{scenario+1}'
         # time series values
         gdf[scenario_col] = np.empty(gdf.shape[0])
-        # extract SOS, POS and EOS timing
-        metrics = ['sos', 'pos', 'eos']
-        scenario_metric_cols = [f'{vi_name}_{scenario+1}_{x}' for x in metrics]
-        for scenario_metric_col in scenario_metric_cols:
-            gdf[scenario_metric_col] = np.nan
 
         # loop over sample points and add them as new entries to the dataframe
         for _, unique_point in unique_points.iterrows():
@@ -553,13 +549,7 @@ def vegetation_time_series_scenarios(
                 (gdf.row == unique_point.row) & (gdf.col == unique_point.col) & (gdf.id == unique_point.id),
                 scenario_col
             ] = ts_values[0,0,:]
-            # get metrics (SOS, POS, EOS) from scenario run
-            for mdx, metric in enumerate(metrics):
-                metric_value = eval(f'pheno_ds.{metric}_times.data[{unique_point.row},{unique_point.col}]')
-                gdf.loc[
-                    (gdf.row == unique_point.row) & (gdf.col == unique_point.col) & (gdf.id == unique_point.id),
-                    scenario_metric_cols[mdx]
-                ] = metric_value
+
         # do the same for the reference run
         if scenario == 0:
             try:
@@ -700,6 +690,7 @@ def main(
     # actual phenological metrics scenarios
     vegetation_time_series_scenarios(
         ts_stack_dict=ts_stack_dict,
+        file_df=file_df,
         n_scenarios=n_scenarios,
         out_dir_scenarios=out_dir_scenarios,
         vi_name=vi_name,
@@ -714,12 +705,12 @@ if __name__ == '__main__':
     )
     
     # directory with uncertainty analysis results
-    # uncertainty_analysis_dir = Path(
-    #     '../S2A_MSIL2A_Analysis/150_scenarios'
-    # )
     uncertainty_analysis_dir = Path(
-        '../S2A_MSIL2A_Analysis'
+        '../S2A_MSIL2A_Analysis/150_scenarios'
     )
+    # uncertainty_analysis_dir = Path(
+    #     '../S2A_MSIL2A_Analysis'
+    # )
 
     # extent of study area
     in_file_aoi = Path(
@@ -748,7 +739,7 @@ if __name__ == '__main__':
         out_dir_plots.mkdir()
     
     # number of scenarios to generate
-    n_scenarios = 10 # 1000
+    n_scenarios = 2 # 1000
 
     for vi_name in vi_names:
 

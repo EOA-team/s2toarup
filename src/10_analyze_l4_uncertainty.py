@@ -2,6 +2,9 @@
 Calculates the absolute uncertainty in the phenological metrics including
 start, peak and end of season (timing and vegetation index/ parameter values at
 these phenological stages).
+
+In addition, the module plots the time series of selected pixels extracted in the
+previous step.
 '''
 
 import glob
@@ -295,6 +298,7 @@ def visualize_sample_time_series(
             # add uncertainty range around the metric (expressed in days)
             # everything smaller than .5 days will be rounded to the next smaller int
             # and vice versa
+            # TODO: rectangle around mean of scenarios!!!
             unc = int(np.round(point_gdf[f'{metric} Uncertainty'].iloc[0]))
             unc_x1 = pheno_metric_date - datetime.timedelta(unc)
 
@@ -327,6 +331,7 @@ def visualize_sample_time_series(
         ax.plot(point_gdf.date, point_gdf[f'{vi_name}_ts_sm'], color='blue',
                 label='original smoothed')
 
+        # TODO: legend below the plot
         ax.legend(fontsize=20)
         ax.set_ylabel(f'{vi_name} [-]', fontsize=24)
         ax.set_title(title_str, fontsize=24)

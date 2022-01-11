@@ -335,8 +335,8 @@ def extract_uncertainty_crops(
         # TODO: plot central 90% of values
         ax1.fill_between(
             x=crop_gdf_grouped.index,
-            y1=crop_gdf_grouped[vi_name, 'min'],
-            y2=crop_gdf_grouped[vi_name, 'max'],
+            y1=crop_gdf_grouped[vi_name, 'percentile_5'],
+            y2=crop_gdf_grouped[vi_name, 'percentile_95'],
             color='orange',
             alpha=0.4
         )
@@ -356,11 +356,11 @@ def extract_uncertainty_crops(
         ax2.plot(crop_gdf_grouped[unc_name, 'mean'], label='Mean', color='blue', linewidth=3)
         ax2.fill_between(
             x=crop_gdf_grouped.index,
-            y1=crop_gdf_grouped[unc_name, 'min'],
-            y2=crop_gdf_grouped[unc_name, 'max'],
+            y1=crop_gdf_grouped[unc_name, 'percentile_5'],
+            y2=crop_gdf_grouped[unc_name, 'percentile_95'],
             color='orange',
             alpha=0.4,
-            label='Min-Max Spread'
+            label='5-95% Quantile Spread'
         )
         ax2.fill_between(
             x=crop_gdf_grouped.index,

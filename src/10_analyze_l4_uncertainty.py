@@ -17,6 +17,9 @@ import matplotlib.patches as patches
 import numpy as np
 from pathlib import Path
 from typing import Dict
+from typing import Union
+from typing import Any
+from typing import Optional
 
 from agrisatpy.io import SatDataHandler
 from logger import get_logger
@@ -24,7 +27,48 @@ from copy import deepcopy
 
 logger = get_logger('l5_uncertainty')
 
+# define start date for converting DOYs (day of year) to date
 start_date = datetime.date(2019,1,1)
+
+
+def get_stats(
+        gdf: Union[pd.DataFrame, gpd.GeoDataFrame],
+        col_name: str,
+        unit: str,
+        precision: Optional[Union[int, float]] = 1
+    ) -> Dict[str, Any]:
+    """
+    Calculates base statistics of a dataframe column and returns a summary
+    string that can be used for plotting.
+
+    :param gdf:
+        dataframe to analyze
+    :param col_name:
+        name of the column to analyze
+    :param unit:
+        (phyiscal) unit of the column (used in the string)
+    :param precision:
+        number of decimal places to round the data to
+    :return:
+        dict with statistics and summary text string
+    """
+
+    stats = {
+        'median': gdf[col_name].median(),
+        'mean':  gdf[col_name].mean(),
+        'q05': gdf[col_name].quantile(0.05),
+        'q95': gdf[col_name].quantile(0.95)
+    }
+
+    textstr = '\n'.join((
+        r'$\mu=%.1f$' % (np.round(stats['mean'], precision), ) + f' {unit}',
+        r'$\mathrm{median}=%.0f$' % (stats['median'], ) + f' {unit}',
+        r'$5\%$'+r' quantile=%.1f' % (np.round(stats['q05'], precision), ) + f' {unit}',
+        r'$95\%$'+r' quantile=%.1f' % (np.round(stats['q95'], precision), ) + f' {unit}'
+    ))
+    stats['textstr'] = textstr
+
+    return stats
 
 
 def calc_l4_uncertainty(
@@ -79,23 +123,34 @@ def calc_l4_uncertainty(
 
         # save to raster files and create a preview plot
         unc_handler = deepcopy(handler_list[0])
+        snap_band = unc_handler.get_bandnames()[0]
         band_names = [f'{pheno_metric} Uncertainty', f'{pheno_metric} Mean']
-        band_name = band_names[0]
-        unc_handler.add_band(band_name=band_name, band_data=standard_unc)
-        band_name = band_names[1]
-        unc_handler.add_band(band_name=band_name, band_data=scenario_mean)
+        band_data = [standard_unc, scenario_mean]
+
+        for bdx, band_name in enumerate(band_names):
+            unc_handler.add_band(
+                band_name=band_name,
+                band_data=band_data[bdx],
+                snap_band=snap_band
+            )
 
         # plot as map
         if 'times' in pheno_metric:
             unit = 'days'
+            vmin= 0
+            vmax = 50
         else:
             unit = '-'
+            vmin = 0
+            vmax = None
         label = f'Absolute Uncertainty (k=1) [{unit}]'
-        # TODO: set vmin and vmax to colormap (agrisatpy option)
+
         fig_unc = unc_handler.plot_band(
             band_names[0],
             colormap='coolwarm',
-            colorbar_label=label
+            colorbar_label=label,
+            vmin=vmin,
+            vmax=vmax
         )
 
         fname_out_fig = out_dir.joinpath(f'{vi_name}_{pheno_metric}_abs-uncertainty.png')
@@ -105,7 +160,7 @@ def calc_l4_uncertainty(
         fname_out_raster = fname_out_fig.as_posix().replace('.png','.tif')
         unc_handler.write_bands(
             out_file=fname_out_raster,
-            band_names=[band_names]
+            band_names=band_names
         )
 
 
@@ -142,6 +197,7 @@ def get_uncertainty_maps_and_histograms_by_croptype(
     # add shapefile data with crop type codes
     band_names = handler.get_bandnames()
     unc_band = band_names[0]
+    mean_band = band_names[1]
     handler.add_bands_from_vector(
         in_file_vector=shapefile_crops,
         snap_band=unc_band,
@@ -159,13 +215,19 @@ def get_uncertainty_maps_and_histograms_by_croptype(
     # plot the uncertainty band now masked to the crop selection
     if 'times' in pheno_metric:
         unit = 'days'
+        vmin= 0
+        vmax = 50
     else:
         unit = '-'
+        vmin = 0
+        vmax = None
     label = f'Absolute Uncertainty (k=1) [{unit}]'
     fig_unc = handler.plot_band(
         band_name=unc_band,
         colormap='coolwarm',
-        colorbar_label=label
+        colorbar_label=label,
+        vmin=vmin,
+        vmax=vmax
     )
     fname_out_base = out_dir.joinpath(
         f'{vi_name}_{pheno_metric}_abs-uncertainty_{shapefile_crops.name.split(".")[0]}'
@@ -183,26 +245,73 @@ def get_uncertainty_maps_and_histograms_by_croptype(
     gdf['crop'] = gdf.crop_code.apply(
         lambda x, crop_code_mapping=crop_code_mapping: crop_code_mapping[x]
     )
+
     # histogram of all crops
-    # TODO: plot means of metric
-    gdf[unc_band].hist(by=gdf['crop'], bins=50, sharex=True, sharey=True, density=True)
-    plt.suptitle(
-        f'{pheno_metric_alias.upper()} derived from {vi_name}:\nRelative Frequencies of Absolute Uncertainty (k=1) Values per Crop Type'
-    )
-    plt.subplots_adjust(top=0.85)
-    plt.savefig(
-        f'{fname_out_base}_histogram-uncertainties-all-crops.png',
-        dpi=300,
-        bbox_inches='tight'
-    )
-    plt.close()
+    crop_unc_list = []
+    crop_mean_list = []
+    for crop in list(gdf.crop.unique()):
+
+        crop_gdf = gdf[gdf.crop == crop].copy()
+
+        # some statistics
+        stats_unc = get_stats(crop_gdf, unc_band, unit=unit)
+        stats_unc['crop'] = crop
+        stats_unc['vi_name'] = vi_name
+        stats_unc['metric'] = pheno_metric
+        stats_unc['metric_alias'] = pheno_metric_alias
+        crop_unc_list.append(stats_unc)
+
+        textstr_unc = stats_unc['textstr']
+        props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+
+        # plot histogram of pixel uncertainties and scenario means
+        fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, sharey=True, figsize=(16,8))
+
+        ax1.hist(crop_gdf[unc_band], bins=50, density=True)
+        ax1.set_ylabel('Relative Frequency', fontsize=24)
+        ax1.set_xlabel(f'Absolute Uncertainty [{unit}] (k=1)', fontsize=24)
+        ax1.text(0.4, 0.95, textstr_unc, transform=ax1.transAxes, fontsize=16,
+                 verticalalignment='top', bbox=props)
+
+        stats_mean = get_stats(crop_gdf, mean_band, unit=unit)
+        stats_mean['crop'] = crop
+        stats_mean['vi_name'] = vi_name
+        stats_mean['metric'] = pheno_metric
+        stats_mean['metric_alias'] = pheno_metric_alias
+        crop_mean_list.append(stats_mean)
+        
+        textstr_mean = stats_mean['textstr']
+        ax2.hist(crop_gdf[mean_band], bins=50, density=True)
+        ax2.set_xlabel(f'Pixel Scenario Mean [{unit}]', fontsize=24)
+        ax2.text(0.05, 0.95, textstr_mean, transform=ax2.transAxes, fontsize=16,
+                 verticalalignment='top', bbox=props)
+
+        fig.suptitle(
+            f'{crop} {pheno_metric_alias.upper()} derived from {vi_name}\n'\
+            f'Number of Scenarios=1000; Number of Pixels={crop_gdf.shape[0]}',
+            fontsize=26
+        )
+
+        fname_out = out_dir.joinpath(
+            f'{vi_name}_{crop}_{pheno_metric}_pixel-histograms.png'
+        )
+        fig.savefig(fname_out, dpi=300, bbox_inches='tight')
+        plt.close(fig)
+
+    # save crop statistics to csv
+    crop_unc_stats = pd.DataFrame(crop_unc_list)
+    crop_unc_stats.drop('textstr', axis=1, inplace=True)
+    crop_unc_stats.to_csv(f'{fname_out_base}_uncertainty-crops-stats.csv', index=False)
+
+    crop_mean_stats = pd.concat(crop_mean_list)
+    crop_mean_stats.drop('textstr', axis=1, inplace=True)
+    crop_mean_stats.to_csv(f'{fname_out_base}_scenario-means-crops-stats.csv', index=False)
 
     # save dataframe to csv for future analysis
     gdf['x'] = gdf.geometry.x
     gdf['y'] = gdf.geometry.y
     gdf.drop('geometry', axis=1, inplace=True)
     gdf.to_csv(f'{fname_out_base}_data.csv', index=False)
-
 
 
 def visualize_sample_time_series(
@@ -303,12 +412,17 @@ def visualize_sample_time_series(
             ax.text(pheno_metric_date+datetime.timedelta(time_delta),
                     ymin+0.1, metric_text, fontsize=20)
 
-            # add uncertainty range around the metric (expressed in days)
+            # add uncertainty range around the metric (expressed in days) computed from
+            # the mean of the scenarios
             # everything smaller than .5 days will be rounded to the next smaller int
             # and vice versa
-            # TODO: rectangle around mean of scenarios!!!
             unc = int(np.round(point_gdf[f'{metric} Uncertainty'].iloc[0]))
-            unc_x1 = pheno_metric_date - datetime.timedelta(unc)
+            scenario_mean = int(np.round(point_gdf[f'{metric} Mean'].iloc[0]))
+            scenario_mean_date = start_date + datetime.timedelta(days=scenario_mean)
+            ax.vlines(x=pheno_metric_date, ymin=ymin, ymax=ymax,
+                      linestyles='dotted', color=metric_color, linewidth=3)
+
+            unc_x1 = scenario_mean_date - datetime.timedelta(unc)
 
             ax.add_patch(
                 patches.Rectangle(
@@ -340,7 +454,7 @@ def visualize_sample_time_series(
                 label='original smoothed')
 
         # TODO: legend below the plot
-        ax.legend(fontsize=20)
+        ax.legend(loc="lower center", bbox_to_anchor=(0.5, -0.5), ncol=4, fontsize=20)
         ax.set_ylabel(f'{vi_name} [-]', fontsize=24)
         ax.set_title(title_str, fontsize=24)
         ax.set_ylim(ymin, ymax)
@@ -391,27 +505,27 @@ if __name__ == '__main__':
     gdf = gpd.read_file(shapefile_crops)
     crop_code_mapping = dict(list(gdf.groupby([column_crop_code, column_crop_names]).groups))
 
-    # for vi_name in vi_names:
-    #
-    #     calc_l4_uncertainty(
-    #         uncertainty_dir=uncertainty_dir,
-    #         out_dir=out_dir,
-    #         vi_name=vi_name
-    #     )
-    #
-    #     create maps and histograms of phenometrics
-    #     for idx, pheno_metric in enumerate(pheno_metrics):
-    #         pheno_metric_alias = pheno_metrics_aliases[idx]
-    #         get_uncertainty_maps_and_histograms_by_croptype(
-    #             result_dir=result_dir,
-    #             vi_name=vi_name,
-    #             pheno_metric=pheno_metric,
-    #             pheno_metric_alias=pheno_metric_alias,
-    #             shapefile_crops=shapefile_crops,
-    #             column_crop_code=column_crop_code,
-    #             crop_code_mapping=crop_code_mapping,
-    #             out_dir=out_dir_crops
-    #         )
+    for vi_name in vi_names:
+    
+        calc_l4_uncertainty(
+            uncertainty_dir=uncertainty_dir,
+            out_dir=out_dir,
+            vi_name=vi_name
+        )
+    
+        # # create maps and histograms of phenometrics
+        # for idx, pheno_metric in enumerate(pheno_metrics):
+        #     pheno_metric_alias = pheno_metrics_aliases[idx]
+        #     get_uncertainty_maps_and_histograms_by_croptype(
+        #         result_dir=result_dir,
+        #         vi_name=vi_name,
+        #         pheno_metric=pheno_metric,
+        #         pheno_metric_alias=pheno_metric_alias,
+        #         shapefile_crops=shapefile_crops,
+        #         column_crop_code=column_crop_code,
+        #         crop_code_mapping=crop_code_mapping,
+        #         out_dir=out_dir_crops
+        #     )
         
     # change plot style here to ggplot (therefore, use two different loops)
     plt.style.use('ggplot')
@@ -419,6 +533,20 @@ if __name__ == '__main__':
     matplotlib.rc('ytick', labelsize=20) 
 
     for vi_name in vi_names:
+
+        # create maps and histograms of phenometrics
+        for idx, pheno_metric in enumerate(pheno_metrics):
+            pheno_metric_alias = pheno_metrics_aliases[idx]
+            get_uncertainty_maps_and_histograms_by_croptype(
+                result_dir=result_dir,
+                vi_name=vi_name,
+                pheno_metric=pheno_metric,
+                pheno_metric_alias=pheno_metric_alias,
+                shapefile_crops=shapefile_crops,
+                column_crop_code=column_crop_code,
+                crop_code_mapping=crop_code_mapping,
+                out_dir=out_dir_crops
+            )
 
         # visualize the randomly selected pixel time series samples
         vi_dir = uncertainty_dir.joinpath(vi_name)

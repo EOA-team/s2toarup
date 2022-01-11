@@ -804,14 +804,14 @@ if __name__ == '__main__':
     ### define user inputs
     
     # directory with L1C data (.SAFE subdirectories)
-    orig_datasets_dir = Path('../S2A_MSIL1C_orig/autumn')
+    orig_datasets_dir = Path('../S2A_MSIL1C_orig/spring')
     
     # directory with radiometric uncertainty outputs (.RUT subdirectories)
     unc_datasets_dir = orig_datasets_dir
     
     # directory where to store the scenarios (a subdirectory will be created for each scene)
     # in which the actual scenarios are placed
-    scenario_dir = Path('../S2A_MSIL1C_RUT-Scenarios/autumn')
+    scenario_dir = Path('../S2A_MSIL1C_RUT-Scenarios/spring')
     
     # define bounds of the study area (aka region of interest)
     # bounds col_min, col_max, row_min, row_max (image coordinates of the 10m raster)

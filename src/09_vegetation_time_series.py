@@ -140,12 +140,12 @@ def read_data_and_uncertainty(
         fname_vi = plot_dir.joinpath(f'{vi_name.lower()}-nominal_quicklook.png')
         fname_unc = plot_dir.joinpath(f'{vi_name.lower()}-stdunc_quicklook.png')
 
-        fig_rgb = s2_stack.plot_rgb()
-        fig_rgb.savefig(fname=fname_rgb, bbox_inches='tight')
-        fig_nir = s2_stack.plot_false_color_infrared()
-        fig_nir.savefig(fname=fname_nir, bbox_inches='tight')
-        fig_scl = s2_stack.plot_scl()
-        fig_scl.savefig(fname=fname_scl, bbox_inches='tight')
+        # fig_rgb = s2_stack.plot_rgb()
+        # fig_rgb.savefig(fname=fname_rgb, bbox_inches='tight')
+        # fig_nir = s2_stack.plot_false_color_infrared()
+        # fig_nir.savefig(fname=fname_nir, bbox_inches='tight')
+        # fig_scl = s2_stack.plot_scl()
+        # fig_scl.savefig(fname=fname_scl, bbox_inches='tight')
 
         # read Vegetation parameter/index band
         handler = SatDataHandler()
@@ -174,10 +174,10 @@ def read_data_and_uncertainty(
             full_bounding_box_only=True
         )
 
-        fig_unc = handler.plot_band(
-            band_name='abs_stddev'
-        )
-        fig_unc.savefig(fname=fname_unc, bbox_inches='tight')
+        # fig_unc = handler.plot_band(
+        #     band_name='abs_stddev'
+        # )
+        # fig_unc.savefig(fname=fname_unc, bbox_inches='tight')
 
         # apply the cloud mask also to the absolute uncertainty band
         s2_stack.add_band(
@@ -230,34 +230,33 @@ def extract_uncertainty_crops(
 
     # loop over scenes, rasterize the shapefile with the crops and convert it to
     # geodataframe to allow for crop-type specific analysis
-    gdf_list = []
+    gdf_dict = {}
     for idx, record in file_df.iterrows():
 
         # read original (reference) data for the field polygons
         _date = record.date
         scene_handler = deepcopy(ts_stack_dict[_date])
-        # scene_bands = scene_handler.get_bandnames()
+
         scene_handler.add_bands_from_vector(
             in_file_vector=sample_polygons,
             snap_band=vi_name,
             attribute_selection=['crop_code']
         )
-        # # mask pixels not having a crop type
-        # mask_value = scene_handler.get_band_nodata('crop_code')
-        # scene_handler.mask(
-        #     name_mask_band='crop_code',
-        #     mask_values=[mask_value],
-        #     bands_to_mask=scene_bands
-        # )
-        # convert to geodataframe
+
+        # convert to geodataframe and save them as CSVs
         gdf = scene_handler.to_dataframe()
         # drop NaNs
         gdf = gdf.dropna()
         gdf['date'] = record.date
-        gdf_list.append(gdf)
+        fname_csv = out_dir.joinpath(f'{vi_name}_{idx+1}_crops.csv')
+        gdf_dict[date] = fname_csv
+        scene_handler = None
+        gdf.to_csv(fname_csv, index=False)
+        logger.info(f'Read scene data from {_date} ({idx+1}/{file_df.shape[0]})')
 
-    # concat dataframes
-    gdf = pd.concat(gdf_list)
+    # concat dataframes (fails unfortunately)
+    # gdf = pd.concat(gdf_list)
+    # gdf.to_csv(out_dir.joinpath(f'{vi_name}_crops.csv'), index=False)
 
     # add crop name from original shape file
     gdf_polys = gpd.read_file(sample_polygons)
@@ -270,13 +269,19 @@ def extract_uncertainty_crops(
         # get crop name
         crop_name = gdf_polys[gdf_polys.crop_code == int(crop_code)]['crop_type'].iloc[0]
 
-        crop_gdf = gdf[gdf.crop_code == crop_code].copy()
+        # get values
+        gdf_list = []
+        for _date in file_df.date.unique():
+            gdf_date = pd.read_csv(gdf_dict[_date])
+            crop_gdf = gdf_date[gdf_date.crop_code == crop_code].copy()
+            # aggregate by date
+            crop_gdf_grouped = crop_gdf[['date', vi_name, f'{vi_name}_unc']].groupby('date').agg(
+                ['mean', 'min', 'max', 'std']
+            )
+            gdf_list.append(crop_gdf)
 
-        # aggregate by date
-        crop_gdf_grouped = crop_gdf[['date', vi_name, f'{vi_name}_unc']].groupby('date').agg(
-            ['mean', 'min', 'max', 'std']
-        )
-        
+        crop_gdf = pd.concat(gdf_list)
+
         # plot
         fig, (ax1, ax2) = plt.subplots(2, sharex=True, figsize=(15,10))
 
@@ -326,6 +331,7 @@ def extract_uncertainty_crops(
         fig.suptitle(f'Time Series of {crop_name} (Pixels: {pixel_count})', fontsize=26)
         fname = f'{vi_name}_{crop_name}_all-pixel-timeseries.png'
         fig.savefig(out_dir.joinpath(fname), dpi=300, bbox_inches='tight')
+        plt.close(fig)
         
 
 
@@ -453,6 +459,7 @@ def vegetation_time_series_scenarios(
                     gdf_points[['id', 'row', 'col']],
                     on='id'
                 )
+                
                 gdf_list.append(gdf_joined)
 
                 # append original raster data to stack once

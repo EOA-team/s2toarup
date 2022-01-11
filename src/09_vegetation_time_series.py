@@ -230,7 +230,7 @@ def extract_uncertainty_crops(
 
     # loop over scenes, rasterize the shapefile with the crops and convert it to
     # geodataframe to allow for crop-type specific analysis
-    gdf_dict = {}
+    gdf_list = []
     for idx, record in file_df.iterrows():
 
         # read original (reference) data for the field polygons
@@ -243,20 +243,22 @@ def extract_uncertainty_crops(
             attribute_selection=['crop_code']
         )
 
-        # convert to geodataframe and save them as CSVs
+        # convert to geodataframe and save them as CSVs (backup)
         gdf = scene_handler.to_dataframe()
         # drop NaNs
         gdf = gdf.dropna()
         gdf['date'] = record.date
+        gdf_list.append(gdf)
+        
         fname_csv = out_dir.joinpath(f'{vi_name}_{idx+1}_crops.csv')
-        gdf_dict[date] = fname_csv
         scene_handler = None
         gdf.to_csv(fname_csv, index=False)
+        
         logger.info(f'Read scene data from {_date} ({idx+1}/{file_df.shape[0]})')
 
-    # concat dataframes (fails unfortunately)
-    # gdf = pd.concat(gdf_list)
-    # gdf.to_csv(out_dir.joinpath(f'{vi_name}_crops.csv'), index=False)
+    # concat dataframes
+    gdf = pd.concat(gdf_list)
+    gdf.to_csv(out_dir.joinpath(f'{vi_name}_crops.csv'), index=False)
 
     # add crop name from original shape file
     gdf_polys = gpd.read_file(sample_polygons)
@@ -269,18 +271,12 @@ def extract_uncertainty_crops(
         # get crop name
         crop_name = gdf_polys[gdf_polys.crop_code == int(crop_code)]['crop_type'].iloc[0]
 
-        # get values
-        gdf_list = []
-        for _date in file_df.date.unique():
-            gdf_date = pd.read_csv(gdf_dict[_date])
-            crop_gdf = gdf_date[gdf_date.crop_code == crop_code].copy()
-            # aggregate by date
-            crop_gdf_grouped = crop_gdf[['date', vi_name, f'{vi_name}_unc']].groupby('date').agg(
-                ['mean', 'min', 'max', 'std']
-            )
-            gdf_list.append(crop_gdf)
+        crop_gdf = gdf[gdf.crop_code == crop_code].copy()
 
-        crop_gdf = pd.concat(gdf_list)
+        # aggregate by date
+        crop_gdf_grouped = crop_gdf[['date', vi_name, f'{vi_name}_unc']].groupby('date').agg(
+            ['mean', 'min', 'max', 'std']
+        )
 
         # plot
         fig, (ax1, ax2) = plt.subplots(2, sharex=True, figsize=(15,10))
@@ -301,7 +297,7 @@ def extract_uncertainty_crops(
             color='red',
             alpha=0.45
         )
-        ax1.set_title({vi_name}, fontsize=20)
+        ax1.set_title(vi_name, fontsize=20)
         ax1.set_ylabel(f'{vi_name} [-]', fontsize=24)
         ax1.set_ylim(ymin, ymax)
 
@@ -322,9 +318,9 @@ def extract_uncertainty_crops(
             y2=crop_gdf_grouped[unc_name, 'mean']+crop_gdf_grouped[unc_name, 'std'],
             color='red',
             alpha=0.45,
-            label=r'$\pm$ Stddev'
+            label=r'$\pm$ 1 Stddev'
         )
-        ax2.set_title(f'Uncertainty in {vi_name}', fontsize=20)
+        ax2.set_title(f'Uncertainty in {vi_name} (k=1)', fontsize=20)
         ax2.set_ylabel(f'Absolute Uncertainty [-]', fontsize=24)
         ax2.legend(loc="lower center", bbox_to_anchor=(0.5, -0.5), fontsize=20, ncol=3)
 

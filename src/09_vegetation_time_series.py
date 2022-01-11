@@ -236,6 +236,13 @@ def read_data_and_uncertainty(
     return merged, ts_stack_dict
 
 
+def percentile(n):
+    def percentile_(x):
+        return np.percentile(x, n)
+    percentile_.__name__ = 'percentile_%s' % n
+    return percentile_
+
+
 def extract_uncertainty_crops(
         ts_stack_dict: Dict[date, SatDataHandler],
         file_df: pd.DataFrame,
@@ -315,8 +322,9 @@ def extract_uncertainty_crops(
         crop_gdf = gdf[gdf.crop_code == crop_code].copy()
 
         # aggregate by date
+        # TODO: test if that works
         crop_gdf_grouped = crop_gdf[['date', vi_name, f'{vi_name}_unc']].groupby('date').agg(
-            ['mean', 'min', 'max', 'std']
+            ['mean', 'min', 'max', 'std', percentile(5), percentile(95)]
         )
 
         # plot
@@ -324,6 +332,7 @@ def extract_uncertainty_crops(
 
         # plot original time series showing spread between pixels (not scenarios!)
         ax1.plot(crop_gdf_grouped[vi_name, 'mean'], color='blue', linewidth=3)
+        # TODO: plot central 90% of values
         ax1.fill_between(
             x=crop_gdf_grouped.index,
             y1=crop_gdf_grouped[vi_name, 'min'],

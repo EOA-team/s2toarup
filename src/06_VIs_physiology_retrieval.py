@@ -85,7 +85,7 @@ def main(
                 )
                 in_file = fnames['bandstack']
                 for vi_name in vi_names:
-                    handler.calc_vi(vi_name)
+                    handler.calc_si(vi_name)
                     vi_fname = vis_dir.joinpath(f'VI_{in_file.split(".")[0]}_{vi_name.upper()}.tif').as_posix()
                     # save to raster
                     handler.write_bands(
@@ -121,7 +121,9 @@ def resample_and_stack_orig_data(
     orig_datasets_l2a = glob.glob(Path(orig_datasets_dir).joinpath(
         'S2*_MSIL2A*.SAFE').as_posix())
     
-    for orig_dataset in orig_datasets_l2a:
+    for idx, orig_dataset in enumerate(orig_datasets_l2a):
+
+        logger.info(f'Processing original dataset {orig_dataset} ({idx+1}/{len(orig_datasets_l2a)})')
 
         # save results in a folder called as the dataset ending with .VIs instead of
         # .SAFE
@@ -133,7 +135,7 @@ def resample_and_stack_orig_data(
         handler = Sentinel2Handler()
         handler.read_from_safe(
             in_dir=Path(orig_dataset), 
-            in_file_aoi=shapefile_study_area
+            polygon_features=shapefile_study_area
         )
 
         # resample the bands to 10m using nearest neighbor interpolation
@@ -191,6 +193,8 @@ def resample_and_stack_orig_data(
                 band_names=[vi_name]
             )
 
+        logger.info(f'Processed original dataset {orig_dataset} ({idx+1}/{len(orig_datasets_l2a)})')
+
 
 if __name__ == '__main__':
 
@@ -212,5 +216,3 @@ if __name__ == '__main__':
         orig_datasets_dir=orig_l2a_data,
         shapefile_study_area=shapefile_study_area
     )
-
-

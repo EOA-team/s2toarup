@@ -147,12 +147,7 @@ def read_data_and_uncertainty(
         fname_vi = plot_dir.joinpath(f'{vi_name.lower()}-nominal_quicklook.png')
         fname_unc = plot_dir.joinpath(f'{vi_name.lower()}-stdunc_quicklook.png')
 
-        # fig_rgb = s2_stack.plot_rgb()
-        # fig_rgb.savefig(fname=fname_rgb, bbox_inches='tight')
-        # fig_nir = s2_stack.plot_false_color_infrared()
-        # fig_nir.savefig(fname=fname_nir, bbox_inches='tight')
-        # fig_scl = s2_stack.plot_scl()
-        # fig_scl.savefig(fname=fname_scl, bbox_inches='tight')
+        
 
         # read Vegetation parameter/index band
         handler = SatDataHandler()

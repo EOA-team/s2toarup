@@ -176,8 +176,26 @@ def get_uncertainty_maps_and_histograms_by_croptype(
     ):
     """
     Get uncertainty maps of a phenological metric for selected crop types
-    (considering all pixels labelled as these crop types), plus histograms of
-    the uncertainty values over all pixels of a crop type
+    (considering all pixels labeled as this crop type), plus histograms of
+    the uncertainty values over all pixels of a crop type.
+
+    :param result_dir:
+        directory where the results of the uncertainty analysis (in the
+        phenological metrics) are stored
+    :param vi_name:
+        name of the vegetation index/ parameter to process
+    :param pheno_metric:
+        name of the phenometric to process (e.g., 'sos_times')
+    :param pheno_metric_alias:
+        alias name of the phenometric (used for adding text to the plots in
+        a more readable manner)
+    :param shapefile_crops:
+        ESRI shapefile with vector features containing crop type information
+    :param column_crop_code:
+        attribute (column name in the resulting GeoDataFrame) in the shapefile
+        denoting the crop codes as integer values
+    :param out_dir:
+        directory where to save the results to
     """
 
     # find the file with the phenological uncertainty estimates for the selected

@@ -97,13 +97,12 @@ def _calc_pheno_metrics(xds: xr.Dataset) -> Dict[str, xr.Dataset]:
 def read_data_and_uncertainty(
         data_df: pd.DataFrame,
         in_file_aoi: Path,
-        vi_name: str,
-        out_dir_plots: Path
+        vi_name: str
     ) -> Tuple[pd.DataFrame, List[Sentinel2Handler]]:
     """
     This function reads the selected vegetation index (computed in step 7)
-    and the associated standard uncertainty in a uarray (from uncertainties)
-    and stores the read data as new columns in data_df.
+    and the associated standard uncertainty and stores the read data as
+    new columns in data_df.
 
     :param data_df:
         dataframe returned from ``get_data_and_uncertainty``
@@ -111,9 +110,6 @@ def read_data_and_uncertainty(
         shapefile defining the study area
     :param vi_name:
         name of the vegetation index or parameter to process (e.g., NDVI)
-    :param out_dir_plots:
-        directory where to store scene quicklooks (might be helpful for
-        result interpretation)
     :return:
         input dataframe with read data + list of read vegetation data and
         their absolute uncertainty per image acquisition date
@@ -137,23 +133,6 @@ def read_data_and_uncertainty(
         # mask clouds and cloud shadows (if any) and store the cloudy pixel percentage
         cloud_coverage = s2_stack.get_cloudy_pixel_percentage()
 
-        # plot quicklooks and save them
-        plot_dir = out_dir_plots.joinpath(record.date.strftime('%Y%m%d'))
-        if not plot_dir.exists():
-            plot_dir.mkdir()
-        fname_rgb = plot_dir.joinpath('rgb_quicklook.png')
-        fname_nir = plot_dir.joinpath('falsecolor-nir_quicklook.png')
-        fname_scl = plot_dir.joinpath('scene-classification_quicklook.png')
-        fname_vi = plot_dir.joinpath(f'{vi_name.lower()}-nominal_quicklook.png')
-        fname_unc = plot_dir.joinpath(f'{vi_name.lower()}-stdunc_quicklook.png')
-
-        # fig_rgb = s2_stack.plot_rgb()
-        # fig_rgb.savefig(fname=fname_rgb, bbox_inches='tight')
-        # fig_nir = s2_stack.plot_false_color_infrared()
-        # fig_nir.savefig(fname=fname_nir, bbox_inches='tight')
-        # fig_scl = s2_stack.plot_scl()
-        # fig_scl.savefig(fname=fname_scl, bbox_inches='tight')
-
         # read Vegetation parameter/index band
         handler = SatDataHandler()
         handler.read_from_bandstack(
@@ -162,8 +141,7 @@ def read_data_and_uncertainty(
             full_bounding_box_only=True
         )
         handler.reset_bandnames(new_bandnames=[vi_name])
-        fig_vi = handler.plot_band(band_name=vi_name, colormap='summer')
-        fig_vi.savefig(fname=fname_vi, bbox_inches='tight')
+
         s2_stack.add_band(
             band_name=vi_name,
             band_data=handler.get_band(vi_name),
@@ -178,11 +156,6 @@ def read_data_and_uncertainty(
             band_selection=['abs_stddev'],
             full_bounding_box_only=True
         )
-
-        # fig_unc = handler.plot_band(
-        #     band_name='abs_stddev'
-        # )
-        # fig_unc.savefig(fname=fname_unc, bbox_inches='tight')
 
         # apply the cloud mask also to the absolute uncertainty band
         s2_stack.add_band(
@@ -229,9 +202,6 @@ def read_data_and_uncertainty(
     # added update columns to input data frame
     update_df = pd.DataFrame(update_list)
     merged = pd.merge(data_df, update_df, on='date')
-
-    # backup met
-    merged.to_csv(out_dir_plots.joinpath('metadata.csv'), index=False)
 
     return merged, ts_stack_dict
 
@@ -332,7 +302,7 @@ def extract_uncertainty_crops(
 
         # plot original time series showing spread between pixels (not scenarios!)
         ax1.plot(crop_gdf_grouped[vi_name, 'mean'], color='blue', linewidth=3)
-        # TODO: plot central 90% of values
+        # TODO: test plot central 90% of values
         ax1.fill_between(
             x=crop_gdf_grouped.index,
             y1=crop_gdf_grouped[vi_name, 'percentile_5'],
@@ -681,8 +651,7 @@ def main(
     file_df, ts_stack_dict = read_data_and_uncertainty(
         data_df=data_df,
         vi_name=vi_name,
-        in_file_aoi=in_file_aoi,
-        out_dir_plots=out_dir_plots
+        in_file_aoi=in_file_aoi
     )
 
     # check uncertainty in different crop types over time

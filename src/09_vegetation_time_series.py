@@ -332,7 +332,7 @@ def extract_uncertainty_crops(
 
         # plot original time series showing spread between pixels (not scenarios!)
         ax1.plot(crop_gdf_grouped[vi_name, 'mean'], color='blue', linewidth=3)
-        # TODO: plot central 90% of values
+        # TODO: test plot central 90% of values
         ax1.fill_between(
             x=crop_gdf_grouped.index,
             y1=crop_gdf_grouped[vi_name, 'percentile_5'],

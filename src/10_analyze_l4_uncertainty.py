@@ -519,7 +519,7 @@ if __name__ == '__main__':
     column_crop_code = 'crop_code'
     column_crop_names = 'crop_type'
 
-    # define mapping of "NUTZUNGSCODES" to crop types
+    # define mapping of "crop_codes" to crop types
     gdf = gpd.read_file(shapefile_crops)
     crop_code_mapping = dict(list(gdf.groupby([column_crop_code, column_crop_names]).groups))
 

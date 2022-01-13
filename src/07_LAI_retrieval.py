@@ -6,7 +6,10 @@ the band names.
 '''
 
 import os
+import sys
 import glob
+import shlex
+from subprocess import Popen, PIPE
 from pathlib import Path
 from typing import Optional
 
@@ -19,6 +22,7 @@ logger = get_logger('06_LAI_retrieval')
 def loop_scenarios(
         scenario_dir: Path,
         shapefile_study_area: Path,
+        model_path: Path,
         matlab_script_path: Path,
         matlab_executable_path: Optional[Path] = None
     ):
@@ -33,6 +37,8 @@ def loop_scenarios(
     :param shapefile_study_area:
         ESRI shapefile denoting the extent of the study area (used for
         clipping output of LAI model)
+    :param lai_model_path:
+        path to the actual LAI model (*.mat file) from Amin et al. (2021)
     :param matlab_script_path:
         path to the matlab script. The LAI model is available upon request
         from Eatidal Amin (??)
@@ -41,7 +47,7 @@ def loop_scenarios(
     """
 
     if matlab_executable_path is None:
-        matlab_executable_path = 'mex'
+        matlab_executable_path = 'matlab'
     else:
         matlab_executable_path = matlab_executable_path.as_posix()
 
@@ -60,24 +66,44 @@ def loop_scenarios(
         for jdx, scenario in enumerate(scenarios):
 
             # define input and outputs for the LAI model
-            lai_model_inp = scenario.as_posix()
-            vi_dir = scenario.joinpath('Vegetation_Indices')
-            lai_model_opt = vi_dir.as_posix()
+            scenario = Path(scenario)
+            in_dir_safe = scenario.parent.as_posix()
+            vi_dir = scenario.parent.joinpath('Vegetation_Indices')
+            out_dir = vi_dir.as_posix()
 
             logger.info(f'Starting LAI retrieval {jdx+1}/{len(scenarios)} ({scenario})')
-            # TODO: call LAI model here (using subprocess)
-            cmd_inp = f'{matlab_executable_path} {matlab_script_path}'
+            # call LAI model here (using subprocess)
+            cwd = os.getcwd()
+            # change into directory where the Matlab src is located to avoid path problems
+            os.chdir(matlab_script_path.parent)
+            matlab_script = matlab_script_path.name.split('.')[0]
+            cmd_inp = f'{matlab_executable_path} -nodisplay -nosplash -r "{matlab_script} {model_path} {in_dir_safe} {out_dir}"'
+
+            command = shlex.split(cmd_inp)
+            process = Popen(command, stdout=PIPE, stderr=PIPE)
+            _, stderr = process.communicate()
+
+            if stderr != b'':
+                logger.error(f'Execution of LAI retrieval errored: {stderr}')
+                sys.exit()
+
+            # change back into previous working directory
+            os.chdir(cwd)
 
             # once the model is finished, apply the post-processing
             lai_product = glob.glob(vi_dir.joinpath('LAI_S2*.tiff').as_posix())[0]
             logger.info(f'Finished LAI retrieval {jdx+1}/{len(scenarios)} ({scenario})')
 
             post_process_lai_product(
-                lai_product=lai_product,
+                lai_product=Path(lai_product),
                 shapefile_study_area=shapefile_study_area
             )
 
             logger.info(f'Cleaned up LAI outputs {jdx+1}/{len(scenarios)} ({scenario})')
+
+        logger.info(f'Finished scene {scene} ({idx+1}/{len(scenes)})')
+
+    logger.info('Done')
 
 
 def post_process_lai_product(
@@ -155,9 +181,25 @@ def post_process_lai_product(
 
 if __name__ == '__main__':
 
-    lai_product = Path('/mnt/ides/Lukas/04_Work/GPR_LAI/LAI_S2A_20190328_T32TMT.tiff')
+    # input directories and files
+    scenario_dir = Path('/mnt/ides/Lukas/04_Work/GPR_LAI/S2_RUT_Scenarios')
     shapefile_study_area = Path('../shp/AOI_Esch_EPSG32632.shp')
-    post_process_lai_product(lai_product, shapefile_study_area)
 
+    # LAI model path
+    gpr_install_dir = Path('/mnt/ides/Lukas/software/S2GPR/S2GPR_Ret')
+    lai_model_path = gpr_install_dir.joinpath('LAIGreen_GPR_10b_4k_v11_1.mat')
 
-    matlab_executable_path = Path('/mnt/ides/Lukas/software/matlab/bin/mex')
+    # path to the Matlab script calling the LAI model class
+    matlab_script_path = gpr_install_dir.joinpath('S2Ret_run.m')
+    
+    # path to the Matlab executable (not required if matlab is found in $PATH)
+    # matlab_executable_path = Path('/mnt/ides/Lukas/software/matlab/bin/matlab')
+    matlab_executable_path = Path('matlab')
+
+    loop_scenarios(
+        scenario_dir=scenario_dir,
+        shapefile_study_area=shapefile_study_area,
+        model_path=lai_model_path,
+        matlab_script_path=matlab_script_path,
+        matlab_executable_path=matlab_executable_path
+    )

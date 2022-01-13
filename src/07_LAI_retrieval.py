@@ -16,7 +16,7 @@ from typing import Optional
 from agrisatpy.io import SatDataHandler
 from logger import get_logger
 
-logger = get_logger('06_LAI_retrieval')
+logger = get_logger('07_LAI_retrieval')
 
 
 def loop_scenarios(
@@ -186,7 +186,7 @@ if __name__ == '__main__':
     shapefile_study_area = Path('../shp/AOI_Esch_EPSG32632.shp')
 
     # LAI model path
-    gpr_install_dir = Path('/mnt/ides/Lukas/software/S2GPR/S2GPR_Ret')
+    gpr_install_dir = Path('/home/graflu/git/s2gpr_ret')
     lai_model_path = gpr_install_dir.joinpath('LAIGreen_GPR_10b_4k_v11_1.mat')
 
     # path to the Matlab script calling the LAI model class

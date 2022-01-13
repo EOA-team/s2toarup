@@ -3,17 +3,21 @@ Check how many scenario runs are necessary
 '''
 
 import glob
+import matplotlib
 import numpy as np
 import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
 from pathlib import Path
 from copy import deepcopy
+from typing import Optional
 from agrisatpy.io import SatDataHandler
 
 from logger import get_logger
 
 plt.style.use('ggplot')
+matplotlib.rc('xtick', labelsize=20) 
+matplotlib.rc('ytick', labelsize=20)
 
 logger = get_logger('_how_many_scenarios')
 
@@ -22,7 +26,8 @@ def plot_uncertainty_number_of_scenarios(
         scenarios_scene_dir: Path,
         sample_polygons: Path,
         vi_name: str,
-        out_dir: Path
+        out_dir: Path,
+        relative_uncertainty: Optional[bool] = True
     ):
 
     # search expression to find all scenario realizations
@@ -30,6 +35,13 @@ def plot_uncertainty_number_of_scenarios(
     scenario_files = glob.glob(
         scenarios_scene_dir.joinpath(search_expr).as_posix()
     )
+
+    # absolute or relative uncertainty
+    prefix = 'Absolute'
+    unit = '-'
+    if relative_uncertainty:
+        prefix = 'Relative'
+        unit = '%'
 
     # read all scenario results at the selected point locations into a dataframe
     scenario_array_list = []
@@ -48,7 +60,7 @@ def plot_uncertainty_number_of_scenarios(
 
     # map crop type to crop code
     gdf_polys = gpd.read_file(sample_polygons)
-    crops = list(gdf_polys.crop_code.unique())
+    crops = list(gdf_polys.crop_type.unique())
 
     # stack scenario array into 3d array
     scenarios_stacked = np.stack(scenario_array_list)
@@ -57,7 +69,7 @@ def plot_uncertainty_number_of_scenarios(
     handler = None
 
     # rasterize the field polygons (using their int crop code)
-    snap_band = handler.get_bandnames()[0]
+    snap_band = unc_handler.get_bandnames()[0]
     unc_handler.add_bands_from_vector(
         in_file_vector=sample_polygons,
         snap_band=snap_band,
@@ -70,12 +82,16 @@ def plot_uncertainty_number_of_scenarios(
     # the number of scenarios considered on the x axis
     for crop in crops:
 
-        logger.info(f'Plotting number of scenarios vs. derived uncertainty for crop {crop}')
+        logger.info(f'Plotting number of scenarios vs. {prefix.lower()} uncertainty for crop "{crop}"')
 
         # get crop code
-        crop_code = gdf_polys[gdf_polys.crop_type == crop].iloc[0]
+        crop_code = gdf_polys[gdf_polys.crop_type == crop]['crop_code'].iloc[0]
+        # and crop mask
+        crop_mask = np.zeros_like(crop_code_arr).astype('uint8')
+        crop_mask[~np.isin(crop_code_arr, crop_code)] = 1
+        crop_pixels = np.unique(crop_mask, return_counts=True)[1][0]
 
-        title_str = f'{crop} {vi_name}'
+        title_str = f'{crop} - {vi_name}\nNumber of Pixels: {crop_pixels}'
 
         # loop over the scenarios and save min, mean, std and max uncertainty of all pixels
         # of the crop type for the current number of scenarios
@@ -88,38 +104,79 @@ def plot_uncertainty_number_of_scenarios(
         for _ in range(n_batches):
 
             res = {}
-            abs_unc = np.nanstd(scenarios_stacked[start_idx:counter,:,:], axis=0)
+            # get uncertainty and apply crop mask
+            abs_unc = np.nanstd(scenarios_stacked[start_idx:counter,:,:], axis=0).data
+            mean_vi = np.nanmean(scenarios_stacked[start_idx:counter,:,:], axis=0).data
 
-            # add to handler, mask all but pixels of the current crop type and calculate
-            # the statistics
-            mask = crop_code_arr[crop_code_arr != crop_code]
+            # convert to relative uncertainty
+            if relative_uncertainty:
+                abs_unc = np.divide(abs_unc, mean_vi) * 100.
+
+            abs_unc[crop_mask == 1]= np.nan
 
             res['scenario_number'] = counter
+            res['_min'] = np.nanmin(abs_unc)
+            res['_max'] = np.nanmax(abs_unc)
+            res['_q05'] = np.nanquantile(abs_unc, 0.05)
+            res['_q95'] = np.nanquantile(abs_unc, 0.95)
+            res['_mean'] = np.nanmean(abs_unc)
+            res['_median'] = np.nanmedian(abs_unc)
+            res['_std_plus'] = res['_mean'] + np.nanstd(abs_unc)
+            res['_std_minus'] = res['_mean'] - np.nanstd(abs_unc)
 
             res_list.append(res)
             counter += increment
 
-
         df = pd.DataFrame(res_list)
+        fname_csv = out_dir.joinpath(
+            f'{vi_name}_{crop.replace(" ","-")}_scenarios-{prefix.lower()}-uncertainty.csv'
+        )
+        df.to_csv(fname_csv, index=False)
 
         # plot the derived uncertainty values on the y-axis and the number of scenarios
         # used on the x-axis
-        fig = plt.figure(num=1, dpi=150)
+        fig = plt.figure(num=1, figsize=(15,10))
         ax = fig.add_subplot(111)
 
         # absolute uncertainty
-        ax.plot(scenario_number, abs_unc, label=f'{vi_name} Uncertainty')
-        ax.set_xlabel('Number of scenarios', fontsize=16)
-        ax.set_ylabel('Absolute Uncertainty (k=1) [-]', fontsize=16)
+        ax.plot(df.scenario_number, df._mean, color='blue', label=f'Mean')
+        ax.fill_between(
+            x=df.scenario_number,
+            y1=df._min,
+            y2=df._max,
+            label='Min-Max Spread',
+            color='orange',
+            alpha=0.5
+        )
+        ax.fill_between(
+            x=df.scenario_number,
+            y1=df._std_minus,
+            y2=df._std_plus,
+            label=r'$\pm$ 1 Stddev',
+            color='red',
+            alpha=0.45
+        )
 
-        ax.set_title(title_str, fontsize=14)
-        ax.legend(fontsize=14)
+        ax.fill_between(
+            x=df.scenario_number,
+            y1=df._q05,
+            y2=df._q95,
+            label=r'5-95% Quantile Spread',
+            color='red',
+            alpha=0.3
+        )
 
-        fname_out = out_dir.joinpath(f'{vi_name}_{crop}_scenarios-uncertainty.png')
-        fig.savefig(fname_out, bbox_inches='tight')
+        ax.set_xlabel('Number of Scenarios', fontsize=24)
+        ax.set_ylabel(f'{prefix} Uncertainty (k=1) [{unit}]', fontsize=24)
+
+        ax.set_title(title_str, fontsize=26)
+        ax.legend(loc="lower center", bbox_to_anchor=(0.5, -0.2), ncol=4, fontsize=20)
+
+        fname_out = out_dir.joinpath(f'{vi_name}_{crop.replace(" ","")}_scenarios-{prefix.lower()}-uncertainty.png')
+        fig.savefig(fname_out, bbox_inches='tight', dpi=300)
         plt.close(fig)
 
-        logger.info(f'Plotted number of scenarios vs. derived uncertainty for crop {crop}')
+        logger.info(f'Plotted number of scenarios vs. {prefix.lower()} uncertainty for crop {crop}')
     
 
 
@@ -131,7 +188,7 @@ if __name__ == '__main__':
         'S2A_MSIL1C_20190818T103031_N0208_R108_T32TMT_20190818T124651'
     ]
 
-    sample_polygons = Path('../shp/ZH_Points_2019_EPSG32632_selected-crops_buffered.shp')
+    sample_polygons = Path('../shp/ZH_Polygons_2019_EPSG32632_selected-crops_buffered.shp')
     vi_names = ['NDVI', 'EVI']
     out_dir = Path('../S2A_MSIL2A_Analysis/how_many_scenarios')
     orig_datasets_dir = Path('../S2A_MSIL1C_orig')

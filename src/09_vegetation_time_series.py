@@ -49,7 +49,7 @@ matplotlib.rc('ytick', labelsize=20)
 
 # define SCL classes to mask
 # see https://sentinels.copernicus.eu/web/sentinel/technical-guides/sentinel-2-msi/level-2a/algorithm
-# for a legend
+# for a legend of the class labels
 scl_mask_values = [1,2,3,7,8,9,10,11]
 
 

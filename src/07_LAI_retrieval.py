@@ -182,7 +182,7 @@ def post_process_lai_product(
 if __name__ == '__main__':
 
     # input directories and files
-    scenario_dir = Path('/mnt/ides/Lukas/04_Work/GPR_LAI/S2_RUT_Scenarios')
+    scenario_dir = Path('../S2A_MSIL1C_RUT-Scenarios')
     shapefile_study_area = Path('../shp/AOI_Esch_EPSG32632.shp')
 
     # LAI model path
@@ -193,8 +193,8 @@ if __name__ == '__main__':
     matlab_script_path = gpr_install_dir.joinpath('S2Ret_run.m')
     
     # path to the Matlab executable (not required if matlab is found in $PATH)
-    # matlab_executable_path = Path('/mnt/ides/Lukas/software/matlab/bin/matlab')
-    matlab_executable_path = Path('matlab')
+    matlab_executable_path = Path('/mnt/ides/Lukas/software/matlab/bin/matlab')
+    # matlab_executable_path = Path('matlab')
 
     loop_scenarios(
         scenario_dir=scenario_dir,

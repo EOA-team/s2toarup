@@ -211,6 +211,7 @@ if __name__ == '__main__':
                 scenarios_scene_dir=scenario_scene_dir,
                 sample_polygons=sample_polygons,
                 vi_name=vi_name,
-                out_dir=out_dir_vi
+                out_dir=out_dir_vi,
+                relative_uncertainty=False
             )
         

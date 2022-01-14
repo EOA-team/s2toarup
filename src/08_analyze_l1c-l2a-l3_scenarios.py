@@ -1,4 +1,3 @@
-
 '''
 This script is used to analyze the uncertainty
 propagation outcomes before and after Sen2Cor. It generates
@@ -552,13 +551,14 @@ def unc_maps(
                     maxmax_l2a = 10
     
             # map
+            cmap='Oranges'
             im_l1c = single_axs[0].imshow(
-                l1c_data, vmin=minmin_l1c, vmax=maxmax_l1c, cmap='bwr', interpolation='none',
+                l1c_data, vmin=minmin_l1c, vmax=maxmax_l1c, cmap=cmap, interpolation='none',
                 extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
             )
             single_axs[0].title.set_text(f'L1C TOA {band}')
             im_l2a = single_axs[1].imshow(
-                l2a_data, vmin=minmin_l2a, vmax=maxmax_l2a, cmap='bwr', interpolation='none',
+                l2a_data, vmin=minmin_l2a, vmax=maxmax_l2a, cmap=cmap, interpolation='none',
                 extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
             )
             single_axs[1].title.set_text(f'L2A BOA {band}')
@@ -631,7 +631,7 @@ def unc_maps(
 
             # map
             im_l1c = single_axs.imshow(
-                atm_data, vmin=minmin, vmax=maxmax, cmap='bwr', interpolation='none',
+                atm_data, vmin=minmin, vmax=maxmax, cmap=cmap, interpolation='none',
                 extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
             )
             if band in vegetation_indices:

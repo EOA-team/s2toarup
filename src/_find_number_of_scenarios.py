@@ -27,14 +27,49 @@ def plot_uncertainty_number_of_scenarios(
         sample_polygons: Path,
         vi_name: str,
         out_dir: Path,
-        relative_uncertainty: Optional[bool] = True
+        relative_uncertainty: Optional[bool] = True,
+        orig_scene_dir: Optional[Path] = None
     ):
+    """
+    Plots the number of scenarios vs. the corresponding uncertainty
+    in one of the vegetation indices/parameters for all pixels
+    of a crop type
+
+    :param scenario_scene_dir:
+        directory where the outcomes of the S2-RUT scenarios (vegetation
+        indices/parameters derived from the L2A data) are located
+    :param sample_polygons:
+        polygon features with crop type information
+    :param vi_name:
+        name of the vegetation index/parameter to analyze
+    :param relative_uncertainty:
+        determines if to calculate relative (default) or absolute
+        uncertainty
+    :param orig_scene_dir:
+        original (reference) vegetation index/parameter data to use
+        for relative uncertainty calculation
+    """
 
     # search expression to find all scenario realizations
     search_expr = f'*/Vegetation_Indices/VI*_None_10m_{vi_name}.tif'
     scenario_files = glob.glob(
         scenarios_scene_dir.joinpath(search_expr).as_posix()
     )
+
+    # find original data for relative uncertainty calculation
+    if relative_uncertainty:
+        orig_file = glob.glob(
+            orig_scene_dir.joinpath(search_expr[2:]).as_posix()
+        )[0]
+        handler = SatDataHandler()
+        handler.read_from_bandstack(
+            fname_bandstack=orig_file,
+            in_file_aoi=sample_polygons,
+            full_bounding_box_only=True
+        )
+        band_name = handler.get_bandnames()[0]
+        orig_arr = handler.get_band(band_name)
+        orig_arr = orig_arr.data
 
     # absolute or relative uncertainty
     prefix = 'Absolute'
@@ -106,11 +141,10 @@ def plot_uncertainty_number_of_scenarios(
             res = {}
             # get uncertainty and apply crop mask
             abs_unc = np.nanstd(scenarios_stacked[start_idx:counter,:,:], axis=0).data
-            mean_vi = np.nanmean(scenarios_stacked[start_idx:counter,:,:], axis=0).data
 
-            # convert to relative uncertainty
+            # convert to relative uncertainty using the original data
             if relative_uncertainty:
-                abs_unc = np.divide(abs_unc, mean_vi) * 100.
+                abs_unc = np.divide(abs_unc, orig_arr) * 100.
 
             abs_unc[crop_mask == 1]= np.nan
 
@@ -193,6 +227,8 @@ if __name__ == '__main__':
     out_dir = Path('../S2A_MSIL2A_Analysis/how_many_scenarios')
     orig_datasets_dir = Path('../S2A_MSIL1C_orig')
 
+    relative_uncertainty = True
+
     for scene in scenes:
 
         scenario_scene_dir = Path(f'../S2A_MSIL1C_RUT-Scenarios/{scene}')
@@ -200,6 +236,15 @@ if __name__ == '__main__':
 
         if not out_dir_scene.exists():
             out_dir_scene.mkdir()
+
+        orig_scene_dir = None
+        if relative_uncertainty:
+            scene_splitted = scene.split('_')
+            search_expr = scene_splitted[0] + '_MSIL2A_' + scene_splitted[2]
+            orig_scene_dir = glob.glob(
+                orig_datasets_dir.joinpath(f'{search_expr}*.VIs').as_posix()
+            )[0]
+            orig_scene_dir = Path(orig_scene_dir)
 
         for vi_name in vi_names:
 
@@ -212,6 +257,7 @@ if __name__ == '__main__':
                 sample_polygons=sample_polygons,
                 vi_name=vi_name,
                 out_dir=out_dir_vi,
-                relative_uncertainty=False
+                orig_scene_dir=orig_scene_dir,
+                relative_uncertainty=relative_uncertainty
             )
         

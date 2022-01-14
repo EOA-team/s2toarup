@@ -143,12 +143,13 @@ def analyze_scenarios_spatial(
         in_file_shp: Path,
         out_dir: Path,
         processing_level: str,
-        **kwargs
+        orig_dataset_dir: Path,
+        n_random_pixels: Optional[int]
     ):
     """
     Extracts a region of interest (ROI) from a series of
-    uncertainty scenarios, stacks them, and compiles the mean and
-    standard deviation among all scenarios per pixel. Thus, it is
+    uncertainty scenarios, stacks them, and compiles the standard
+    deviation among all scenarios per pixel. Thus, it is
     possible to obtain spatial (absolute & relative) uncertainty
     information.
 
@@ -165,22 +166,14 @@ def analyze_scenarios_spatial(
         (before and after atmospheric correction)
         OR 'L3' for analyzing the vegetation indices or either higher
         level products
-    :kwargs:
-    select_random_pixels:
-        if set to True (Default) generates histograms of randomly chosen
-        pixels showing the histograms obtained from the scenarios
-    n_random_pixels:
-        if select_random_pixels is True a user-defined number of pixels
-        is analyzed. The default is 5 pixels
-    orig_dataset_directory:
-        directory with the original dataset in L1C or L2A processing level
+    :param n_random_pixels:
+        A user-defined number of pixels is analyzed (histogram of scenario
+        results to check for normal distribution). The default is 5 pixels.
+    :param orig_dataset_directory:
+        directory with the original dataset in L1C, L2A or L3 processing level
         to be used when plotting the histograms of the randomly selected
-        pixels.
+        pixels and for obtaining the relative uncertainties
     """
-
-    select_random_pixels = kwargs.get('select_random_pixels', True)
-    n_random_pixels = kwargs.get('n_random_pixels', 5)
-    orig_dataset_directory = kwargs.get('orig_dataset_directory', None)
 
     # check processing level
     if processing_level == 'L1C':
@@ -196,21 +189,19 @@ def analyze_scenarios_spatial(
     # read shapefile
     gdf = gpd.read_file(in_file_shp)
 
-    # extract random pixels if selected within the ROI bounds
+    # extract random pixels  within the ROI bounds
     # works only if the shapefile is in the same projection as the sat data
-    if select_random_pixels:
+    left, bottom, right, top = gdf.iloc[0]['geometry'].bounds
+    # sample across rows and columns, leave buffer to avoid out-of-bounds errors
+    sampling_buffer = 60
+    left += sampling_buffer
+    bottom += sampling_buffer
+    right -= sampling_buffer
+    top -= sampling_buffer
 
-        left, bottom, right, top = gdf.iloc[0]['geometry'].bounds
-        # sample across rows and columns, leave buffer to avoid out-of-bounds errors
-        sampling_buffer = 60
-        left += sampling_buffer
-        bottom += sampling_buffer
-        right -= sampling_buffer
-        top -= sampling_buffer
-
-        col_samples = np.random.uniform(left, right, n_random_pixels)
-        row_samples = np.random.uniform(bottom, top, n_random_pixels)
-        coord_samples = list(zip(col_samples, row_samples))
+    col_samples = np.random.uniform(left, right, n_random_pixels)
+    row_samples = np.random.uniform(bottom, top, n_random_pixels)
+    coord_samples = list(zip(col_samples, row_samples))
 
     # loop over single bands and extract data from scenario runs
     for spatial_res in band_dict_s2.keys():
@@ -247,43 +238,42 @@ def analyze_scenarios_spatial(
             gdf_reprojected = gdf.to_crs(sat_crs)
             feature = gdf_reprojected.iloc[0]
 
-            # read original L1C and L2A data in case random pixel are selected
-            if select_random_pixels:
-                if processing_level == 'L1C':
-                    # original scene has the same name as the scenario directory + .SAFE
-                    orig_dataset = orig_dataset_directory.joinpath(
-                        f'{unc_scenario_dir.name}.SAFE'
-                    )
-                elif processing_level == 'L2A':
-                    # the L2A dataset has a bit different name but parts of the name are the same
-                    date_str = unc_scenario_dir.name.split('_')[2]
-                    tile_str = unc_scenario_dir.name.split('_')[5]
-                    orig_dataset = glob.glob(
-                        orig_dataset_directory.joinpath(
-                            f'S2*_{abbrev}*_{date_str}_*_{tile_str}_*.SAFE'
-                        ).as_posix()
-                    )[0]
-                elif processing_level == 'L3':
-                    # the L3 dataset has a bit different name but parts of the name are the same
-                    date_str = unc_scenario_dir.name.split('_')[2]
-                    tile_str = unc_scenario_dir.name.split('_')[5]
-                    orig_dataset = glob.glob(
-                        orig_dataset_directory.joinpath(
-                            f'S2*_{date_str}_*_{tile_str}_*.VIs'
-                        ).as_posix()
-                    )[0]
-
-                orig_file = glob.glob(
-                    str(Path(orig_dataset).joinpath(search_expr_orig + band_dict[band]))
+            # read original data
+            if processing_level == 'L1C':
+                # original scene has the same name as the scenario directory + .SAFE
+                orig_dataset = orig_dataset_directory.joinpath(
+                    f'{unc_scenario_dir.name}.SAFE'
+                )
+            elif processing_level == 'L2A':
+                # the L2A dataset has a bit different name but parts of the name are the same
+                date_str = unc_scenario_dir.name.split('_')[2]
+                tile_str = unc_scenario_dir.name.split('_')[5]
+                orig_dataset = glob.glob(
+                    orig_dataset_directory.joinpath(
+                        f'S2*_{abbrev}*_{date_str}_*_{tile_str}_*.SAFE'
+                    ).as_posix()
+                )[0]
+            elif processing_level == 'L3':
+                # the L3 dataset has a bit different name but parts of the name are the same
+                date_str = unc_scenario_dir.name.split('_')[2]
+                tile_str = unc_scenario_dir.name.split('_')[5]
+                orig_dataset = glob.glob(
+                    orig_dataset_directory.joinpath(
+                        f'S2*_{date_str}_*_{tile_str}_*.VIs'
+                    ).as_posix()
                 )[0]
 
-                with rio.open(orig_file, 'r') as src:
-                    orig_arr, _ = rio.mask.mask(
-                            src,
-                            [feature["geometry"]],
-                            crop=True, 
-                            all_touched=True # IMPORTANT!
-                    )
+            orig_file = glob.glob(
+                str(Path(orig_dataset).joinpath(search_expr_orig + band_dict[band]))
+            )[0]
+
+            with rio.open(orig_file, 'r') as src:
+                orig_arr, _ = rio.mask.mask(
+                        src,
+                        [feature["geometry"]],
+                        crop=True, 
+                        all_touched=True # IMPORTANT!
+                )
 
             # loop over scenario members
             n_scenarios = len(scenario_files)
@@ -322,106 +312,107 @@ def analyze_scenarios_spatial(
                 }
             )
 
-            # if random pixels shall be analyzed then plot their histogram
-            if select_random_pixels:
-                # calculate the image coordinates for the coordinate tuples
-                for coord_tuple in coord_samples:
-                    # point coordinates
-                    rand_coords = pixel_to_img_coords(
-                        point_coords=coord_tuple,
-                        img_transform=meta['transform']
+            # plot histograms of randomly selected pixels
+            # calculate the image coordinates for the coordinate tuples
+            for coord_tuple in coord_samples:
+                # point coordinates
+                rand_coords = pixel_to_img_coords(
+                    point_coords=coord_tuple,
+                    img_transform=meta['transform']
+                )
+                # extract pixel value in all scenarios
+                pixel_vals = data_arr[:,rand_coords['row'],rand_coords['col']]
+                # extract also the "original" value
+                orig_val = orig_arr[0,rand_coords['row'],rand_coords['col']]
+
+                # plot histogram using true percentage values of reflectance
+                if band != 'SCL' and processing_level != 'L3':
+                    pixel_vals *= 0.01
+                    orig_val *= 0.01
+                # plot the histogram of values
+                fig = plt.figure(figsize=(6,8))
+                ax = fig.add_subplot(111)
+                
+                ax.hist(pixel_vals, bins=30, color='cornflowerblue')
+                x = int(np.around(coord_tuple[0]))
+                y = int(np.around(coord_tuple[1]))
+                epsg = sat_crs.to_epsg()
+
+                if band == 'SCL':
+                    title_str = 'Scene Classification Layer Samples '
+                    xlabel = 'Scene Classifcation Class'
+                elif band == 'WVP':
+                    title_str = 'Atmospheric Water Vapor Column'
+                    xlabel = 'Water Vapor Column [cm]'
+                elif band == 'AOT':
+                    title_str = 'Aerosol Optical Thickness @550nm'
+                    xlabel = 'Aerosol Optical Thichkness [-]'
+                else:
+                    if processing_level == 'L1C':
+                        title_str = r'$\rho_{TOA}$ Samples '
+                        xlabel = r'$\rho_{TOA}$ Reflectance Factor [%]'
+                    elif processing_level == 'L2A':
+                        title_str = r'$\rho_{BOA}$ Samples '
+                        xlabel = r'$\rho_{BOA}$ Reflectance Factor [%]'
+                    elif processing_level == 'L3':
+                        title_str = 'Vegetation Index Samples'
+                        xlabel = 'Index Value [-]'
+
+                ax.set_title(
+                    title_str + f'{band} (N={n_scenarios})\nx = {x}m, y = {y}m (EPSG:{epsg})',
+                    fontsize=16
+                )
+                ax.set_ylabel('Absolute Frequency [-]', fontsize=14)
+                ax.set_xlabel(xlabel, fontsize=14)
+                if band != 'SCL':
+                    avg = np.mean(pixel_vals)
+                    std = np.std(pixel_vals)
+                    ymax = ax.get_ylim()[1]
+                    ax.vlines(
+                        x=avg,
+                        ymin=0,
+                        ymax=ymax,
+                        color='firebrick',
+                        linewidth=4,
+                        label='Mean'
                     )
-                    # extract pixel value in all scenarios
-                    pixel_vals = data_arr[:,rand_coords['row'],rand_coords['col']]
-                    # extract also the "original" value
-                    orig_val = orig_arr[0,rand_coords['row'],rand_coords['col']]
-
-                    # plot histogram using true percentage values of reflectance
-                    if band != 'SCL' and processing_level != 'L3':
-                        pixel_vals *= 0.01
-                        orig_val *= 0.01
-                    # plot the histogram of values
-                    fig = plt.figure(figsize=(6,8))
-                    ax = fig.add_subplot(111)
-                    
-                    ax.hist(pixel_vals, bins=30, color='cornflowerblue')
-                    x = int(np.around(coord_tuple[0]))
-                    y = int(np.around(coord_tuple[1]))
-                    epsg = sat_crs.to_epsg()
-
-                    if band == 'SCL':
-                        title_str = 'Scene Classification Layer Samples '
-                        xlabel = 'Scene Classifcation Class'
-                    elif band == 'WVP':
-                        title_str = 'Atmospheric Water Vapor Column'
-                        xlabel = 'Water Vapor Column [cm]'
-                    elif band == 'AOT':
-                        title_str = 'Aerosol Optical Thickness @550nm'
-                        xlabel = 'Aerosol Optical Thichkness [-]'
-                    else:
-                        if processing_level == 'L1C':
-                            title_str = r'$\rho_{TOA}$ Samples '
-                            xlabel = r'$\rho_{TOA}$ Reflectance Factor [%]'
-                        elif processing_level == 'L2A':
-                            title_str = r'$\rho_{BOA}$ Samples '
-                            xlabel = r'$\rho_{BOA}$ Reflectance Factor [%]'
-                        elif processing_level == 'L3':
-                            title_str = 'Vegetation Index Samples'
-                            xlabel = 'Index Value [-]'
-
-                    ax.set_title(
-                        title_str + f'{band} (N={n_scenarios})\nx = {x}m, y = {y}m (EPSG:{epsg})',
-                        fontsize=16
+                    ax.vlines(
+                        x=avg-std,
+                        ymin=0,
+                        ymax=ymax,
+                        color='lightcoral',
+                        linewidth=3,
+                        linestyle='dashed',
+                        label=r'$\pm$ 1 Std-Dev'
                     )
-                    ax.set_ylabel('Absolute Frequency [-]', fontsize=14)
-                    ax.set_xlabel(xlabel, fontsize=14)
-                    if band != 'SCL':
-                        avg = np.mean(pixel_vals)
-                        std = np.std(pixel_vals)
-                        ymax = ax.get_ylim()[1]
-                        ax.vlines(
-                            x=avg,
-                            ymin=0,
-                            ymax=ymax,
-                            color='firebrick',
-                            linewidth=4,
-                            label='Mean'
-                        )
-                        ax.vlines(
-                            x=avg-std,
-                            ymin=0,
-                            ymax=ymax,
-                            color='lightcoral',
-                            linewidth=3,
-                            linestyle='dashed',
-                            label=r'$\pm$ 1 Std-Dev'
-                        )
-                        ax.vlines(
-                            x=avg+std,
-                            ymin=0,
-                            ymax=ymax,
-                            color='lightcoral',
-                            linewidth=3,
-                            linestyle='dashed',
-                        )
-                        ax.vlines(
-                            x=orig_val,
-                            ymin=0,
-                            ymax=ymax,
-                            linewidth=4,
-                            color='orange',
-                            label='Original Value'
-                        )
-                        ax.legend(fontsize=14)
-                    # save plots
-                    histo_dir = out_dir.joinpath('pixel_histograms')
-                    if not histo_dir.exists(): histo_dir.mkdir()
-                    fname_plot = histo_dir.joinpath(
-                        f'{processing_level}_{band}_{spatial_res}m_{x}_{y}_histogram.png'
+                    ax.vlines(
+                        x=avg+std,
+                        ymin=0,
+                        ymax=ymax,
+                        color='lightcoral',
+                        linewidth=3,
+                        linestyle='dashed',
                     )
-                    fig.savefig(fname_plot, bbox_inches='tight')
-                    plt.close(fig)
+                    ax.vlines(
+                        x=orig_val,
+                        ymin=0,
+                        ymax=ymax,
+                        linewidth=4,
+                        color='orange',
+                        label='Original Value'
+                    )
+                    ax.legend(fontsize=14)
 
+                # save plots
+                histo_dir = out_dir.joinpath('pixel_histograms')
+                if not histo_dir.exists(): histo_dir.mkdir()
+                fname_plot = histo_dir.joinpath(
+                    f'{processing_level}_{band}_{spatial_res}m_{x}_{y}_histogram.png'
+                )
+                fig.savefig(fname_plot, bbox_inches='tight')
+                plt.close(fig)
+
+            # calculate uncertainties for the full raster extent
             fname = f'{processing_level}_{band}_{spatial_res}m_{in_file_shp.name.split(".")[0]}.tif'
 
             if band == 'SCL':
@@ -458,8 +449,9 @@ def analyze_scenarios_spatial(
                     dst.write_band(4, np.nanstd(data_arr, axis=0))
     
                     # standard uncertainty -> normalize stack of scenarios
+                    # to the values of the original (measured) band
                     dst.set_band_description(5, 'rel_std_unc')
-                    rel_std = np.nanstd(data_arr, axis=0) / np.nanmean(data_arr, axis=0)
+                    rel_std = np.nanstd(data_arr, axis=0) / orig_arr
                     # since some vegetation indices can also take negative values
                     # it is necessary to return absolute values here
                     rel_std = abs(rel_std)

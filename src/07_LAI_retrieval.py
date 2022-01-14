@@ -182,8 +182,8 @@ def post_process_lai_product(
 if __name__ == '__main__':
 
     # input directories and files
-    scenario_dir = Path('../S2A_MSIL1C_RUT-Scenarios')
-    shapefile_study_area = Path('../shp/AOI_Esch_EPSG32632.shp')
+    scenario_dir = Path('/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2A_MSIL1C_RUT-Scenarios')
+    shapefile_study_area = Path('/mnt/ides/Lukas/software/scripts_paper_uncertainty/shp/AOI_Esch_EPSG32632.shp')
 
     # LAI model path
     gpr_install_dir = Path('/home/graflu/git/s2gpr_ret')

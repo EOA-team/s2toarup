@@ -1,2 +1,2 @@
 source /mnt/ides/Lukas/venvs/GeoPython/bin/activate
-python 07_lai_retrieval.py
+python /mnt/ides/Lukas/software/scripts_paper_uncertainty/src/07_LAI_retrieval.py

@@ -23,8 +23,8 @@ def loop_scenarios(
         scenario_dir: Path,
         shapefile_study_area: Path,
         model_path: Path,
-        matlab_script_path: Path,
-        matlab_executable_path: Optional[Path] = None
+        matlab_compiled_script_path: Path,
+        matlab_runtime_path: Path
     ):
     """
     Loops over the scenarios of all S2 scenes found and runs the LAI model
@@ -39,17 +39,12 @@ def loop_scenarios(
         clipping output of LAI model)
     :param lai_model_path:
         path to the actual LAI model (*.mat file) from Amin et al. (2021)
-    :param matlab_script_path:
-        path to the matlab script. The LAI model is available upon request
-        from Eatidal Amin (??)
-    :param matlab_executable_path:
-        path to the Matlab executable if not part of the system $PATH
+    :param matlab_compiled_script_path:
+        path to the compiled matlab script compiled from the original
+        Matlab code from Amin et al. (2021).
+    :param matlab_runtime_path:
+        path to the Matlab runtime root directory
     """
-
-    if matlab_executable_path is None:
-        matlab_executable_path = 'matlab'
-    else:
-        matlab_executable_path = matlab_executable_path.as_posix()
 
     # find scenes for which scenarios are available
     scenes = glob.glob(scenario_dir.joinpath('S2*_MSIL1C*').as_posix())
@@ -75,9 +70,10 @@ def loop_scenarios(
             # call LAI model here (using subprocess)
             cwd = os.getcwd()
             # change into directory where the Matlab src is located to avoid path problems
-            os.chdir(matlab_script_path.parent)
-            matlab_script = matlab_script_path.name.split('.')[0]
-            cmd_inp = f'{matlab_executable_path} -nodisplay -nosplash -r "{matlab_script} {model_path} {in_dir_safe} {out_dir}"'
+            os.chdir(matlab_compiled_script_path.parent)
+            matlab_script = matlab_compiled_script_path.name
+            # cmd_inp = f'{matlab_executable_path} -nodisplay -nosplash -r "{matlab_script} {model_path} {in_dir_safe} {out_dir}"'
+            cmd_inp = f'./{matlab_script} {matlab_runtime_path} {model_path} {in_dir_safe} {out_dir}'
 
             command = shlex.split(cmd_inp)
             process = Popen(command, stdout=PIPE, stderr=PIPE)
@@ -189,17 +185,18 @@ if __name__ == '__main__':
     gpr_install_dir = Path('/home/graflu/git/s2gpr_ret')
     lai_model_path = gpr_install_dir.joinpath('LAIGreen_GPR_10b_4k_v11_1.mat')
 
-    # path to the Matlab script calling the LAI model class
-    matlab_script_path = gpr_install_dir.joinpath('S2Ret_run.m')
+    # path to the sh file calling the compiled Matlab application
+    matlab_compiled_script_path = gpr_install_dir.joinpath(
+        'S2Ret_run/for_redistribution_files_only/run_S2Ret_run.sh'
+    )
     
     # path to the Matlab executable (not required if matlab is found in $PATH)
-    matlab_executable_path = Path('/mnt/ides/Lukas/software/matlab/bin/matlab')
-    # matlab_executable_path = Path('matlab')
+    matlab_runtime_path = Path('/home/graflu/MATLAB/v911')
 
     loop_scenarios(
         scenario_dir=scenario_dir,
         shapefile_study_area=shapefile_study_area,
         model_path=lai_model_path,
-        matlab_script_path=matlab_script_path,
-        matlab_executable_path=matlab_executable_path
+        matlab_compiled_script_path=matlab_compiled_script_path,
+        matlab_runtime_path=matlab_runtime_path
     )

@@ -101,8 +101,8 @@ def read_data_and_uncertainty(
     ) -> Tuple[pd.DataFrame, List[Sentinel2Handler]]:
     """
     This function reads the selected vegetation index (computed in step 7)
-    and the associated standard uncertainty and stores the read data as
-    new columns in data_df.
+    and the associated standard (absolute) uncertainty and stores the read
+    data as new columns in data_df.
 
     :param data_df:
         dataframe returned from ``get_data_and_uncertainty``
@@ -148,7 +148,7 @@ def read_data_and_uncertainty(
             snap_band='B02'
         )
 
-        # read vegetation parameter/index uncertainty band
+        # read vegetation parameter/index absolute uncertainty band
         handler = SatDataHandler()
         handler.read_from_bandstack(
             fname_bandstack=Path(record.filename_unc),
@@ -291,14 +291,19 @@ def extract_uncertainty_crops(
 
         crop_gdf = gdf[gdf.crop_code == crop_code].copy()
 
+        # add relative uncertainty by computing the ratio between the absolute uncertainty
+        # and the original index value
+        crop_gdf[f'{vi_name}_rel_unc'] = crop_gdf[vi_name] / crop_gdf[f'{vi_name}_unc']
+
         # aggregate by date
         # TODO: test if that works
-        crop_gdf_grouped = crop_gdf[['date', vi_name, f'{vi_name}_unc']].groupby('date').agg(
+        col_selection = ['date', vi_name, f'{vi_name}_unc', f'{vi_name}_rel_unc']
+        crop_gdf_grouped = crop_gdf[col_selection].groupby('date').agg(
             ['mean', 'min', 'max', 'std', percentile(5), percentile(95)]
         )
 
         # plot
-        fig, (ax1, ax2) = plt.subplots(2, sharex=True, figsize=(15,10))
+        fig, (ax1, ax2, ax3) = plt.subplots(3, sharex=True, figsize=(20,10))
 
         # plot original time series showing spread between pixels (not scenarios!)
         ax1.plot(crop_gdf_grouped[vi_name, 'mean'], color='blue', linewidth=3)
@@ -329,10 +334,34 @@ def extract_uncertainty_crops(
             y1=crop_gdf_grouped[unc_name, 'percentile_5'],
             y2=crop_gdf_grouped[unc_name, 'percentile_95'],
             color='orange',
+            alpha=0.4
+        )
+
+        # absolute uncertainties
+        ax2.fill_between(
+            x=crop_gdf_grouped.index,
+            y1=crop_gdf_grouped[unc_name, 'mean']-crop_gdf_grouped[unc_name, 'std'],
+            y2=crop_gdf_grouped[unc_name, 'mean']+crop_gdf_grouped[unc_name, 'std'],
+            color='red',
+            alpha=0.45
+        )
+        ax2.set_title(f'Uncertainty in {vi_name} (k=1)', fontsize=20)
+        ax2.set_ylabel(f'Absolute Uncertainty [-]', fontsize=24)
+
+        # relative uncertainties
+        unc_name = vi_name + '_rel_unc'
+        ax3.plot(crop_gdf_grouped[unc_name, 'mean'], label='Mean', color='blue', linewidth=3)
+        ax3.fill_between(
+            x=crop_gdf_grouped.index,
+            y1=crop_gdf_grouped[unc_name, 'percentile_5'],
+            y2=crop_gdf_grouped[unc_name, 'percentile_95'],
+            color='orange',
             alpha=0.4,
             label='5-95% Quantile Spread'
         )
-        ax2.fill_between(
+
+        # absolute uncertainties
+        ax3.fill_between(
             x=crop_gdf_grouped.index,
             y1=crop_gdf_grouped[unc_name, 'mean']-crop_gdf_grouped[unc_name, 'std'],
             y2=crop_gdf_grouped[unc_name, 'mean']+crop_gdf_grouped[unc_name, 'std'],
@@ -340,9 +369,9 @@ def extract_uncertainty_crops(
             alpha=0.45,
             label=r'$\pm$ 1 Stddev'
         )
-        ax2.set_title(f'Uncertainty in {vi_name} (k=1)', fontsize=20)
-        ax2.set_ylabel(f'Absolute Uncertainty [-]', fontsize=24)
-        ax2.legend(loc="lower center", bbox_to_anchor=(0.5, -0.5), fontsize=20, ncol=3)
+        ax3.set_ylabel(f'Relative Uncertainty [%]', fontsize=24)
+       
+        ax3.legend(loc="lower center", bbox_to_anchor=(0.5, -0.5), fontsize=20, ncol=3)
 
         fig.suptitle(f'Time Series of {crop_name} (Pixels: {pixel_count})', fontsize=26)
         fname = f'{vi_name}_{crop_name}_all-pixel-timeseries.png'

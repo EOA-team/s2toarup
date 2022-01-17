@@ -8,6 +8,7 @@ interest (ROI) into a handy CSV file format.
 '''
 
 import os
+import sys
 import glob
 import pandas as pd
 import datetime
@@ -31,6 +32,10 @@ from typing import List
 from rasterio.transform import Affine
 from numpy import absolute
 
+from logger import get_logger
+
+# get logger
+logger = get_logger('08_analyze_uncertainty_l1c-l2a-l3')
 
 # define plotting styles
 plt.style.use('ggplot')
@@ -143,8 +148,8 @@ def analyze_scenarios_spatial(
         in_file_shp: Path,
         out_dir: Path,
         processing_level: str,
-        orig_dataset_dir: Path,
-        n_random_pixels: Optional[int]
+        orig_dataset_directory: Path,
+        n_random_pixels: Optional[int] = 5
     ):
     """
     Extracts a region of interest (ROI) from a series of
@@ -221,7 +226,7 @@ def analyze_scenarios_spatial(
         # loop over scenarios of the current band and extract ROIs
         for band in band_dict.keys():
 
-            print(
+            logger.info(
                 f'Extracting {band} from {spatial_res}m spatial resolution ({processing_level})'
             )
 
@@ -231,7 +236,8 @@ def analyze_scenarios_spatial(
             )
             n_scenarios = len(scenario_files)
             if n_scenarios == 0:
-                print('No scenarios found')
+                logger.info('No scenarios found')
+                sys.exit()
 
             # check CRS between ROI and raster
             sat_crs = rio.open(scenario_files[0]).crs
@@ -451,7 +457,7 @@ def analyze_scenarios_spatial(
                     # standard uncertainty -> normalize stack of scenarios
                     # to the values of the original (measured) band
                     dst.set_band_description(5, 'rel_std_unc')
-                    rel_std = np.nanstd(data_arr, axis=0) / orig_arr
+                    rel_std = np.nanstd(data_arr, axis=0) / orig_arr[0,:,:]
                     # since some vegetation indices can also take negative values
                     # it is necessary to return absolute values here
                     rel_std = abs(rel_std)
@@ -505,7 +511,7 @@ def unc_maps(
 
     for band in band_list:
 
-        print(f'Working on band {band}')
+        logger.info(f'Working on band {band}')
 
         if band not in atmospheric_parameters and band not in preclass and band not in vegetation_indices:
         
@@ -907,11 +913,14 @@ def main(
     for scene in dir_list:
 
         unc_scenario_dir = unc_scenario_dir_home.joinpath(scene)
+        if not scene.startswith('S2'):
+            continue
+
         out_dir = out_dir_home.joinpath(scene)
         if not out_dir.exists():
             out_dir.mkdir()
 
-        print(f'Analyzing Uncertainty of {unc_scenario_dir.name}')
+        logger.info(f'Analyzing Uncertainty of {unc_scenario_dir.name}')
 
         # processing levels of the data; we analyze L1C and L2A
         processing_levels = ['L1C', 'L2A', 'L3']
@@ -994,7 +1003,7 @@ def main(
             msg = f'Finished Analyzing Relative Uncertainty of {unc_scenario_dir.name}'
         unc_roi_df.to_csv(fname_csv, index=False)
 
-        print(msg)
+        logger.info(msg)
 
 
 

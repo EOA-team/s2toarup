@@ -94,7 +94,8 @@ band_dict_l2a = {
 band_dict_vis = {
     '10': {
         'NDVI': '*NDVI.tif',
-        'EVI': '*EVI.tif'
+        'EVI': '*EVI.tif',
+        'LAI': '*LAI.tif'
     }
 }
 
@@ -475,7 +476,6 @@ def unc_maps(
     spatial pattern of uncertainty and their land cover/ use dependency
 
     TODO: update doc string
-    TODO: check gain factor for absolute uncertainty
     """
 
     # get files
@@ -1007,7 +1007,7 @@ if __name__ == '__main__':
         '../shp/AOI_Esch_EPSG32632.shp'
     )
     in_file_shp_rois = Path(
-        '../shp/ZH_Polygons_2019_EPSG32632_selected-crops.shp'
+        '../shp/ZH_Polygons_2019_EPSG32632_selected-crops_buffered.shp'
     )
     id_column = 'crop_type'
 

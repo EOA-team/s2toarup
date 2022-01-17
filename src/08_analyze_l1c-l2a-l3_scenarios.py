@@ -229,6 +229,8 @@ def analyze_scenarios_spatial(
             logger.info(
                 f'Extracting {band} from {spatial_res}m spatial resolution ({processing_level})'
             )
+            if band != 'LAI':
+                continue
 
             # find scenario files
             scenario_files = glob.glob(

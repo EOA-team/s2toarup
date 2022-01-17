@@ -6,6 +6,7 @@ the band names.
 '''
 
 import os
+import shutil
 import sys
 import glob
 import shlex
@@ -19,12 +20,84 @@ from logger import get_logger
 logger = get_logger('07_LAI_retrieval')
 
 
+def loop_orig_datasets(
+        orig_dataset_dir: Path,
+        shapefile_study_area: Path,
+        model_path: Path,
+        matlab_compiled_script_path: Path,
+        matlab_runtime_path: Path,
+    ):
+    """
+    Loops over the original S2 scenes found and runs the LAI model
+    developed by Amin et al. (2021, RSE) on each dataset. To keep the
+    disk space requirements as low as possible and to stay conform with
+    file naming conventions, also renames the outputs of the LAI routine.
+
+    :param orig_dataset_dir:
+        directory where the original S2 scenes are stored
+    :param shapefile_study_area:
+        ESRI shapefile denoting the extent of the study area (used for
+        clipping output of LAI model)
+    :param lai_model_path:
+        path to the actual LAI model (*.mat file) from Amin et al. (2021)
+    :param matlab_compiled_script_path:
+        path to the compiled matlab script compiled from the original
+        Matlab code from Amin et al. (2021).
+    :param matlab_runtime_path:
+        path to the Matlab runtime root directory
+    """
+
+    # define temporary output directory
+    out_dir = orig_dataset_dir.joinpath('temp_lai')
+    out_dir.mkdir(exist_ok=True)
+
+    # call LAI model here (using subprocess)
+    cwd = os.getcwd()
+    # change into directory where the Matlab src is located to avoid path problems
+    os.chdir(matlab_compiled_script_path.parent)
+    matlab_script = matlab_compiled_script_path.name
+    # cmd_inp = f'{matlab_executable_path} -nodisplay -nosplash -r "{matlab_script} {model_path} {in_dir_safe} {out_dir}"'
+    cmd_inp = f'./{matlab_script} {matlab_runtime_path} {model_path} {orig_dataset_dir} {out_dir}'
+
+    command = shlex.split(cmd_inp)
+    process = Popen(command, stdout=PIPE, stderr=PIPE)
+    _, stderr = process.communicate()
+
+    if stderr != b'':
+        logger.error(f'Execution of LAI retrieval errored: {stderr}')
+        sys.exit()
+
+    # change back into previous working directory
+    os.chdir(cwd)
+
+    # once the model is finished, apply the post-processing
+    lai_products = glob.glob(out_dir.joinpath('LAI_S2*.tiff').as_posix())
+    logger.info(f'Finished LAI retrieval')
+
+    for lai_product in lai_products: 
+        post_process_lai_product(
+            lai_product=Path(lai_product),
+            shapefile_study_area=shapefile_study_area
+        )
+
+    # copy the files into the correct destination folder
+    lai_tifs = glob.glob(out_dir.joinpath('*LAI.tif').as_posix())
+
+    for lai_tif in lai_tifs:
+
+        date_str = Path(lai_tif).name.split('_')[1]
+        search_expr = orig_dataset_dir.joinpath(f'S2*_{date_str}T*.VIs').as_posix()
+        dst = glob.glob(search_expr)[0]
+        shutil.move(lai_tif, dst)
+
+    
+
 def loop_scenarios(
         scenario_dir: Path,
         shapefile_study_area: Path,
         model_path: Path,
         matlab_compiled_script_path: Path,
-        matlab_runtime_path: Path
+        matlab_runtime_path: Path,
     ):
     """
     Loops over the scenarios of all S2 scenes found and runs the LAI model
@@ -180,6 +253,7 @@ if __name__ == '__main__':
     # input directories and files
     scenario_dir = Path('/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2A_MSIL1C_RUT-Scenarios')
     shapefile_study_area = Path('/mnt/ides/Lukas/software/scripts_paper_uncertainty/shp/AOI_Esch_EPSG32632.shp')
+    orig_dataset_dir = Path('/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2A_MSIL1C_orig')
 
     # LAI model path
     gpr_install_dir = Path('/home/graflu/git/s2gpr_ret')
@@ -192,6 +266,15 @@ if __name__ == '__main__':
     
     # path to the Matlab executable (not required if matlab is found in $PATH)
     matlab_runtime_path = Path('/home/graflu/MATLAB/v911')
+
+    # process original datasets
+    loop_orig_datasets(
+        orig_dataset_dir=orig_dataset_dir,
+        shapefile_study_area=shapefile_study_area,
+        model_path=lai_model_path,
+        matlab_compiled_script_path=matlab_compiled_script_path,
+        matlab_runtime_path=matlab_runtime_path
+    )
 
     loop_scenarios(
         scenario_dir=scenario_dir,

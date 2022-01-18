@@ -132,11 +132,11 @@ def plot_uncertainty_number_of_scenarios(
         # of the crop type for the current number of scenarios
         start_idx = 0
         increment = 1
-        counter = start_idx + increment
+        counter = start_idx + 2*increment
         n_batches = int(scenarios_stacked.shape[0]/increment)
 
         res_list = []
-        for _ in range(n_batches):
+        for _ in range(1, n_batches):
 
             res = {}
             # get uncertainty and apply crop mask
@@ -223,11 +223,11 @@ if __name__ == '__main__':
     ]
 
     sample_polygons = Path('../shp/ZH_Polygons_2019_EPSG32632_selected-crops_buffered.shp')
-    vi_names = ['NDVI', 'EVI']
+    vi_names = ['NDVI', 'EVI', 'LAI']
     out_dir = Path('../S2A_MSIL2A_Analysis/how_many_scenarios')
     orig_datasets_dir = Path('../S2A_MSIL1C_orig')
 
-    relative_uncertainty = True
+    relative_uncertainty = False
 
     for scene in scenes:
 

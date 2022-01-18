@@ -363,8 +363,12 @@ def analyze_scenarios_spatial(
                         title_str = r'$\rho_{BOA}$ Samples '
                         xlabel = r'$\rho_{BOA}$ Reflectance Factor [%]'
                     elif processing_level == 'L3':
-                        title_str = 'Vegetation Index Samples'
-                        xlabel = 'Index Value [-]'
+                        if band == 'LAI':
+                            title_str = 'Vegetation Parameter Samples '
+                            xlabel = r'LAI Values [$m^2$/$m^2$]'
+                        else:
+                            title_str = 'Vegetation Index Samples '
+                            xlabel = 'Index Values [-]'
 
                 ax.set_title(
                     title_str + f'{band} (N={n_scenarios})\nx = {x}m, y = {y}m (EPSG:{epsg})',

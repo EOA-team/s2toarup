@@ -229,8 +229,6 @@ def analyze_scenarios_spatial(
             logger.info(
                 f'Extracting {band} from {spatial_res}m spatial resolution ({processing_level})'
             )
-            if band != 'LAI':
-                continue
 
             # find scenario files
             scenario_files = glob.glob(
@@ -282,6 +280,8 @@ def analyze_scenarios_spatial(
                         crop=True, 
                         all_touched=True # IMPORTANT!
                 )
+                if band == 'LAI':
+                    orig_arr = orig_arr[0:1,:,:]
 
             # loop over scenario members
             n_scenarios = len(scenario_files)
@@ -559,14 +559,13 @@ def unc_maps(
                     maxmax_l2a = 10
     
             # map
-            cmap='Oranges'
             im_l1c = single_axs[0].imshow(
-                l1c_data, vmin=minmin_l1c, vmax=maxmax_l1c, cmap=cmap, interpolation='none',
+                l1c_data, vmin=minmin_l1c, vmax=maxmax_l1c, cmap='coolwarm', interpolation='none',
                 extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
             )
             single_axs[0].title.set_text(f'L1C TOA {band}')
             im_l2a = single_axs[1].imshow(
-                l2a_data, vmin=minmin_l2a, vmax=maxmax_l2a, cmap=cmap, interpolation='none',
+                l2a_data, vmin=minmin_l2a, vmax=maxmax_l2a, cmap='coolwarm', interpolation='none',
                 extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
             )
             single_axs[1].title.set_text(f'L2A BOA {band}')
@@ -634,16 +633,18 @@ def unc_maps(
             minmin = np.nanquantile(atm_data, 0.05)
             maxmax = np.nanquantile(atm_data, 0.95)
 
-            # cut values higher than 10%, otherwise there is not much to see in the L1C image
             labelpad = 20
 
             # map
             im_l1c = single_axs.imshow(
-                atm_data, vmin=minmin, vmax=maxmax, cmap=cmap, interpolation='none',
+                atm_data, vmin=minmin, vmax=maxmax, cmap='Oranges', interpolation='none',
                 extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
             )
             if band in vegetation_indices:
-                single_axs.title.set_text(f'L3 Vegetation Index {band}')
+                if band == 'LAI':
+                    single_axs.title.set_text(f'L3 Biophysical Parameter {band}')
+                else:
+                    single_axs.title.set_text(f'L3 Vegetation Index {band}')
             else:
                 single_axs.title.set_text(f'L2A Atmospheric {band}')
     
@@ -836,6 +837,8 @@ def extract_roi_unc(
 
         # get geometries of the crop type
         crop_df = gdf[gdf.crop_type == crop_type].copy()
+        # drop geometries if None (might happen after buffering)
+        crop_df = crop_df.drop(crop_df[crop_df.geometry == None].index)
 
         crop_areas = crop_df.geometry.area # area in sqm covered by crop type
         band_res_l1c['area_km2'] = crop_areas.sum() / 10**6 # overall area in km2
@@ -944,7 +947,6 @@ def main(
                 processing_level=processing_level,
                 **kwargs
             )
-        
 
         #    STEP_2        ANALYSIS AND VISUALIZATION OF UNCERTAINTY
     

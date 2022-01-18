@@ -252,9 +252,9 @@ def post_process_lai_product(
 if __name__ == '__main__':
 
     # input directories and files
-    scenario_dir = Path('/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2A_MSIL1C_RUT-Scenarios/autumn')
+    scenario_dir = Path('/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_RUT-Scenarios')
     shapefile_study_area = Path('/mnt/ides/Lukas/software/scripts_paper_uncertainty/shp/AOI_Esch_EPSG32632.shp')
-    orig_dataset_dir = Path('/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2A_MSIL1C_orig/autumn')
+    orig_dataset_dir = Path('/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_orig')
 
     # LAI model path
     gpr_install_dir = Path('/home/graflu/git/s2gpr_ret')

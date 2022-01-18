@@ -19,7 +19,7 @@ import cv2
 import glob
 
 from pathlib import Path
-from agrisatpy.spatial_resampling.sentinel2.resample_and_stack import _get_output_file_names
+from agrisatpy.operational.resampling.sentinel2.resample_and_stack import _get_output_file_names
 from agrisatpy.io.sentinel2 import Sentinel2Handler
 
 from logger import get_logger
@@ -198,7 +198,7 @@ def resample_and_stack_orig_data(
 
 if __name__ == '__main__':
 
-    scenario_dir = Path('../S2A_MSIL1C_RUT-Scenarios')
+    scenario_dir = Path('/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_RUT-Scenarios')
     
     shapefile_study_area = Path('../shp/AOI_Esch_EPSG32632.shp')
     
@@ -209,7 +209,7 @@ if __name__ == '__main__':
     )
 
     # original Sentinel-2 L2A data
-    orig_l2a_data = Path('../S2A_MSIL1C_orig')
+    orig_l2a_data = Path('/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_orig')
 
     # resample bandstacks and SCL for original datasets
     resample_and_stack_orig_data(

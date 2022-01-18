@@ -77,17 +77,18 @@ def loop_orig_datasets(
     for lai_product in lai_products: 
         post_process_lai_product(
             lai_product=Path(lai_product),
-            shapefile_study_area=shapefile_study_area
+            shapefile_study_area=shapefile_study_area,
+            plot_product=True
         )
-
+    
     # copy the files into the correct destination folder
     lai_tifs = glob.glob(out_dir.joinpath('*LAI.tif').as_posix())
-
+    
     for lai_tif in lai_tifs:
-
+    
         date_str = Path(lai_tif).name.split('_')[1]
         search_expr = orig_dataset_dir.joinpath(f'S2*_{date_str}T*.VIs').as_posix()
-        dst = glob.glob(search_expr)[0]
+        dst = Path(glob.glob(search_expr)[0]).joinpath('Vegetation_Indices')
         shutil.move(lai_tif, dst)
 
     
@@ -217,7 +218,7 @@ def post_process_lai_product(
             r'Standard Deviation [$m^2/m^2$]',
             'Coefficient of Variation [%]'
         ]
-        cmaps = ['YlGn', 'coolwarm', 'coolwarm']
+        cmaps = ['YlGn', 'Oranges', 'Oranges']
         for idx, band_name in enumerate(new_bandnames):
             ymin, ymax = None, None
             if band_name == 'CV':
@@ -226,8 +227,8 @@ def post_process_lai_product(
                 band_name=band_name,
                 colormap=cmaps[idx],
                 colorbar_label=labels[idx],
-                ymin=ymin,
-                ymax=ymax
+                vmin=ymin,
+                vmax=ymax
             )
             fname = out_dir.joinpath(f'{lai_product.name}_{band_name}.png')
             fig_lai.savefig(fname, dpi=300, bbox_inches='tight')
@@ -276,10 +277,10 @@ if __name__ == '__main__':
         matlab_runtime_path=matlab_runtime_path
     )
 
-    loop_scenarios(
-        scenario_dir=scenario_dir,
-        shapefile_study_area=shapefile_study_area,
-        model_path=lai_model_path,
-        matlab_compiled_script_path=matlab_compiled_script_path,
-        matlab_runtime_path=matlab_runtime_path
-    )
+    # loop_scenarios(
+    #     scenario_dir=scenario_dir,
+    #     shapefile_study_area=shapefile_study_area,
+    #     model_path=lai_model_path,
+    #     matlab_compiled_script_path=matlab_compiled_script_path,
+    #     matlab_runtime_path=matlab_runtime_path
+    # )

@@ -1030,19 +1030,19 @@ if __name__ == '__main__':
 
     # directory where to save the resulting files to
     out_dir_home = Path(
-        '../S2A_MSIL2A_Analysis/1000_scenarios'
+        '../S2A_MSIL2A_Analysis/autumn'
     )
 
     options = {
         'orig_dataset_directory': Path(
-            '../S2A_MSIL1C_orig'
+            '../S2A_MSIL1C_orig/autumn'
         )
     }
 
     
     # directory containing the raster realizations
     unc_scenario_dir_home = Path(
-        f'../S2A_MSIL1C_RUT-Scenarios'
+        f'../S2A_MSIL1C_RUT-Scenarios/autumn'
     )
 
     # absolute uncertainty

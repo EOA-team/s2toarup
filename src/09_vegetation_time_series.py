@@ -29,10 +29,10 @@ from copy import deepcopy
 import geopandas as gpd
 import matplotlib.pyplot as plt
 
-from _phenolopy import remove_outliers
-from _phenolopy import interpolate
-from _phenolopy import smooth
-from _phenolopy import calc_phenometrics
+from phenolopy import remove_outliers
+from phenolopy import interpolate
+from phenolopy import smooth
+from phenolopy import calc_phenometrics
 from _find_datasets import get_data_and_uncertainty_files
 from agrisatpy.io import SatDataHandler
 from agrisatpy.io.sentinel2 import Sentinel2Handler

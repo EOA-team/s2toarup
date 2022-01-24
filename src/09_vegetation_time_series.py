@@ -6,7 +6,7 @@ For each scenario, the timing and value of the start, peak and end of season
 is calculated using the Phenolopy package that is heavily inspired by TIMESAT.
 
 Many thanks @lewistrotter for providing Phenolopy
-(see: https://github.com/lewistrotter/Phenolopy) avialable under Apache 2.0 licence.
+(see: https://github.com/lewistrotter/Phenolopy) available under Apache 2.0 licence.
 
 In addition, the script extracts the time series plus uncertainty at user-defined
 pixels and plots the uncertainty over time for all pixels of the crop types available.

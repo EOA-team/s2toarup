@@ -149,7 +149,8 @@ def analyze_scenarios_spatial(
         out_dir: Path,
         processing_level: str,
         orig_dataset_directory: Path,
-        n_random_pixels: Optional[int] = 5
+        n_random_pixels: Optional[int] = 5,
+        lai_model_uncertainty: Optional[bool] = False
     ):
     """
     Extracts a region of interest (ROI) from a series of
@@ -171,13 +172,17 @@ def analyze_scenarios_spatial(
         (before and after atmospheric correction)
         OR 'L3' for analyzing the vegetation indices or either higher
         level products
-    :param n_random_pixels:
-        A user-defined number of pixels is analyzed (histogram of scenario
-        results to check for normal distribution). The default is 5 pixels.
     :param orig_dataset_directory:
         directory with the original dataset in L1C, L2A or L3 processing level
         to be used when plotting the histograms of the randomly selected
         pixels and for obtaining the relative uncertainties
+    :param n_random_pixels:
+        A user-defined number of pixels is analyzed (histogram of scenario
+        results to check for normal distribution). The default is 5 pixels.
+    :param lai_model_uncertainty:
+        if False (default) analyses the uncertainty in the retrieved LAI values.
+        If True analyses the spread of **model** uncertainty across scenario
+        members instead
     """
 
     # check processing level
@@ -281,7 +286,12 @@ def analyze_scenarios_spatial(
                         all_touched=True # IMPORTANT!
                 )
                 if band == 'LAI':
-                    orig_arr = orig_arr[0:1,:,:]
+                    # band 1: LAI
+                    # band 2: model uncertainty
+                    if lai_model_uncertainty:
+                        orig_arr = orig_arr[1:2,:,:]
+                    else:
+                        orig_arr = orig_arr[0:1,:,:]
 
             # loop over scenario members
             n_scenarios = len(scenario_files)
@@ -305,7 +315,10 @@ def analyze_scenarios_spatial(
                             "transform": out_transform,
                          }
                     )
-                data_arr[idx,:,:] = out_band[0,:,:]
+                if band == 'LAI' and lai_model_uncertainty:
+                    data_arr[idx] = out_band[1,:,:]
+                else:
+                    data_arr[idx,:,:] = out_band[0,:,:]
 
             # analysis: calculate min, max, mean and standard deviation per pixel
             # (does not apply to SCL - here the majority vote will be analyzed)
@@ -319,6 +332,10 @@ def analyze_scenarios_spatial(
                     "dtype": np.float32
                 }
             )
+
+            # calculate uncertainties for the full raster extent
+            if band == 'LAI' and lai_model_uncertainty:
+                band += '_SD'
 
             # plot histograms of randomly selected pixels
             # calculate the image coordinates for the coordinate tuples
@@ -365,7 +382,10 @@ def analyze_scenarios_spatial(
                     elif processing_level == 'L3':
                         if band == 'LAI':
                             title_str = 'Vegetation Parameter Samples '
-                            xlabel = r'LAI Values [$m^2$/$m^2$]'
+                            if lai_model_uncertainty:
+                                xlabel = r'LAI Model Abs Uncertainty Values [$m^2$/$m^2$]'
+                            else:
+                                xlabel = r'LAI Values [$m^2$/$m^2$]'
                         else:
                             title_str = 'Vegetation Index Samples '
                             xlabel = 'Index Values [-]'
@@ -424,7 +444,6 @@ def analyze_scenarios_spatial(
                 fig.savefig(fname_plot, bbox_inches='tight')
                 plt.close(fig)
 
-            # calculate uncertainties for the full raster extent
             fname = f'{processing_level}_{band}_{spatial_res}m_{in_file_shp.name.split(".")[0]}.tif'
 
             if band == 'SCL':
@@ -481,13 +500,19 @@ def unc_maps(
         analysis_results_scl: Path,
         analysis_results_vis: Path,
         out_dir: Path,
-        absolute_uncertainty: Optional[bool] = True
+        absolute_uncertainty: Optional[bool] = True,
+        lai_model_uncertainty: Optional[bool] = False
     ) -> None:
     """
     Maps raster values of L1C and L2A uncertainty values to reveal
     spatial pattern of uncertainty and their land cover/ use dependency
 
     TODO: update doc string
+
+    :param lai_model_uncertainty:
+        if False (default) analyses the uncertainty in the retrieved LAI values.
+        If True analyses the spread of **model** uncertainty across scenario
+        members instead
     """
 
     # get files
@@ -614,11 +639,11 @@ def unc_maps(
                     meta = src.meta
                     bounds = src.bounds
             else:
-                # special case TCARI_OSAVI (it has an underscore)
-                if band.find('_') > 0:
+                # special case LAI_SD
+                if band == 'LAI' and lai_model_uncertainty:
                     vi_raster = [
-                        x for x in vis if Path(x).name.split('_')[1] == band.split('_')[0] and 
-                            Path(x).name.split('_')[2] == band.split('_')[1]
+                        x for x in vis if Path(x).name.split('_')[1] == 'LAI' and 
+                            Path(x).name.split('_')[2] == 'SD'
                     ][0]
                 else:
                     vi_raster = [
@@ -646,7 +671,10 @@ def unc_maps(
             )
             if band in vegetation_indices:
                 if band == 'LAI':
-                    single_axs.title.set_text(f'L3 Biophysical Parameter {band}')
+                    if lai_model_uncertainty:
+                        single_axs.title.set_text(f'L3 Spread of LAI Model Uncertainty')
+                    else:
+                        single_axs.title.set_text(f'L3 Biophysical Parameter {band}')
                 else:
                     single_axs.title.set_text(f'L3 Vegetation Index {band}')
             else:
@@ -722,6 +750,9 @@ def unc_maps(
 
 
         # save figure
+        if band == 'LAI' and lai_model_uncertainty:
+            band += '_SD'
+
         if absolute_uncertainty:
             fname = out_dir.joinpath(f'{band}_l1c-l2a_absolute-uncertainty-map.png')
         else:
@@ -878,7 +909,7 @@ def extract_roi_unc(
                     nodata_value=0.  # AOT and WVP are > 0
                 )
             elif band in vegetation_indices:
-                # special case TCARI_OSAVI (it has an underscore)
+                # special case LAI_SD (it has an underscore)
                 if band.find('_') > 0:
                     vi_raster = [
                         x for x in vis if Path(x).name.split('_')[1] == band.split('_')[0] and 
@@ -909,6 +940,7 @@ def main(
         in_file_shp_rois: Path,
         id_column: str,
         absolute_uncertainty: Optional[bool] = True,
+        lai_model_uncertainty: Optional[bool] = False,
         **kwargs
     ) -> None:
     """
@@ -931,8 +963,9 @@ def main(
 
         logger.info(f'Analyzing Uncertainty of {unc_scenario_dir.name}')
 
-        # processing levels of the data; we analyze L1C and L2A
-        processing_levels = ['L1C', 'L2A', 'L3']
+        # processing levels of the data; we analyze L1C, L2A and L3
+        # processing_levels = ['L1C', 'L2A', 'L3']
+        processing_levels = ['L3']
     
         #    STEP_1      ANALYZE THE SCENARIOS BY READING ALL REALIZATIONS
         #                FOR YOUR STUDY AREA
@@ -949,6 +982,7 @@ def main(
                 in_file_shp=in_file_shp,
                 out_dir=out_dir,
                 processing_level=processing_level,
+                lai_model_uncertainty=lai_model_uncertainty,
                 **kwargs
             )
 
@@ -974,7 +1008,8 @@ def main(
             analysis_results_scl=analysis_results_scl,
             analysis_results_vis=analysis_results_vis,
             out_dir=out_dir_maps,
-            absolute_uncertainty=absolute_uncertainty
+            absolute_uncertainty=absolute_uncertainty,
+            lai_model_uncertainty=lai_model_uncertainty
         ) 
 
         # acquisition date of the S2 image
@@ -1030,20 +1065,23 @@ if __name__ == '__main__':
 
     # directory where to save the resulting files to
     out_dir_home = Path(
-        '../S2A_MSIL2A_Analysis/autumn'
+        '../S2A_MSIL2A_Analysis/1000_scenarios'
     )
 
     options = {
         'orig_dataset_directory': Path(
-            '../S2A_MSIL1C_orig/autumn'
+            '../S2A_MSIL1C_orig'
         )
     }
 
     
     # directory containing the raster realizations
     unc_scenario_dir_home = Path(
-        f'../S2A_MSIL1C_RUT-Scenarios/autumn'
+        f'../S2A_MSIL1C_RUT-Scenarios'
     )
+
+    # check spread of LAI model uncertainty across scenarios?
+    lai_model_uncertainty = True
 
     # absolute uncertainty
     main(
@@ -1052,6 +1090,7 @@ if __name__ == '__main__':
         in_file_shp=in_file_shp,
         in_file_shp_rois=in_file_shp_rois,
         id_column=id_column,
+        lai_model_uncertainty=lai_model_uncertainty,
         **options
     )
 
@@ -1063,5 +1102,6 @@ if __name__ == '__main__':
         in_file_shp_rois=in_file_shp_rois,
         id_column=id_column,
         absolute_uncertainty=False,
+        lai_model_uncertainty=lai_model_uncertainty,
         **options
     )

@@ -452,14 +452,13 @@ def gen_rad_unc_scenarios(
             f'Creating scenario {scenario+1}/{n_scenarios} for {orig_dataset_path.name}'
         )
 
-        # empty arrays for storing the errors
         error_band_dict = dict.fromkeys(s2_bands)
         for s2_band in s2_bands:
-            error_band_dict[s2_band] = np.zeros_like(mc_input_data[s2_band].r_toa.astype(np.float16))
 
-            if scenario == 0:
-                uncorrelated_part[s2_band] = np.zeros_like(error_band_dict[s2_band])
-                correlated_part[s2_band] = np.zeros_like(error_band_dict[s2_band])
+            # empty arrays for storing the errors
+            error_band_dict[s2_band] = np.zeros_like(mc_input_data[s2_band].r_toa.astype(np.float16))
+            uncorrelated_part[s2_band] = np.zeros_like(error_band_dict[s2_band])
+            correlated_part[s2_band] = np.zeros_like(error_band_dict[s2_band])
 
         ######################################################################
         #                                                                    #
@@ -494,29 +493,26 @@ def gen_rad_unc_scenarios(
                         size=(num_row, num_col)
                     )
                 error_band_dict[s2_band] += uncorr_sample
-
-                if scenario == 0:
-                    uncorrelated_part[s2_band] += uncorr_sample
+                uncorrelated_part[s2_band] += uncorr_sample
 
             # loop over constant error terms; they are simply added
             for const_error_term in const_error_terms:
                 error_band_dict[s2_band] += \
                     mc_input_data[s2_band].unc_contrib[const_error_term]
 
-                if scenario == 0:
-                    correlated_part[s2_band] += \
-                        mc_input_data[s2_band].unc_contrib[const_error_term]
+                correlated_part[s2_band] += \
+                    mc_input_data[s2_band].unc_contrib[const_error_term]
 
             # save uncorrelated contributors for the current S2 band
-            if scenario == 0:
-                fname_uncorrelated = scenario_path.joinpath(
-                    f'uncorrelated_contributors_sample_{s2_band}.tif'
-                )
-                meta = deepcopy(band_georeference_info[s2_band])
-                meta.update({'dtype': 'float32', 'driver': 'GTiff'})
-                with rio.open(fname_uncorrelated, 'w+', **meta) as dst:
-                    dst.write(uncorrelated_part[s2_band], 1)
-            
+            fname_uncorrelated = scenario_path.joinpath(
+                f'{scenario+1}/uncorrelated_contributors_sample_{s2_band}.tif'
+            )
+            meta = deepcopy(band_georeference_info[s2_band])
+            meta.update({'dtype': 'float32', 'driver': 'GTiff'})
+            with rio.open(fname_uncorrelated, 'w+', **meta) as dst:
+                uncorr_sample = mc_input_data[s2_band].r_toa + \
+                    uncorrelated_part[s2_band] * mc_input_data[s2_band].r_toa
+                dst.write(uncorr_sample, 1)
 
         # fully and partly correlated contributors
         # append these to a list of arrays and concatenate them into a 1d-array
@@ -586,16 +582,14 @@ def gen_rad_unc_scenarios(
                 # add the sample to the error_band_dict if all contributors are correlated
                 if corr_contributor in fully_corr_contributors:
                     error_band_dict[s2_band] += band_samples
-                    if scenario == 0:
-                        correlated_part[s2_band] += band_samples
+                    correlated_part[s2_band] += band_samples
                 # or weight it by alpha in case the spectral domain has a correlation coefficient
                 # smaller 1
                 elif corr_contributor in partly_corr_contributors:
                     error_band_dict[s2_band] += (1 - alpha) * band_samples + \
                         alpha * indep_band_samples[idx]
-                    if scenario == 0:
-                        correlated_part[s2_band] += (1 - alpha) * band_samples + \
-                            alpha * indep_band_samples[idx]
+                    correlated_part[s2_band] += (1 - alpha) * band_samples + \
+                        alpha * indep_band_samples[idx]
 
         # correlation in the temporal domain only -> should be u_stray_rand
         for contributor in only_temporally_corr_contributors:
@@ -612,8 +606,7 @@ def gen_rad_unc_scenarios(
                     )
                 # add to other contributors
                 error_band_dict[s2_band] += temp_corr
-                if scenario == 0:
-                    correlated_part[s2_band] += temp_corr
+                correlated_part[s2_band] += temp_corr
 
         # implement correlation in the temporal and spatial domain
         # this requires a little tweak so that sampling accross the columns and spectral bands
@@ -658,32 +651,32 @@ def gen_rad_unc_scenarios(
                 # band has 10m pixel size -> nothing to do
                 if band_scaling_factors[s2_band] == 1:
                     error_band_dict[s2_band] += band_arr
-                    if scenario == 0:
-                        correlated_part[s2_band] += band_arr
+                    correlated_part[s2_band] += band_arr
                 # else take if n-th row and column element to obtain the original number
                 # of pixels due to the pixel size
                 else:
                     error_band_dict[s2_band] += band_arr[
                         0::band_scaling_factors[s2_band],0::band_scaling_factors[s2_band]
                     ]
-                    if scenario == 0:
-                        correlated_part[s2_band] += band_arr[
-                            0::band_scaling_factors[s2_band],0::band_scaling_factors[s2_band]
-                        ]
+                    correlated_part[s2_band] += band_arr[
+                        0::band_scaling_factors[s2_band],0::band_scaling_factors[s2_band]
+                    ]
 
         # save correlated contributors to file
-        if scenario == 0:
-
-            for s2_band in s2_bands:
-                
-                fname_correlated = scenario_path.joinpath(
-                    f'correlated_contributors_sample_{s2_band}.tif'
-                )
-                with rio.open(fname_correlated, 'w+', **meta) as dst:
-                    dst.write(correlated_part[s2_band], 1)
+        for s2_band in s2_bands:
+            
+            fname_correlated = scenario_path.joinpath(
+                f'{scenario+1}/correlated_contributors_sample_{s2_band}.tif'
+            )
+            meta = deepcopy(band_georeference_info[s2_band])
+            meta.update({'dtype': 'float32', 'driver': 'GTiff'})
+            with rio.open(fname_correlated, 'w+', **meta) as dst:
+                corr_sample = mc_input_data[s2_band].r_toa + \
+                    correlated_part[s2_band] * mc_input_data[s2_band].r_toa
+                dst.write(corr_sample, 1)
 
         if check_contributors_only:
-            return
+            continue
 
         ######################################################################
         #                                                                    #

@@ -508,11 +508,10 @@ def gen_rad_unc_scenarios(
                 f'{scenario+1}/uncorrelated_contributors_sample_{s2_band}.jp2'
             )
             meta = deepcopy(band_georeference_info[s2_band])
-            meta.update({'dtype': 'float16'})
             with rio.open(fname_uncorrelated, 'w+', **meta) as dst:
                 uncorr_sample = mc_input_data[s2_band].r_toa + \
                     uncorrelated_part[s2_band] * mc_input_data[s2_band].r_toa
-                dst.write(uncorr_sample, 1)
+                dst.write(uncorr_sample.astype('uint16'), 1)
 
         # fully and partly correlated contributors
         # append these to a list of arrays and concatenate them into a 1d-array
@@ -669,11 +668,10 @@ def gen_rad_unc_scenarios(
                 f'{scenario+1}/correlated_contributors_sample_{s2_band}.jp2'
             )
             meta = deepcopy(band_georeference_info[s2_band])
-            meta.update({'dtype': 'float16'})
             with rio.open(fname_correlated, 'w+', **meta) as dst:
                 corr_sample = mc_input_data[s2_band].r_toa + \
                     correlated_part[s2_band] * mc_input_data[s2_band].r_toa
-                dst.write(corr_sample, 1)
+                dst.write(corr_sample.astype('uint16'), 1)
 
         if check_contributors_only:
             continue

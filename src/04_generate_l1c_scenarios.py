@@ -459,6 +459,7 @@ def gen_rad_unc_scenarios(
 
             if scenario == 0:
                 uncorrelated_part[s2_band] = np.zeros_like(error_band_dict[s2_band])
+                correlated_part[s2_band] = np.zeros_like(error_band_dict[s2_band])
 
         ######################################################################
         #                                                                    #
@@ -503,7 +504,7 @@ def gen_rad_unc_scenarios(
                     mc_input_data[s2_band].unc_contrib[const_error_term]
 
                 if scenario == 0:
-                    uncorrelated_part[s2_band] += \
+                    correlated_part[s2_band] += \
                         mc_input_data[s2_band].unc_contrib[const_error_term]
 
             # save uncorrelated contributors for the current S2 band
@@ -581,9 +582,8 @@ def gen_rad_unc_scenarios(
                 band_samples = corr_sample[trailing_indices[idx]:trailing_indices[idx]+trailing_indices[idx+1]].reshape(
                      mc_input_data[s2_band].unc_contrib[corr_contributor].shape
                 )
+
                 # add the sample to the error_band_dict if all contributors are correlated
-                if scenario == 0:
-                    correlated_part[s2_band] = np.zeros_like(uncorrelated_part[s2_band])
                 if corr_contributor in fully_corr_contributors:
                     error_band_dict[s2_band] += band_samples
                     if scenario == 0:

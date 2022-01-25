@@ -442,7 +442,7 @@ def gen_rad_unc_scenarios(
     # open two arrays for saving the independent (uncorrelated) and dependent (correlated)
     # contributions for later analysis (helps to understand if the uncertainty is mainly
     # caused by random or system effects)
-    uncorrelated_part = np.zeros(shap=full_img_size[res], dtype='float32')
+    uncorrelated_part = dict.fromkeys(s2_bands)
     correlated_part = dict.fromkeys(s2_bands)
 
     # start the iteration process
@@ -456,6 +456,9 @@ def gen_rad_unc_scenarios(
         error_band_dict = dict.fromkeys(s2_bands)
         for s2_band in s2_bands:
             error_band_dict[s2_band] = np.zeros_like(mc_input_data[s2_band].r_toa.astype(np.float16))
+
+            if scenario == 0:
+                uncorrelated_part[s2_band] = np.zeros_like(error_band_dict[s2_band])
 
         ######################################################################
         #                                                                    #
@@ -492,7 +495,7 @@ def gen_rad_unc_scenarios(
                 error_band_dict[s2_band] += uncorr_sample
 
                 if scenario == 0:
-                    uncorrelated_part += uncorr_sample
+                    uncorrelated_part[s2_band] += uncorr_sample
 
             # loop over constant error terms; they are simply added
             for const_error_term in const_error_terms:
@@ -500,18 +503,18 @@ def gen_rad_unc_scenarios(
                     mc_input_data[s2_band].unc_contrib[const_error_term]
 
                 if scenario == 0:
-                    uncorrelated_part += \
+                    uncorrelated_part[s2_band] += \
                         mc_input_data[s2_band].unc_contrib[const_error_term]
 
             # save uncorrelated contributors for the current S2 band
             if scenario == 0:
                 fname_uncorrelated = scenario_path.joinpath(
-                    f'uncorrelated_contributors_{s2_band}.tif'
+                    f'uncorrelated_contributors_sample_{s2_band}.tif'
                 )
                 meta = deepcopy(band_georeference_info[s2_band])
-                meta.update({'dtype': 'float32'})
+                meta.update({'dtype': 'float32', 'driver': 'GTiff'})
                 with rio.open(fname_uncorrelated, 'w+', **meta) as dst:
-                    dst.write(uncorrelated_part, 1)
+                    dst.write(uncorrelated_part[s2_band], 1)
             
 
         # fully and partly correlated contributors
@@ -579,7 +582,8 @@ def gen_rad_unc_scenarios(
                      mc_input_data[s2_band].unc_contrib[corr_contributor].shape
                 )
                 # add the sample to the error_band_dict if all contributors are correlated
-                correlated_part[s2_band] = np.zeros_like(uncorrelated_part)
+                if scenario == 0:
+                    correlated_part[s2_band] = np.zeros_like(uncorrelated_part[s2_band])
                 if corr_contributor in fully_corr_contributors:
                     error_band_dict[s2_band] += band_samples
                     if scenario == 0:
@@ -673,7 +677,7 @@ def gen_rad_unc_scenarios(
             for s2_band in s2_bands:
                 
                 fname_correlated = scenario_path.joinpath(
-                    f'correlated_contributors_{s2_band}.tif'
+                    f'correlated_contributors_sample_{s2_band}.tif'
                 )
                 with rio.open(fname_correlated, 'w+', **meta) as dst:
                     dst.write(correlated_part[s2_band], 1)
@@ -692,7 +696,7 @@ def gen_rad_unc_scenarios(
 
         for s2_band in s2_bands:
 
-            # define output file location (bit clumpsy due to the .SAFE structure)
+            # define output file location (bit clumbsy due to the .SAFE structure)
             band_fname = band_files[s2_band].name
             # we need to reconstruct the intermediate part of the .SAFE directory
             # to obtain the correct sub-directory for writting the band
@@ -753,7 +757,8 @@ def main(
         unc_datasets_dir: Path,
         scenario_dir: Path,
         roi_bounds_10m: List[int],
-        n_scenarios: int
+        n_scenarios: int,
+        check_contributors_only: Optional[bool] = True
     ) -> None:
     """
     main executable function taking care about generating the scenarios and
@@ -774,7 +779,7 @@ def main(
     """
 
     # find scenes and their uncertainty
-    orig_datasets = glob.glob(orig_datasets_dir.joinpath('*.SAFE').as_posix())
+    orig_datasets = glob.glob(orig_datasets_dir.joinpath('S2*MSIL1C*.SAFE').as_posix())
     unc_datasets = glob.glob(unc_datasets_dir.joinpath('*.RUT').as_posix())
     n_datasets = len(orig_datasets)
     
@@ -827,7 +832,8 @@ def main(
             scenario_path=scenario_path,
             template_path=template_path,
             n_scenarios=n_scenarios,
-            roi_bounds_10m=roi_bounds_10m
+            roi_bounds_10m=roi_bounds_10m,
+            check_contributors_only=check_contributors_only
         )
 
         logger.info(f'Finished MC simulations for {scene_name} ({counter+1}/{n_datasets})')
@@ -857,7 +863,7 @@ if __name__ == '__main__':
 
     # TODO: correct paths afterwards
     # directory with L1C data (.SAFE subdirectories)
-    orig_datasets_dir = Path('../S2A_MSIL1C_orig/spring')
+    orig_datasets_dir = Path('/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_orig')
     
     # directory with radiometric uncertainty outputs (.RUT subdirectories)
     unc_datasets_dir = orig_datasets_dir

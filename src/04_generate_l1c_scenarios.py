@@ -505,10 +505,10 @@ def gen_rad_unc_scenarios(
 
             # save uncorrelated contributors for the current S2 band
             fname_uncorrelated = scenario_path.joinpath(
-                f'{scenario+1}/uncorrelated_contributors_sample_{s2_band}.tif'
+                f'{scenario+1}/uncorrelated_contributors_sample_{s2_band}.jp2'
             )
             meta = deepcopy(band_georeference_info[s2_band])
-            meta.update({'dtype': 'float32', 'driver': 'GTiff'})
+            meta.update({'dtype': 'float16'})
             with rio.open(fname_uncorrelated, 'w+', **meta) as dst:
                 uncorr_sample = mc_input_data[s2_band].r_toa + \
                     uncorrelated_part[s2_band] * mc_input_data[s2_band].r_toa
@@ -666,10 +666,10 @@ def gen_rad_unc_scenarios(
         for s2_band in s2_bands:
             
             fname_correlated = scenario_path.joinpath(
-                f'{scenario+1}/correlated_contributors_sample_{s2_band}.tif'
+                f'{scenario+1}/correlated_contributors_sample_{s2_band}.jp2'
             )
             meta = deepcopy(band_georeference_info[s2_band])
-            meta.update({'dtype': 'float32', 'driver': 'GTiff'})
+            meta.update({'dtype': 'float16'})
             with rio.open(fname_correlated, 'w+', **meta) as dst:
                 corr_sample = mc_input_data[s2_band].r_toa + \
                     correlated_part[s2_band] * mc_input_data[s2_band].r_toa
@@ -751,7 +751,8 @@ def main(
         scenario_dir: Path,
         roi_bounds_10m: List[int],
         n_scenarios: int,
-        check_contributors_only: Optional[bool] = True
+        check_contributors_only: Optional[bool] = True,
+        scene_selection: Optional[List[str]] = None
     ) -> None:
     """
     main executable function taking care about generating the scenarios and
@@ -769,12 +770,18 @@ def main(
         for a spatial subset of the original scene, only
     :param n_scenarios:
         number of scenarios to create (>=100).
+    :param check_contributors_only:
+    :param scene_selection:
     """
 
     # find scenes and their uncertainty
     orig_datasets = glob.glob(orig_datasets_dir.joinpath('S2*MSIL1C*.SAFE').as_posix())
     unc_datasets = glob.glob(unc_datasets_dir.joinpath('*.RUT').as_posix())
     n_datasets = len(orig_datasets)
+
+    # filter by scene selection if not None:
+    if scene_selection is not None:
+        orig_datasets = [Path(x) for x in orig_datasets if Path(x).name in scene_selection]
     
     # loop over the scenes. Before generating the scenarios some
     # preparation is required
@@ -856,7 +863,7 @@ if __name__ == '__main__':
 
     # TODO: correct paths afterwards
     # directory with L1C data (.SAFE subdirectories)
-    orig_datasets_dir = Path('/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_orig')
+    orig_datasets_dir = Path('../S2A_MSIL1C_orig')
     
     # directory with radiometric uncertainty outputs (.RUT subdirectories)
     unc_datasets_dir = orig_datasets_dir
@@ -868,16 +875,22 @@ if __name__ == '__main__':
     # define bounds of the study area (aka region of interest)
     # bounds col_min, col_max, row_min, row_max (image coordinates of the 10m raster)
     roi_bounds_10m = [7200,8400,4200,5400]
+
+    scene_selection = [
+        'S2A_MSIL1C_20190328T102021_N0207_R065_T32TMT_20190328T154025.SAFE',
+        'S2B_MSIL1C_20190724T103029_N0208_R108_T32TMT_20190724T122822.SAFE',
+        'S2B_MSIL1C_20190604T103029_N0207_R108_T32TMT_20190604T131830.SAFE'
+    ]
     
     # number of scenarios (each scenario is a possible realization of a S2 scene!)
-    # TODO: set to 150 afterwards
-    n_scenarios = 1 # 150
-    
+    n_scenarios = 150
+ 
     main(
         orig_datasets_dir,
         unc_datasets_dir,
         scenario_dir,
         roi_bounds_10m,
         n_scenarios,
-        check_contributors_only=True # TODO: set to False
+        check_contributors_only=True, # TODO: set to False,
+        scene_selection=scene_selection
     )

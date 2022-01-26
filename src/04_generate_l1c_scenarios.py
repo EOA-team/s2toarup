@@ -520,6 +520,17 @@ def gen_rad_unc_scenarios(
                 f'{scenario+1}/uncorrelated_contributors_sample_{s2_band}.jp2'
             )
             meta = deepcopy(band_georeference_info[s2_band])
+
+            # update meta to the extent of the region of interest
+            meta.update(
+                {
+                    'ulx': roi_bounds[s2_band_res[s2_band]][0],
+                    'uly': roi_bounds[s2_band_res[s2_band]][3],
+                    'width': num_col,
+                    'height': num_row
+                }
+            )
+            
             with rio.open(fname_uncorrelated, 'w+', **meta) as dst:
                 uncorr_sample = mc_input_data[s2_band].r_toa + \
                     uncorrelated_part[s2_band] * mc_input_data[s2_band].r_toa
@@ -679,7 +690,21 @@ def gen_rad_unc_scenarios(
             fname_correlated = scenario_path.joinpath(
                 f'{scenario+1}/correlated_contributors_sample_{s2_band}.jp2'
             )
+            
             meta = deepcopy(band_georeference_info[s2_band])
+            cols_and_rows = roi_size_all[s2_band_res[s2_band]]
+            num_row = cols_and_rows['n_row']
+            num_col = cols_and_rows['n_col']
+
+            meta.update(
+                {
+                    'ulx': roi_bounds[s2_band_res[s2_band]][0],
+                    'uly': roi_bounds[s2_band_res[s2_band]][3],
+                    'width': num_col,
+                    'height': num_row
+                }
+            )
+
             with rio.open(fname_correlated, 'w+', **meta) as dst:
                 corr_sample = mc_input_data[s2_band].r_toa + \
                     correlated_part[s2_band] * mc_input_data[s2_band].r_toa

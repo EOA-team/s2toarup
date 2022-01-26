@@ -251,8 +251,14 @@ def gen_rad_unc_scenarios(
 
     # create scenario output folders in .SAFE structure
     scenario_paths = []
+    scenarios_to_ignore = []
     for idx in range(n_scenarios):
         current_scenario_path = scenario_path.joinpath(str(idx+1))
+        # IGNORE existing scenario folders - so it is possible to add new scenarios to
+        # existing ones
+        if current_scenario_path.exists():
+            scenarios_to_ignore.append(idx+1)
+            continue
         # copy template
         shutil.copytree(
             template_path,
@@ -445,9 +451,15 @@ def gen_rad_unc_scenarios(
     uncorrelated_part = dict.fromkeys(s2_bands)
     correlated_part = dict.fromkeys(s2_bands)
 
-    # start the iteration process
+    # start the iteration process to generate the MC samples
     for scenario in range(n_scenarios):
-        
+
+        if scenario+1 in scenarios_to_ignore:
+            logger.info(
+                f'Scenario {scenario+1}/{n_scenarios} exists already. Moving on to next scenario'
+            )
+            continue
+
         logger.info(
             f'Creating scenario {scenario+1}/{n_scenarios} for {orig_dataset_path.name}'
         )
@@ -876,12 +888,12 @@ if __name__ == '__main__':
 
     scene_selection = [
         'S2A_MSIL1C_20190328T102021_N0207_R065_T32TMT_20190328T154025.SAFE',
-        'S2B_MSIL1C_20190724T103029_N0208_R108_T32TMT_20190724T122822.SAFE',
-        'S2B_MSIL1C_20190604T103029_N0207_R108_T32TMT_20190604T131830.SAFE'
+        'S2A_MSIL1C_20190530T103031_N0207_R108_T32TMT_20190530T123429.SAFE',
+        'S2A_MSIL1C_20190818T103031_N0208_R108_T32TMT_20190818T124651.SAFE'
     ]
     
     # number of scenarios (each scenario is a possible realization of a S2 scene!)
-    n_scenarios = 150
+    n_scenarios = 1000
  
     main(
         orig_datasets_dir,

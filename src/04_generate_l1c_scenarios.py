@@ -41,6 +41,7 @@ import rasterio as rio
 import rasterio.mask
 import itertools
 from pathlib import Path
+from rasterio import Affine
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -479,6 +480,7 @@ def gen_rad_unc_scenarios(
         ######################################################################
         
         # completely uncorrelated contributors
+        band_meta_roi = dict.fromkeys(s2_bands)
         for s2_band in s2_bands:
 
             # get spatial resolution and corresponding array size of the ROI
@@ -522,15 +524,30 @@ def gen_rad_unc_scenarios(
             meta = deepcopy(band_georeference_info[s2_band])
 
             # update meta to the extent of the region of interest
+            # TODO!!!
+            pixres_x = meta['transform'][0]
+            pixres_y = meta['transform'][4]
+            ulx = meta['transform'][2] + pixres_x * roi_bounds_all[s2_band_res[s2_band]][0]
+            uly = meta['transform'][5] + pixres_y * roi_bounds_all[s2_band_res[s2_band]][2]
+            affine_orig = deepcopy(meta['transform'])
+            new_affine = Affine(
+                    a=affine_orig.a,
+                    b=affine_orig.b,
+                    c=ulx,
+                    d=affine_orig.d,
+                    e=affine_orig.e,
+                    f=uly
+                )
+
+            # update affine
             meta.update(
                 {
-                    'ulx': roi_bounds[s2_band_res[s2_band]][0],
-                    'uly': roi_bounds[s2_band_res[s2_band]][3],
+                    'transform': new_affine,
                     'width': num_col,
                     'height': num_row
                 }
             )
-            
+            band_meta_roi[s2_band] = meta
             with rio.open(fname_uncorrelated, 'w+', **meta) as dst:
                 uncorr_sample = mc_input_data[s2_band].r_toa + \
                     uncorrelated_part[s2_band] * mc_input_data[s2_band].r_toa
@@ -691,20 +708,7 @@ def gen_rad_unc_scenarios(
                 f'{scenario+1}/correlated_contributors_sample_{s2_band}.jp2'
             )
             
-            meta = deepcopy(band_georeference_info[s2_band])
-            cols_and_rows = roi_size_all[s2_band_res[s2_band]]
-            num_row = cols_and_rows['n_row']
-            num_col = cols_and_rows['n_col']
-
-            meta.update(
-                {
-                    'ulx': roi_bounds[s2_band_res[s2_band]][0],
-                    'uly': roi_bounds[s2_band_res[s2_band]][3],
-                    'width': num_col,
-                    'height': num_row
-                }
-            )
-
+            meta = deepcopy(band_meta_roi[s2_band])
             with rio.open(fname_correlated, 'w+', **meta) as dst:
                 corr_sample = mc_input_data[s2_band].r_toa + \
                     correlated_part[s2_band] * mc_input_data[s2_band].r_toa

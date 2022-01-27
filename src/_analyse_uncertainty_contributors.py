@@ -136,8 +136,8 @@ def map_uncertainty(unc_results_dir: Path):
 
 if __name__ == '__main__':
 
-    scenario_dir = Path('../S2A_MSIL1C_orig/uncertainty_contributors')
-    out_dir = Path('../S2A_MSIL1C_orig/uncertainty_contributors/L1C_Analysis')
+    scenario_dir = Path('../S2A_MSIL1C_RUT-Scenarios/contributor_analysis')
+    out_dir = Path('../S2A_MSIL1C_RUT-Scenarios/contributor_analysis/L1C_Analysis')
     out_dir.mkdir(exist_ok=True)
 
     calc_uncertainty(scenario_dir, out_dir)

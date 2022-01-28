@@ -165,7 +165,7 @@ def resample_and_stack_orig_data(
 
         # save rasters (spectral bands, VIs, SCL)
         fname_bandstack = out_dir.joinpath(fnames['bandstack'])
-        band_selection = handler.get_bandnames()
+        band_selection = handler.bandnames
         band_selection.remove('scl')
         handler.write_bands(
             out_file=fname_bandstack,

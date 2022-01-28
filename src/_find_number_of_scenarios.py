@@ -12,12 +12,12 @@ from pathlib import Path
 from copy import deepcopy
 from typing import Optional
 from agrisatpy.io import SatDataHandler
-
 from logger import get_logger
 
 plt.style.use('ggplot')
 matplotlib.rc('xtick', labelsize=20) 
 matplotlib.rc('ytick', labelsize=20)
+
 
 logger = get_logger('_how_many_scenarios')
 
@@ -67,7 +67,7 @@ def plot_uncertainty_number_of_scenarios(
             in_file_aoi=sample_polygons,
             full_bounding_box_only=True
         )
-        band_name = handler.get_bandnames()[0]
+        band_name = handler.bandnames[0]
         orig_arr = handler.get_band(band_name)
         orig_arr = orig_arr.data
 
@@ -88,7 +88,7 @@ def plot_uncertainty_number_of_scenarios(
             in_file_aoi=sample_polygons,
             full_bounding_box_only=True
         )
-        band_name = handler.get_bandnames()[0]
+        band_name = handler.bandnames[0]
         scenario_array_list.append(handler.get_band(band_name))
 
         logger.info(f'Read scenario {idx+1}/{len(scenario_files)}')
@@ -104,7 +104,7 @@ def plot_uncertainty_number_of_scenarios(
     handler = None
 
     # rasterize the field polygons (using their int crop code)
-    snap_band = unc_handler.get_bandnames()[0]
+    snap_band = unc_handler.bandnames[0]
     unc_handler.add_bands_from_vector(
         in_file_vector=sample_polygons,
         snap_band=snap_band,

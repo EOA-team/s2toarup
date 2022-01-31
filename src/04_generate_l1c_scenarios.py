@@ -68,7 +68,7 @@ l1c_unc_contributors = [
     'DS',
     'gamma',
     'diff_abs',
-    'diff_temp',
+    # 'diff_temp', not considered as discussed with Javier Gorrono on 31st Jan 2022
     'diff_cos',
     'diff_k',
     'quant'
@@ -902,27 +902,27 @@ if __name__ == '__main__':
 
     # TODO: correct paths afterwards
     # directory with L1C data (.SAFE subdirectories)
-    orig_datasets_dir = Path('../S2A_MSIL1C_orig')
+    orig_datasets_dir = Path('../S2_MSIL1C_orig')
     
     # directory with radiometric uncertainty outputs (.RUT subdirectories)
     unc_datasets_dir = orig_datasets_dir
     
     # directory where to store the scenarios (a subdirectory will be created for each scene)
     # in which the actual scenarios are placed
-    scenario_dir = Path('../S2A_MSIL1C_RUT-Scenarios/contributor_analysis')
+    scenario_dir = Path('../S2_MSIL1C_RUT-Scenarios')
     
     # define bounds of the study area (aka region of interest)
     # bounds col_min, col_max, row_min, row_max (image coordinates of the 10m raster)
     roi_bounds_10m = [7200,8400,4200,5400]
 
-    scene_selection = [
-        'S2A_MSIL1C_20190328T102021_N0207_R065_T32TMT_20190328T154025.SAFE',
-        'S2A_MSIL1C_20190530T103031_N0207_R108_T32TMT_20190530T123429.SAFE',
-        'S2A_MSIL1C_20190818T103031_N0208_R108_T32TMT_20190818T124651.SAFE'
-    ]
+    # scene_selection = [
+    #     'S2A_MSIL1C_20190328T102021_N0207_R065_T32TMT_20190328T154025.SAFE',
+    #     'S2A_MSIL1C_20190530T103031_N0207_R108_T32TMT_20190530T123429.SAFE',
+    #     'S2A_MSIL1C_20190818T103031_N0208_R108_T32TMT_20190818T124651.SAFE'
+    # ]
     
     # number of scenarios (each scenario is a possible realization of a S2 scene!)
-    n_scenarios = 1000
+    n_scenarios = 300
  
     main(
         orig_datasets_dir,
@@ -930,6 +930,5 @@ if __name__ == '__main__':
         scenario_dir,
         roi_bounds_10m,
         n_scenarios,
-        check_contributors_only=True, # TODO: set to False,
-        scene_selection=scene_selection
+        check_contributors_only=False
     )

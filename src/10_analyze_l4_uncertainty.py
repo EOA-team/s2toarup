@@ -109,7 +109,7 @@ def calc_l4_uncertainty(
         logger.info(f'Reading scenario {idx+1}/{len(scenarios)} ({scenario})')
 
     # calculate the absolute uncertainty for each phenological metric
-    pheno_metrics = dict.fromkeys(handler_list[0].get_bandnames())
+    pheno_metrics = dict.fromkeys(handler_list[0].bandnames)
 
     for pheno_metric in pheno_metrics:
         
@@ -123,7 +123,7 @@ def calc_l4_uncertainty(
 
         # save to raster files and create a preview plot
         unc_handler = deepcopy(handler_list[0])
-        snap_band = unc_handler.get_bandnames()[0]
+        snap_band = unc_handler.bandnames[0]
         band_names = [f'{pheno_metric} Uncertainty', f'{pheno_metric} Mean']
         band_data = [standard_unc, scenario_mean]
 
@@ -213,7 +213,7 @@ def get_uncertainty_maps_and_histograms_by_croptype(
     )
 
     # add shapefile data with crop type codes
-    band_names = handler.get_bandnames()
+    band_names = handler.bandnames
     unc_band = band_names[0]
     mean_band = band_names[1]
     handler.add_bands_from_vector(

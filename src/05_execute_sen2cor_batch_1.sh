@@ -21,7 +21,7 @@
 #
 
 # define directory where the L1C realizations are located
-unc_scenarios="/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2A_MSIL1C_RUT-Scenarios/spring/batch_1"
+unc_scenarios="/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2_MSIL1C_RUT-Scenarios/batch_1"
 
 cd "$unc_scenarios" 
 

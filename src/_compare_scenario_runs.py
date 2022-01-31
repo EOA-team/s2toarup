@@ -19,7 +19,7 @@ def compare(file_1, file_2, out_dir, vi_name):
 
     # loop over bands and calculate the difference images
     diff_stats = []
-    for band_name in handler_1.get_bandnames():
+    for band_name in handler_1.bandnames:
         
         diff = np.subtract(handler_1.get_band(band_name), handler_2.get_band(band_name))
         # add as band

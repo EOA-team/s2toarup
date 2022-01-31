@@ -198,7 +198,7 @@ def resample_and_stack_orig_data(
 
 if __name__ == '__main__':
 
-    scenario_dir = Path('/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_RUT-Scenarios')
+    scenario_dir = Path('../S2A_MSIL1C_RUT-Scenarios')
     
     shapefile_study_area = Path('../shp/AOI_Esch_EPSG32632.shp')
     
@@ -208,11 +208,11 @@ if __name__ == '__main__':
         shapefile_study_area=shapefile_study_area
     )
 
-    # original Sentinel-2 L2A data
-    orig_l2a_data = Path('/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/Uncertainty/ESCH/scripts_paper_uncertainty/S2A_MSIL1C_orig')
-
-    # resample bandstacks and SCL for original datasets
-    resample_and_stack_orig_data(
-        orig_datasets_dir=orig_l2a_data,
-        shapefile_study_area=shapefile_study_area
-    )
+    # # original Sentinel-2 L2A data
+    # orig_l2a_data = Path('../S2A_MSIL1C_orig')
+    #
+    # # resample bandstacks and SCL for original datasets
+    # resample_and_stack_orig_data(
+    #     orig_datasets_dir=orig_l2a_data,
+    #     shapefile_study_area=shapefile_study_area
+    # )

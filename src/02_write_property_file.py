@@ -3,7 +3,7 @@
 """
 This scripts generates xml parameter files to run the S2 L1C-RUT
 for the single uncertainty contributors. It is therefore the step before
-running the actually *.sh bash script to execute the S2 L1C RUT.
+running the script to execute the S2 L1C RUT.
 """
 
 from pathlib import Path
@@ -56,5 +56,5 @@ def write_properties(
 
 if __name__ == '__main__':
     
-    out_dir = Path('./../S2A_MSIL1C_orig/spring')
+    out_dir = Path('./../S2A_MSIL1C_orig')
     write_properties(out_dir=out_dir)

@@ -510,6 +510,7 @@ def vegetation_time_series_scenarios(
 
             # get samples from uncertainty distribution and add it to the vi_data
             # (can be done directly because we deal with absolute uncertainties)
+            # TODO: implement also fully correlated case here
             samples = np.random.normal(
                 loc=0,
                 scale=vi_unc,

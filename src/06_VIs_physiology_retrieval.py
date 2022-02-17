@@ -9,10 +9,6 @@ In addition, it resamples the original Sentinel-2 data in L2A processing level
 to 10m spatial resolution using nearest neighbor interpolation and saves the
 data clipped to the extent of the study area. For these original datasets NDVI and
 EVI are calculated as well; these serve as reference to the scenario runs.
-
-TODO: test this script first on the workstation (autumn and spring)
-TODO: then delete the *.VIs folders on the group share and rerun this script also thre
-TODO: upload the original datasets from the workstation to the group share
 '''
 
 import cv2
@@ -20,7 +16,7 @@ import glob
 
 from pathlib import Path
 from agrisatpy.operational.resampling.sentinel2.resample_and_stack import _get_output_file_names
-from agrisatpy.io.sentinel2 import Sentinel2Handler
+from agrisatpy.core.sensors import Sentinel2
 
 from logger import get_logger
 
@@ -63,13 +59,13 @@ def main(
 
             # read data from SAFE; we only need the bands for the EVI and NDVI
             try:
-                handler = Sentinel2Handler()
-                handler.read_from_safe(
+                handler = Sentinel2().from_safe(
                     in_dir=Path(scenario), 
                     band_selection=['B02','B04','B08'],
-                    polygon_features=shapefile_study_area,
+                    vector_features=shapefile_study_area,
                     read_scl=False
                 )
+                handler.scale(inplace=True)
                 # calculate the spectral indices
                 # define output directory
                 vis_dir = out_dir.joinpath('Vegetation_Indices')
@@ -85,12 +81,12 @@ def main(
                 )
                 in_file = fnames['bandstack']
                 for vi_name in vi_names:
-                    handler.calc_si(vi_name)
+                    handler.calc_si(vi_name, inplace=True)
                     vi_fname = vis_dir.joinpath(f'VI_{in_file.split(".")[0]}_{vi_name.upper()}.tif').as_posix()
                     # save to raster
-                    handler.write_bands(
-                        out_file=vi_fname,
-                        band_names=[vi_name]
+                    handler.to_rasterio(
+                        fpath_raster=vi_fname,
+                        band_selection=[vi_name]
                     )
                 handler = None
             except Exception as e:
@@ -132,10 +128,10 @@ def resample_and_stack_orig_data(
         out_dir.mkdir(exist_ok=True)
 
         # read dataset from .SAFE for the extent of the study area
-        handler = Sentinel2Handler()
-        handler.read_from_safe(
+        handler = Sentinel2()
+        handler.from_safe(
             in_dir=Path(orig_dataset), 
-            polygon_features=shapefile_study_area
+            vector_features=shapefile_study_area
         )
 
         # resample the bands to 10m using nearest neighbor interpolation
@@ -198,15 +194,17 @@ def resample_and_stack_orig_data(
 
 if __name__ == '__main__':
 
-    scenario_dir = Path('../S2A_MSIL1C_RUT-Scenarios')
+    scenario_dir = Path('../S2_MSIL1C_RUT-Scenarios')
     
     shapefile_study_area = Path('../shp/AOI_Esch_EPSG32632.shp')
     
     # vegetation indices on scenarios
-    main(
-        scenario_dir=scenario_dir,
-        shapefile_study_area=shapefile_study_area
-    )
+    batches = [idx for idx in range(1,6)]
+    for batch in batches:
+        main(
+            scenario_dir=scenario_dir.joinpath(f'batch_{batch}'),
+            shapefile_study_area=shapefile_study_area
+        )
 
     # # original Sentinel-2 L2A data
     # orig_l2a_data = Path('../S2A_MSIL1C_orig')

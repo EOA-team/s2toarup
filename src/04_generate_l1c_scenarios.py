@@ -68,7 +68,7 @@ l1c_unc_contributors = [
     'DS',
     'gamma',
     'diff_abs',
-    # 'diff_temp', not considered as discussed with Javier Gorrono on 31st Jan 2022
+    'diff_temp', # not considered as discussed with Javier Gorrono on 31st Jan 2022
     'diff_cos',
     'diff_k',
     'quant'

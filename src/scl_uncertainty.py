@@ -131,4 +131,3 @@ if __name__ == '__main__':
             output_dir=output_dir,
             aoi=aoi
         )
-

@@ -152,8 +152,8 @@ if __name__ == '__main__':
 
     fname_area_stats = Path('../S2_MSIL2A_Analysis').joinpath('SCL_relative-number-of-pixels-per-class_abs-uncertainty.csv')
     area_stats = area_stats.sort_values(by='date')
-    fname_area_stats.to_csv(fname_area_stats, index=False)
+    area_stats.to_csv(fname_area_stats, index=False)
 
     fname_class_confidence = Path('../S2_MSIL2A_Analysis').joinpath('SCL_class-assignment-confidence-abs-variability.csv')
     class_confidence = class_confidence.sort_values(by='date')
-    fname_class_confidence.to_csv(fname_class_confidence, index=False)
+    class_confidence.to_csv(fname_class_confidence, index=False)

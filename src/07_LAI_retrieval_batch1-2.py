@@ -119,7 +119,7 @@ if __name__ == '__main__':
     field_parcels = Path('../shp/ZH_Polygons_2019_EPSG32632_selected-crops_buffered.shp')
     lut_dir = Path('../S2_ProSAIL_LUTs')
 
-    for batch in range(1,6):
+    for batch in range(1,3):
         scenario_dir = Path(f'../S2_MSIL1C_RUT-Scenarios/batch_{batch}')
         loop_scenarios(scenario_dir, field_parcels, lut_dir)
         

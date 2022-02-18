@@ -121,13 +121,39 @@ if __name__ == '__main__':
 
     batches = [x for x in range(1,6)]
 
+    # for batch in batches:
+    #     scenario_dir = Path(f'../S2_MSIL1C_RUT-Scenarios/batch_{batch}')
+    #     output_dir = scenario_dir.joinpath('SCL_Uncertainty')
+    #     output_dir.mkdir(exist_ok=True)
+    #
+    #     scl_uncertainty(
+    #         scenario_dir=scenario_dir,
+    #         output_dir=output_dir,
+    #         aoi=aoi
+    #     )
+
+    # combine results from batches into two single DataFrames and save them to csv and latex
+    area_stats_list = []
+    class_confidence_list = []
     for batch in batches:
-        scenario_dir = Path(f'../S2_MSIL1C_RUT-Scenarios/batch_{batch}')
-        output_dir = scenario_dir.joinpath('SCL_Uncertainty')
-        output_dir.mkdir(exist_ok=True)
-    
-        scl_uncertainty(
-            scenario_dir=scenario_dir,
-            output_dir=output_dir,
-            aoi=aoi
+        fname_area_stats = Path(
+            f'../S2_MSIL1C_RUT-Scenarios/batch_{batch}/SCL_Uncertainty/SCL_relative-number-of-pixels-per-class_abs-uncertainty.csv'
         )
+        df = pd.read_csv(fname_area_stats)
+        area_stats_list.append(df)
+        fname_class_confidence = Path(
+            f'../S2_MSIL1C_RUT-Scenarios/batch_{batch}/SCL_Uncertainty/SCL_class-assignment-confidence-abs-variability.csv'
+        )
+        df = pd.read_csv(fname_class_confidence)
+        class_confidence_list.append(df)
+
+    area_stats = pd.concat(area_stats_list)
+    class_confidence = pd.concat(class_confidence_list)
+
+    fname_area_stats = Path('../S2_MSIL2A_Analysis').joinpath('SCL_relative-number-of-pixels-per-class_abs-uncertainty.csv')
+    area_stats = area_stats.sort_values(by='date')
+    fname_area_stats.to_csv(fname_area_stats, index=False)
+
+    fname_class_confidence = Path('../S2_MSIL2A_Analysis').joinpath('SCL_class-assignment-confidence-abs-variability.csv')
+    class_confidence = class_confidence.sort_values(by='date')
+    fname_class_confidence.to_csv(fname_class_confidence, index=False)

@@ -91,3 +91,4 @@ venv/
 debug/
 
 S2_MSIL1C_RUT-Scenarios/batch_*
+S2_MSIL2A_Analysis/*.csv

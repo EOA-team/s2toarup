@@ -147,7 +147,7 @@ def resample_and_stack_orig_data(
         )
 
         # write SCL, RGB previews
-        fig_rgb = handler.plot_rgb()
+        fig_rgb = handler.plot_multiple_bands(['red','green','blue'])
         rgb_dir = out_dir.joinpath('rgb_previews')
         rgb_dir.mkdir(exist_ok=True)
         fname_rgb = rgb_dir.joinpath(fnames['rgb_preview'])
@@ -161,18 +161,18 @@ def resample_and_stack_orig_data(
 
         # save rasters (spectral bands, VIs, SCL)
         fname_bandstack = out_dir.joinpath(fnames['bandstack'])
-        band_selection = handler.bandnames
-        band_selection.remove('scl')
-        handler.write_bands(
-            out_file=fname_bandstack,
-            band_names=band_selection,
+        band_selection = handler.band_names
+        band_selection.remove('SCL')
+        handler.to_rasterio(
+            fpath_raster=fname_bandstack,
+            band_selection=band_selection,
             use_band_aliases=True
         )
 
         fname_scl = scl_dir.joinpath(fnames['scl'])
-        handler.write_bands(
-            out_file=fname_scl,
-            band_names=['scl']
+        handler.to_rasterio(
+            fpath_raster=fname_scl,
+            band_selection=['scl']
         )
 
         vi_names = ['NDVI', 'EVI']
@@ -184,9 +184,9 @@ def resample_and_stack_orig_data(
             handler.calc_si(vi_name)
             vi_fname = vis_dir.joinpath(f'VI_{in_file.split(".")[0]}_{vi_name.upper()}.tif').as_posix()
             # save to raster
-            handler.write_bands(
-                out_file=vi_fname,
-                band_names=[vi_name]
+            handler.to_rasterio(
+                fpath_raster=vi_fname,
+                band_selection=[vi_name]
             )
 
         logger.info(f'Processed original dataset {orig_dataset} ({idx+1}/{len(orig_datasets_l2a)})')

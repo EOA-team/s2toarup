@@ -89,3 +89,5 @@ venv/
 /.pytest_cache/
 
 debug/
+
+S2_MSIL1C_RUT-Scenarios/batch_*

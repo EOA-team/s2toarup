@@ -121,16 +121,16 @@ if __name__ == '__main__':
 
     batches = [x for x in range(1,6)]
 
-    # for batch in batches:
-    #     scenario_dir = Path(f'../S2_MSIL1C_RUT-Scenarios/batch_{batch}')
-    #     output_dir = scenario_dir.joinpath('SCL_Uncertainty')
-    #     output_dir.mkdir(exist_ok=True)
-    #
-    #     scl_uncertainty(
-    #         scenario_dir=scenario_dir,
-    #         output_dir=output_dir,
-    #         aoi=aoi
-    #     )
+    for batch in batches:
+        scenario_dir = Path(f'../S2_MSIL1C_RUT-Scenarios/batch_{batch}')
+        output_dir = scenario_dir.joinpath('SCL_Uncertainty')
+        output_dir.mkdir(exist_ok=True)
+    
+        scl_uncertainty(
+            scenario_dir=scenario_dir,
+            output_dir=output_dir,
+            aoi=aoi
+        )
 
     # combine results from batches into two single DataFrames and save them to csv and latex
     area_stats_list = []
@@ -157,3 +157,8 @@ if __name__ == '__main__':
     fname_class_confidence = Path('../S2_MSIL2A_Analysis').joinpath('SCL_class-assignment-confidence-abs-variability.csv')
     class_confidence = class_confidence.sort_values(by='date')
     class_confidence.to_csv(fname_class_confidence, index=False)
+
+    # df = pd.read_csv(fname_area_stats)
+    # sel_cols = ['date', 'cloud_shadows', 'vegetation', 'non_vegetated', 'water', 'unclassified',
+    #    'cloud_medium_probability', 'cloud_high_probability', 'thin_cirrus']
+    # latex_expr = df[sel_cols].to_latex(index=False)

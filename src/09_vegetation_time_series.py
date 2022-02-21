@@ -12,6 +12,9 @@ In addition, the script extracts the time series plus uncertainty at user-define
 pixels and plots the uncertainty over time for all pixels of the crop types available.
 '''
 
+# TODO: implement blue-filter
+# TODO: implement full inter-scene correlation
+
 import glob
 import logging
 import matplotlib
@@ -29,15 +32,16 @@ from copy import deepcopy
 import geopandas as gpd
 import matplotlib.pyplot as plt
 
-from phenolopy import remove_outliers
+from phenolopy import remove_outliers, blue_filtering
 from phenolopy import interpolate
-from phenolopy import smooth
+from phenolopy import smooth 
 from phenolopy import calc_phenometrics
 from _find_datasets import get_data_and_uncertainty_files
-from agrisatpy.io import SatDataHandler
-from agrisatpy.io.sentinel2 import Sentinel2Handler
+from agrisatpy.core.sensors import Sentinel2
+from agrisatpy.core.raster import RasterCollection
 
 from logger import get_logger
+from agrisatpy.core.band import Band
 
 
 # setup logger -> will write log file to the /../log directory
@@ -73,15 +77,17 @@ def _calc_pheno_metrics(xds: xr.Dataset) -> Dict[str, xr.Dataset]:
     """
     
     # remove outliers using median filter
-    ds = remove_outliers(ds=xds, method='median', user_factor=2, z_pval=0.05)
+    # ds = remove_outliers(ds=xds, method='median', user_factor=2, z_pval=0.05)
+
+    ds = blue_filtering(ds=xds)
 
     # interpolate nans linearly
     ds = interpolate(ds=ds, method='interpolate_na')
 
-    # smooth data using Savitzky-Golay filter
+    # smooth data using splines (TODO)
     ds = smooth(ds=ds, method='savitsky', window_length=3, polyorder=1)
 
-    # calculate the phenometrics
+    # calculate the phenometrics using 20% seasonal amplitude
     pheno_ds = calc_phenometrics(
         da=ds['veg_index'],
         peak_metric='pos',
@@ -98,7 +104,7 @@ def read_data_and_uncertainty(
         data_df: pd.DataFrame,
         in_file_aoi: Path,
         vi_name: str
-    ) -> Tuple[pd.DataFrame, List[Sentinel2Handler]]:
+    ) -> Tuple[pd.DataFrame, List[Sentinel2]]:
     """
     This function reads the selected vegetation index (computed in step 7)
     and the associated standard (absolute) uncertainty and stores the read
@@ -122,46 +128,31 @@ def read_data_and_uncertainty(
 
     for _, record in data_df.iterrows():
 
-        # read S2 banstack plus its SCL file to mask out clouds and shadows
-        s2_stack = Sentinel2Handler()
-        s2_stack.read_from_bandstack(
+        # read S2 blue and red bands plus SCL file to mask out clouds and shadows
+        s2_stack = Sentinel2().from_bandstack(
             fname_bandstack=Path(record.filename_bandstack),
-            in_file_aoi=in_file_aoi,
-            band_selection=['B02','B03','B04','B08']
+            vector_features=in_file_aoi,
+            band_selection=['B02', 'B04']
         )
 
         # mask clouds and cloud shadows (if any) and store the cloudy pixel percentage
         cloud_coverage = s2_stack.get_cloudy_pixel_percentage()
 
         # read Vegetation parameter/index band
-        handler = SatDataHandler()
-        handler.read_from_bandstack(
-            fname_bandstack=Path(record.filename_veg_par),
-            in_file_aoi=in_file_aoi,
-            full_bounding_box_only=True
-        )
-        handler.reset_bandnames(new_bandnames=[vi_name])
-
         s2_stack.add_band(
-            band_name=vi_name,
-            band_data=handler.get_band(vi_name),
-            snap_band='B02'
+            band_constructor=Band.from_rasterio,
+            fpath_raster=Path(record.filename_veg_par),
+            band_idx=1,
+            band_name_dst=vi_name,
+            vector_features=in_file_aoi
         )
-
         # read vegetation parameter/index absolute uncertainty band
-        handler = SatDataHandler()
-        handler.read_from_bandstack(
-            fname_bandstack=Path(record.filename_unc),
-            in_file_aoi=in_file_aoi,
-            band_selection=['abs_stddev'],
-            full_bounding_box_only=True
-        )
-
-        # apply the cloud mask also to the absolute uncertainty band
         s2_stack.add_band(
-            band_name=f'{vi_name}_unc',
-            band_data=handler.get_band('abs_stddev'),
-            snap_band='B02'
+            band_constructor=Band.from_rasterio,
+            fpath_raster=Path(record.filename_unc),
+            band_name_src='abs_stddev',
+            vector_features=in_file_aoi,
+            band_name_dst=f'{vi_name}_unc'
         )
 
         # mask clouds, shadows, cirrus, dark area and unclassified pixels using the
@@ -171,24 +162,19 @@ def read_data_and_uncertainty(
             cloud_classes=scl_mask_values
         )
 
-        bands_to_drop = ['B02','B03','B04','B08','SCL']
-        for band_to_drop in bands_to_drop:
-            s2_stack.drop_band(band_to_drop)
-        ts_stack_dict[record.date] = s2_stack
-
         # save masked files to disk (thus, the reference run will also have the correct
         # input)
         vi_masked = record.filename_veg_par
         vi_masked = Path(vi_masked.replace('.tif', '_scl-filtered.tif'))
-        s2_stack.write_bands(
-            out_file=vi_masked,
-            band_names=[vi_name]
+        s2_stack.to_rasterio(
+            fpath_raster=vi_masked,
+            band_selection=[vi_name]
         )
         vi_unc_masked = record.filename_unc
         vi_unc_masked = Path(vi_unc_masked.replace('.tif', '_scl-filtered.tif'))
-        s2_stack.write_bands(
-            out_file=vi_unc_masked,
-            band_names=[f'{vi_name}_unc']
+        s2_stack.to_rasterio(
+            fpath_raster=vi_unc_masked,
+            band_selection=[f'{vi_name}_unc']
         )
 
         update_list.append({
@@ -198,11 +184,9 @@ def read_data_and_uncertainty(
             'filename_unc_scl': vi_unc_masked
         })
 
-
     # added update columns to input data frame
     update_df = pd.DataFrame(update_list)
     merged = pd.merge(data_df, update_df, on='date')
-
     return merged, ts_stack_dict
 
 
@@ -214,7 +198,7 @@ def percentile(n):
 
 
 def extract_uncertainty_crops(
-        ts_stack_dict: Dict[date, SatDataHandler],
+        ts_stack_dict: Dict[date, RasterCollection],
         file_df: pd.DataFrame,
         sample_polygons: Path,
         vi_name: str,
@@ -228,7 +212,7 @@ def extract_uncertainty_crops(
     time series plot and saved to CSV file as backup.
 
     :param ts_stack_dict:
-        dictionary with ``SatDataHandler`` instances holding the vegetation parameter
+        dictionary with ``RasterCollection`` instances holding the vegetation parameter
         as one band and its uncertainty as another band per scene date
     :param file_df:
         pandas dataframe with links to the original files (parameter values + uncertainty)
@@ -255,10 +239,13 @@ def extract_uncertainty_crops(
         _date = record.date
         scene_handler = deepcopy(ts_stack_dict[_date])
 
-        scene_handler.add_bands_from_vector(
-            in_file_vector=sample_polygons,
-            snap_band=vi_name,
-            attribute_selection=['crop_code']
+        scene_handler.add_band(
+            band_constructor=Band.from_vector,
+            vector_features=sample_polygons,
+            geo_info=scene_handler['blue'].geo_info,
+            band_name_src='crop_code',
+            band_name_dst='crop_code',
+            snap_bounds=scene_handler['blue'].bounds
         )
 
         # convert to geodataframe and save them as CSVs (backup)
@@ -377,11 +364,10 @@ def extract_uncertainty_crops(
         fname = f'{vi_name}_{crop_name}_all-pixel-timeseries.png'
         fig.savefig(out_dir.joinpath(fname), dpi=300, bbox_inches='tight')
         plt.close(fig)
-        
 
 
 def vegetation_time_series_scenarios(
-        ts_stack_dict: Dict[date, Sentinel2Handler],
+        ts_stack_dict: Dict[date, Sentinel2],
         file_df: pd.DataFrame,
         n_scenarios: int,
         out_dir_scenarios: Path,
@@ -471,9 +457,9 @@ def vegetation_time_series_scenarios(
             if scenario == 0:
                 
                 vegpar_file = file_df[file_df.date == _date]['filename_veg_par_scl'].iloc[0]
-                gdf_sample_data = SatDataHandler.read_pixels(
-                    point_features=sample_points,
-                    raster=vegpar_file
+                gdf_sample_data = RasterCollection.read_pixels(
+                    vector_features=sample_points,
+                    fpath_raster=vegpar_file
                 )
                 colnames = list(gdf_sample_data.columns)
                 if None in colnames:
@@ -481,10 +467,10 @@ def vegetation_time_series_scenarios(
                 gdf_sample_data.columns = colnames
                 
                 vegpar_unc = file_df[file_df.date == _date]['filename_unc_scl'].iloc[0]
-                gdf_sample_unc = SatDataHandler.read_pixels(
-                    point_features=sample_points,
-                    raster=vegpar_unc,
-                    band_selection=[f'{vi_name}_unc']
+                gdf_sample_unc = RasterCollection.read_pixels(
+                    vector_features=sample_points,
+                    fpath_raster=vegpar_unc,
+                    band_names_src=[f'{vi_name}_unc']
                 )
                 gdf_sample_unc.rename({f'{vi_name}_unc': 'unc'}, axis=1, inplace=True)
 

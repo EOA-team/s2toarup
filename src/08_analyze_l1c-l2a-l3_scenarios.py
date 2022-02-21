@@ -1,10 +1,9 @@
 '''
-This script is used to analyze the uncertainty
-propagation outcomes before and after Sen2Cor. It generates
-tif files summarizing the scenario spread and hence  standard uncertainty.
-In addition, it produces some maps useful for visually analyzing the
-results and extracts the uncertainty for the single regions of
-interest (ROI) into a handy CSV file format.
+This script is used to analyze the uncertainty propagation outcomes before and 
+fter Sen2Cor. It generates geoTiff files summarizing the scenario spread and hence 
+standard uncertainty (k=1).
+In addition, it produces some maps for visually analyzing the results and extracts
+the uncertainty for the single regions of interest (ROI) into a handy CSV file format.
 '''
 
 import os
@@ -100,10 +99,9 @@ band_dict_vis = {
     '10': {
         'NDVI': '*NDVI.tif',
         'EVI': '*EVI.tif',
-        'LAI': '*LAI.tif'
+        'LAI': '*GLAI.tif'
     }
 }
-
 
 def pixel_to_img_coords(
         point_coords: Tuple[Union[int,float]],
@@ -142,15 +140,13 @@ def pixel_to_img_coords(
 
     return {'row': sel_row, 'col': sel_col}
 
-
 def analyze_scenarios_spatial(
         unc_scenario_dir: Path,
         in_file_shp: Path,
         out_dir: Path,
         processing_level: str,
         orig_dataset_directory: Path,
-        n_random_pixels: Optional[int] = 5,
-        lai_model_uncertainty: Optional[bool] = False
+        n_random_pixels: Optional[int] = 5
     ):
     """
     Extracts a region of interest (ROI) from a series of
@@ -333,10 +329,6 @@ def analyze_scenarios_spatial(
                 }
             )
 
-            # calculate uncertainties for the full raster extent
-            if band == 'LAI' and lai_model_uncertainty:
-                band += '_SD'
-
             # plot histograms of randomly selected pixels
             # calculate the image coordinates for the coordinate tuples
             for coord_tuple in coord_samples:
@@ -491,7 +483,6 @@ def analyze_scenarios_spatial(
                     rel_std[rel_std > 0.25] = 0.25
                     dst.write_band(5, rel_std * 100)
 
-
 def unc_maps(
         analysis_results_l1c: str,
         analysis_results_l2a: str,
@@ -500,19 +491,13 @@ def unc_maps(
         analysis_results_scl: Path,
         analysis_results_vis: Path,
         out_dir: Path,
-        absolute_uncertainty: Optional[bool] = True,
-        lai_model_uncertainty: Optional[bool] = False
+        absolute_uncertainty: Optional[bool] = True
     ) -> None:
     """
     Maps raster values of L1C and L2A uncertainty values to reveal
     spatial pattern of uncertainty and their land cover/ use dependency
 
     TODO: update doc string
-
-    :param lai_model_uncertainty:
-        if False (default) analyses the uncertainty in the retrieved LAI values.
-        If True analyses the spread of **model** uncertainty across scenario
-        members instead
     """
 
     # get files
@@ -639,16 +624,9 @@ def unc_maps(
                     meta = src.meta
                     bounds = src.bounds
             else:
-                # special case LAI_SD
-                if band == 'LAI' and lai_model_uncertainty:
-                    vi_raster = [
-                        x for x in vis if Path(x).name.split('_')[1] == 'LAI' and 
-                            Path(x).name.split('_')[2] == 'SD'
-                    ][0]
-                else:
-                    vi_raster = [
-                        x for x in vis if Path(x).name.split('_')[1] == band
-                    ][0]
+                vi_raster = [
+                    x for x in vis if Path(x).name.split('_')[1] == band
+                ][0]
                 with rio.open(vi_raster, 'r') as src:
                     atm_data = src.read(l1c_band_idx)
                     meta = src.meta
@@ -715,7 +693,8 @@ def unc_maps(
             )
 
             vote = single_axs[0].imshow(
-                scl_data[0,:,:].astype(int), cmap=cmap,
+                scl_data[0,:,:].astype(int),
+                cmap=cmap,
                 extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
             )
             single_axs[0].title.set_text(f'L2A SCL (Majority Vote)')
@@ -733,7 +712,11 @@ def unc_maps(
             single_axs[1].title.set_text(f'L2A SCL (Confidence)')
 
             cbar_conf = single_fig.colorbar(
-                conf, orientation='horizontal', ax=single_axs[1], pad=0.06
+                conf,
+                vmin=scl_data[1,:,:].min(),
+                vmax=100,
+                orientation='horizontal',
+                ax=single_axs[1], pad=0.06
             )
             cbar_conf.set_label('% Scenario Members Voting for Class', fontsize=16)
 
@@ -748,7 +731,6 @@ def unc_maps(
             single_axs[1].yaxis.set_ticks(np.arange(bounds.bottom, bounds.top, 5000))
             single_axs[1].set_yticklabels([])
 
-
         # save figure
         if band == 'LAI' and lai_model_uncertainty:
             band += '_SD'
@@ -759,7 +741,6 @@ def unc_maps(
             fname = out_dir.joinpath(f'{band}_l1c-l2a_relative-uncertainty-map.png')
         single_fig.savefig(fname, bbox_inches='tight')
         plt.close(single_fig)
-
 
 def _get_roi_mean(
         raster_file: str,
@@ -780,7 +761,6 @@ def _get_roi_mean(
     out_band = out_band[band_idx-1,:,:]
     out_band[out_band == nodata_value] = np.nan
     return np.nanmean(out_band)
-
 
 def extract_roi_unc(
         analysis_results_l1c: Path,
@@ -932,7 +912,6 @@ def extract_roi_unc(
 
     return pd.DataFrame(res)
 
-
 def main(
         unc_scenario_dir_home: Path,
         out_dir_home: Path,
@@ -940,7 +919,6 @@ def main(
         in_file_shp_rois: Path,
         id_column: str,
         absolute_uncertainty: Optional[bool] = True,
-        lai_model_uncertainty: Optional[bool] = False,
         **kwargs
     ) -> None:
     """
@@ -982,7 +960,6 @@ def main(
                 in_file_shp=in_file_shp,
                 out_dir=out_dir,
                 processing_level=processing_level,
-                lai_model_uncertainty=lai_model_uncertainty,
                 **kwargs
             )
 
@@ -1008,8 +985,7 @@ def main(
             analysis_results_scl=analysis_results_scl,
             analysis_results_vis=analysis_results_vis,
             out_dir=out_dir_maps,
-            absolute_uncertainty=absolute_uncertainty,
-            lai_model_uncertainty=lai_model_uncertainty
+            absolute_uncertainty=absolute_uncertainty
         ) 
 
         # acquisition date of the S2 image
@@ -1045,9 +1021,7 @@ def main(
             )
             msg = f'Finished Analyzing Relative Uncertainty of {unc_scenario_dir.name}'
         unc_roi_df.to_csv(fname_csv, index=False)
-
         logger.info(msg)
-
 
 
 if __name__ == '__main__':
@@ -1065,7 +1039,7 @@ if __name__ == '__main__':
 
     # directory where to save the resulting files to
     out_dir_home = Path(
-        '../S2A_MSIL2A_Analysis/1000_scenarios'
+        '../S2A_MSIL2A_Analysis'
     )
 
     options = {
@@ -1074,14 +1048,10 @@ if __name__ == '__main__':
         )
     }
 
-    
     # directory containing the raster realizations
     unc_scenario_dir_home = Path(
         f'../S2A_MSIL1C_RUT-Scenarios'
     )
-
-    # check spread of LAI model uncertainty across scenarios?
-    lai_model_uncertainty = True
 
     # absolute uncertainty
     main(
@@ -1090,7 +1060,6 @@ if __name__ == '__main__':
         in_file_shp=in_file_shp,
         in_file_shp_rois=in_file_shp_rois,
         id_column=id_column,
-        lai_model_uncertainty=lai_model_uncertainty,
         **options
     )
 
@@ -1102,6 +1071,5 @@ if __name__ == '__main__':
         in_file_shp_rois=in_file_shp_rois,
         id_column=id_column,
         absolute_uncertainty=False,
-        lai_model_uncertainty=lai_model_uncertainty,
         **options
     )

@@ -332,6 +332,9 @@ def analyze_scenarios_spatial(
                 # extract also the "original" value
                 orig_val = orig_arr[0,rand_coords['row'],rand_coords['col']]
 
+                if np.isnan(pixel_vals).all():
+                    continue
+
                 # plot histogram using true percentage values of reflectance
                 if band != 'SCL' and processing_level != 'L3':
                     pixel_vals *= 0.01
@@ -339,8 +342,12 @@ def analyze_scenarios_spatial(
                 # plot the histogram of values
                 fig = plt.figure(figsize=(6,8))
                 ax = fig.add_subplot(111)
-                
-                ax.hist(pixel_vals, bins=30, color='cornflowerblue')
+
+                try:
+                    ax.hist(pixel_vals, bins=30, color='cornflowerblue')
+                except Exception as e:
+                    logger.error(e)
+                    continue
                 x = int(np.around(coord_tuple[0]))
                 y = int(np.around(coord_tuple[1]))
                 epsg = sat_crs.to_epsg()
@@ -364,10 +371,7 @@ def analyze_scenarios_spatial(
                     elif processing_level == 'L3':
                         if band == 'LAI':
                             title_str = 'Vegetation Parameter Samples '
-                            if lai_model_uncertainty:
-                                xlabel = r'LAI Model Abs Uncertainty Values [$m^2$/$m^2$]'
-                            else:
-                                xlabel = r'LAI Values [$m^2$/$m^2$]'
+                            xlabel = r'LAI Values [$m^2$/$m^2$]'
                         else:
                             title_str = 'Vegetation Index Samples '
                             xlabel = 'Index Values [-]'
@@ -464,7 +468,10 @@ def analyze_scenarios_spatial(
                     # standard uncertainty -> normalize stack of scenarios
                     # to the values of the original (measured) band
                     dst.set_band_description(5, 'rel_std_unc')
-                    rel_std = np.nanstd(data_arr, axis=0) / orig_arr[0,:,:]
+                    try:
+                        rel_std = np.nanstd(data_arr, axis=0) / orig_arr[0,:,:]
+                    except Exception as e:
+                        continue
                     # since some vegetation indices can also take negative values
                     # it is necessary to return absolute values here
                     rel_std = abs(rel_std)
@@ -639,10 +646,7 @@ def unc_maps(
             )
             if band in vegetation_indices:
                 if band == 'LAI':
-                    if lai_model_uncertainty:
-                        single_axs.title.set_text(f'L3 Spread of LAI Model Uncertainty')
-                    else:
-                        single_axs.title.set_text(f'L3 Biophysical Parameter {band}')
+                   single_axs.title.set_text(f'L3 Biophysical Parameter {band}')
                 else:
                     single_axs.title.set_text(f'L3 Vegetation Index {band}')
             else:
@@ -696,15 +700,14 @@ def unc_maps(
             cbar_vote.set_label('SCL', fontsize=16)
 
             conf = single_axs[1].imshow(
-                scl_data[1,:,:], vmin=0, vmax=100, cmap='Greens', interpolation='none',
+                scl_data[1,:,:], vmin=scl_data[1,:,:].min(),
+                vmax=100, cmap='Oranges', interpolation='none',
                 extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
             )
             single_axs[1].title.set_text(f'L2A SCL (Confidence)')
 
             cbar_conf = single_fig.colorbar(
                 conf,
-                vmin=scl_data[1,:,:].min(),
-                vmax=100,
                 orientation='horizontal',
                 ax=single_axs[1], pad=0.06
             )
@@ -722,9 +725,6 @@ def unc_maps(
             single_axs[1].set_yticklabels([])
 
         # save figure
-        if band == 'LAI' and lai_model_uncertainty:
-            band += '_SD'
-
         if absolute_uncertainty:
             fname = out_dir.joinpath(f'{band}_l1c-l2a_absolute-uncertainty-map.png')
         else:
@@ -932,8 +932,8 @@ def main(
         logger.info(f'Analyzing Uncertainty of {unc_scenario_dir.name}')
 
         # processing levels of the data; we analyze L1C, L2A and L3
-        # processing_levels = ['L1C', 'L2A', 'L3']
-        processing_levels = ['L3']
+        processing_levels = ['L1C', 'L2A', 'L3']
+        # processing_levels = ['L3']
     
         #    STEP_1      ANALYZE THE SCENARIOS BY READING ALL REALIZATIONS
         #                FOR YOUR STUDY AREA
@@ -943,15 +943,15 @@ def main(
         #    MAX, MEAN, STD AND STANDARD UNCERTAINTY DENOTING THE SPREAD
         #    AMONG THE SCENARIO MEMBERS
 
-        for processing_level in processing_levels:
-        
-            analyze_scenarios_spatial(
-                unc_scenario_dir=unc_scenario_dir,
-                in_file_shp=in_file_shp,
-                out_dir=out_dir,
-                processing_level=processing_level,
-                **kwargs
-            )
+        # for processing_level in processing_levels:
+        #
+        #     analyze_scenarios_spatial(
+        #         unc_scenario_dir=unc_scenario_dir,
+        #         in_file_shp=in_file_shp,
+        #         out_dir=out_dir,
+        #         processing_level=processing_level,
+        #         **kwargs
+        #     )
 
         #    STEP_2        ANALYSIS AND VISUALIZATION OF UNCERTAINTY
     
@@ -1017,15 +1017,24 @@ def main(
 if __name__ == '__main__':
 
     ### user inputs
+    from shapely.geometry import box
     
     # shapefile (or other vector format) defining the extent of the study area
-    in_file_shp = Path(
-        '../shp/AOI_Esch_EPSG32632.shp'
-    )
+    # in_file_shp = Path(
+    #     '../shp/AOI_Esch_EPSG32632.shp'
+    # )
     in_file_shp_rois = Path(
         '../shp/ZH_Polygons_2019_EPSG32632_selected-crops_buffered.shp'
     )
     id_column = 'crop_type'
+    gdf = gpd.read_file(in_file_shp_rois)
+    bounds = gdf.geometry.total_bounds
+    bounds = box(*bounds)
+    gdf_out = gpd.GeoDataFrame(geometry=[bounds], crs=gdf.crs)
+    in_file_shp = Path(
+        '../shp/AOI_Esch_EPSG32632_crop-bounds.shp'
+    )
+    gdf_out.to_file(in_file_shp)
 
     # directory where to save the resulting files to
     out_dir_home = Path(

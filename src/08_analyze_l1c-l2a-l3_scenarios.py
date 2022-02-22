@@ -281,13 +281,6 @@ def analyze_scenarios_spatial(
                         crop=True, 
                         all_touched=True # IMPORTANT!
                 )
-                if band == 'LAI':
-                    # band 1: LAI
-                    # band 2: model uncertainty
-                    if lai_model_uncertainty:
-                        orig_arr = orig_arr[1:2,:,:]
-                    else:
-                        orig_arr = orig_arr[0:1,:,:]
 
             # loop over scenario members
             n_scenarios = len(scenario_files)
@@ -311,10 +304,7 @@ def analyze_scenarios_spatial(
                             "transform": out_transform,
                          }
                     )
-                if band == 'LAI' and lai_model_uncertainty:
-                    data_arr[idx] = out_band[1,:,:]
-                else:
-                    data_arr[idx,:,:] = out_band[0,:,:]
+                data_arr[idx,:,:] = out_band[0,:,:]
 
             # analysis: calculate min, max, mean and standard deviation per pixel
             # (does not apply to SCL - here the majority vote will be analyzed)
@@ -1039,18 +1029,18 @@ if __name__ == '__main__':
 
     # directory where to save the resulting files to
     out_dir_home = Path(
-        '../S2A_MSIL2A_Analysis'
+        '../S2_MSIL2A_Analysis'
     )
 
     options = {
         'orig_dataset_directory': Path(
-            '../S2A_MSIL1C_orig'
+            '/home/graflu/Documents/uncertainty/S2_MSIL1C_orig'
         )
     }
 
     # directory containing the raster realizations
     unc_scenario_dir_home = Path(
-        f'../S2A_MSIL1C_RUT-Scenarios'
+        f'../S2_MSIL1C_RUT-Scenarios/batch_5'
     )
 
     # absolute uncertainty

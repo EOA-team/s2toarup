@@ -943,15 +943,15 @@ def main(
         #    MAX, MEAN, STD AND STANDARD UNCERTAINTY DENOTING THE SPREAD
         #    AMONG THE SCENARIO MEMBERS
 
-        # for processing_level in processing_levels:
-        #
-        #     analyze_scenarios_spatial(
-        #         unc_scenario_dir=unc_scenario_dir,
-        #         in_file_shp=in_file_shp,
-        #         out_dir=out_dir,
-        #         processing_level=processing_level,
-        #         **kwargs
-        #     )
+        for processing_level in processing_levels:
+        
+            analyze_scenarios_spatial(
+                unc_scenario_dir=unc_scenario_dir,
+                in_file_shp=in_file_shp,
+                out_dir=out_dir,
+                processing_level=processing_level,
+                **kwargs
+            )
 
         #    STEP_2        ANALYSIS AND VISUALIZATION OF UNCERTAINTY
     
@@ -1048,27 +1048,28 @@ if __name__ == '__main__':
     }
 
     # directory containing the raster realizations
-    unc_scenario_dir_home = Path(
-        f'../S2_MSIL1C_RUT-Scenarios/batch_5'
-    )
-
-    # absolute uncertainty
-    main(
-        unc_scenario_dir_home=unc_scenario_dir_home,
-        out_dir_home=out_dir_home,
-        in_file_shp=in_file_shp,
-        in_file_shp_rois=in_file_shp_rois,
-        id_column=id_column,
-        **options
-    )
-
-    # relative uncertainty
-    main(
-        unc_scenario_dir_home=unc_scenario_dir_home,
-        out_dir_home=out_dir_home,
-        in_file_shp=in_file_shp,
-        in_file_shp_rois=in_file_shp_rois,
-        id_column=id_column,
-        absolute_uncertainty=False,
-        **options
-    )
+    for batch in range(1,4):
+        unc_scenario_dir_home = Path(
+            f'../S2_MSIL1C_RUT-Scenarios/batch_{batch}'
+        )
+    
+        # absolute uncertainty
+        main(
+            unc_scenario_dir_home=unc_scenario_dir_home,
+            out_dir_home=out_dir_home,
+            in_file_shp=in_file_shp,
+            in_file_shp_rois=in_file_shp_rois,
+            id_column=id_column,
+            **options
+        )
+    
+        # relative uncertainty
+        main(
+            unc_scenario_dir_home=unc_scenario_dir_home,
+            out_dir_home=out_dir_home,
+            in_file_shp=in_file_shp,
+            in_file_shp_rois=in_file_shp_rois,
+            id_column=id_column,
+            absolute_uncertainty=False,
+            **options
+        )

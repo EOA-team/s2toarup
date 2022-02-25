@@ -99,10 +99,9 @@ def _calc_pheno_metrics(xds: xr.Dataset) -> Dict[str, xr.Dataset]:
 
     return {'pheno_metrics': pheno_ds, 'ds': ds}
 
-
 def read_data_and_uncertainty(
         data_df: pd.DataFrame,
-        in_file_aoi: Path,
+        parcels: Path,
         vi_name: str
     ) -> Tuple[pd.DataFrame, List[Sentinel2]]:
     """
@@ -112,8 +111,8 @@ def read_data_and_uncertainty(
 
     :param data_df:
         dataframe returned from ``get_data_and_uncertainty``
-    :param in_file_aoi:
-        shapefile defining the study area
+    :param parcels:
+        shapefile defining the crop parcels
     :param vi_name:
         name of the vegetation index or parameter to process (e.g., NDVI)
     :return:
@@ -128,54 +127,88 @@ def read_data_and_uncertainty(
 
     for _, record in data_df.iterrows():
 
-        # read S2 blue and red bands plus SCL file to mask out clouds and shadows
-        s2_stack = Sentinel2().from_bandstack(
-            fname_bandstack=Path(record.filename_bandstack),
-            vector_features=in_file_aoi,
-            band_selection=['B02', 'B04']
-        )
-
-        # mask clouds and cloud shadows (if any) and store the cloudy pixel percentage
-        cloud_coverage = s2_stack.get_cloudy_pixel_percentage()
-
-        # read Vegetation parameter/index band
-        s2_stack.add_band(
+        # read VI data
+        vi_file = Path(record.filename_veg_par)
+        collection = Sentinel2()
+        collection.add_band(
             band_constructor=Band.from_rasterio,
-            fpath_raster=Path(record.filename_veg_par),
+            fpath_raster=vi_file,
             band_idx=1,
-            band_name_dst=vi_name,
-            vector_features=in_file_aoi
+            band_name_dst='NDVI',
+            vector_features=parcels
         )
         # read vegetation parameter/index absolute uncertainty band
-        s2_stack.add_band(
+        vi_unc_file = Path(record.filename_unc)
+        collection.add_band(
             band_constructor=Band.from_rasterio,
-            fpath_raster=Path(record.filename_unc),
-            band_name_src='abs_stddev',
-            vector_features=in_file_aoi,
+            fpath_raster=vi_unc_file,
+            band_idx=4,
+            vector_features=parcels,
             band_name_dst=f'{vi_name}_unc'
         )
 
-        # mask clouds, shadows, cirrus, dark area and unclassified pixels using the
-        # information in the scene classification layer
-        s2_stack.mask_clouds_and_shadows(
-            bands_to_mask=[vi_name, f'{vi_name}_unc'],
-            cloud_classes=scl_mask_values
+        # read S2 blue and red bands plus SCL file to mask out clouds and shadows
+        scl_file = next(
+            Path(record.filename_bandstack).parent.rglob('scene_classification/*.tiff')
         )
+        collection.add_band(
+            band_constructor=Band.from_rasterio,
+            fpath_raster=scl_file,
+            band_idx=1,
+            band_name_dst='SCL',
+            vector_features=parcels
+        )
+        collection.add_band(
+            band_constructor=Band.from_rasterio,
+            fpath_raster=Path(record.filename_bandstack),
+            band_idx=1,
+            band_name_dst='blue',
+            vector_features=parcels,
+        )
+        collection.add_band(
+            band_constructor=Band.from_rasterio,
+            fpath_raster=Path(record.filename_bandstack),
+            band_idx=3,
+            band_name_dst='red',
+            vector_features=parcels,
+        )
+        # add crop codes
+        collection.add_band(
+            band_constructor=Band.from_vector,
+            vector_features=parcels,
+            geo_info=collection[vi_name].geo_info,
+            band_name_src='crop_code',
+            band_name_dst='crop_code',
+            snap_bounds=collection[vi_name].bounds
+        )
+        collection.mask(
+            mask=collection[vi_name].values.mask,
+            bands_to_mask=['crop_code'],
+            inplace=True
+        )
+        # mask clouds, shadows and snow
+        collection.mask_clouds_and_shadows(
+            bands_to_mask=collection.band_names,
+            cloud_classes=[1,2,3,6,7,8,9,10,11],
+            inplace=True
+        )
+        cloud_coverage = collection.get_cloudy_pixel_percentage(cloud_classes=[1,2,3,6,7,8,9,10,11])
 
         # save masked files to disk (thus, the reference run will also have the correct
         # input)
         vi_masked = record.filename_veg_par
         vi_masked = Path(vi_masked.replace('.tif', '_scl-filtered.tif'))
-        s2_stack.to_rasterio(
+        collection.to_rasterio(
             fpath_raster=vi_masked,
             band_selection=[vi_name]
         )
         vi_unc_masked = record.filename_unc
         vi_unc_masked = Path(vi_unc_masked.replace('.tif', '_scl-filtered.tif'))
-        s2_stack.to_rasterio(
+        collection.to_rasterio(
             fpath_raster=vi_unc_masked,
             band_selection=[f'{vi_name}_unc']
         )
+        ts_stack_dict[record.date] = collection
 
         update_list.append({
             'date': record.date,
@@ -239,18 +272,9 @@ def extract_uncertainty_crops(
         _date = record.date
         scene_handler = deepcopy(ts_stack_dict[_date])
 
-        scene_handler.add_band(
-            band_constructor=Band.from_vector,
-            vector_features=sample_polygons,
-            geo_info=scene_handler['blue'].geo_info,
-            band_name_src='crop_code',
-            band_name_dst='crop_code',
-            snap_bounds=scene_handler['blue'].bounds
-        )
-
         # convert to geodataframe and save them as CSVs (backup)
         gdf = scene_handler.to_dataframe()
-        # drop NaNs
+        # drop NaNs (occur because NDVI was filtered)
         gdf = gdf.dropna()
         gdf['date'] = record.date
         gdf_list.append(gdf)
@@ -258,7 +282,7 @@ def extract_uncertainty_crops(
         fname_csv = out_dir.joinpath(f'{vi_name}_{idx+1}_crops.csv')
         scene_handler = None
         gdf.to_csv(fname_csv, index=False)
-        
+
         logger.info(f'Read scene data from {_date} ({idx+1}/{file_df.shape[0]})')
 
     # concat dataframes
@@ -279,8 +303,8 @@ def extract_uncertainty_crops(
         crop_gdf = gdf[gdf.crop_code == crop_code].copy()
 
         # add relative uncertainty by computing the ratio between the absolute uncertainty
-        # and the original index value
-        crop_gdf[f'{vi_name}_rel_unc'] = crop_gdf[vi_name] / crop_gdf[f'{vi_name}_unc']
+        # and the original index value (multiplied by 100 to get % relative uncertainty)
+        crop_gdf[f'{vi_name}_rel_unc'] =  crop_gdf[f'{vi_name}_unc'] / crop_gdf[vi_name] * 100
 
         # aggregate by date
         # TODO: test if that works
@@ -288,15 +312,16 @@ def extract_uncertainty_crops(
         crop_gdf_grouped = crop_gdf[col_selection].groupby('date').agg(
             ['mean', 'min', 'max', 'std', percentile(5), percentile(95)]
         )
+        crop_gdf_grouped['date'] = pd.to_datetime(crop_gdf_grouped.index)
 
         # plot
-        fig, (ax1, ax2, ax3) = plt.subplots(3, sharex=True, figsize=(20,10))
+        fig, (ax1, ax2, ax3) = plt.subplots(3, sharex=True, figsize=(24,12))
 
         # plot original time series showing spread between pixels (not scenarios!)
-        ax1.plot(crop_gdf_grouped[vi_name, 'mean'], color='blue', linewidth=3)
+        ax1.plot(crop_gdf_grouped.date, crop_gdf_grouped[vi_name, 'mean'], color='blue', linewidth=3)
         # TODO: test plot central 90% of values
         ax1.fill_between(
-            x=crop_gdf_grouped.index,
+            x=crop_gdf_grouped.date,
             y1=crop_gdf_grouped[vi_name, 'percentile_5'],
             y2=crop_gdf_grouped[vi_name, 'percentile_95'],
             color='orange',
@@ -637,7 +662,6 @@ def vegetation_time_series_scenarios(
 def main(
         vi_dir: Path,
         uncertainty_analysis_dir: Path,
-        in_file_aoi: Path,
         out_dir_scenarios: Path,
         out_dir_plots: Path,
         n_scenarios: int,
@@ -667,19 +691,19 @@ def main(
     file_df, ts_stack_dict = read_data_and_uncertainty(
         data_df=data_df,
         vi_name=vi_name,
-        in_file_aoi=in_file_aoi
+        parcels=sample_polygons
     )
 
     # check uncertainty in different crop types over time
-    # extract_uncertainty_crops(
-    #     file_df=file_df,
-    #     ts_stack_dict=ts_stack_dict,
-    #     sample_polygons=sample_polygons,
-    #     out_dir=out_dir_scenarios,
-    #     vi_name=vi_name,
-    #     ymin=ymin,
-    #     ymax=ymax
-    # )
+    extract_uncertainty_crops(
+        file_df=file_df,
+        ts_stack_dict=ts_stack_dict,
+        sample_polygons=sample_polygons,
+        out_dir=out_dir_scenarios,
+        vi_name=vi_name,
+        ymin=ymin,
+        ymax=ymax
+    )
 
     # actual phenological metrics scenarios
     vegetation_time_series_scenarios(
@@ -695,20 +719,13 @@ def main(
 if __name__ == '__main__':
     # original Sentinel-2 scenes with vegetation indices
     vi_dir = Path(
-        '../S2A_MSIL1C_orig/*.VIs'
+        # '../S2A_MSIL1C_orig/*.VIs'
+        '/home/graflu/Documents/uncertainty/S2_MSIL1C_orig/*.VIs'
     )
     
     # directory with uncertainty analysis results
     uncertainty_analysis_dir = Path(
-        '../S2A_MSIL2A_Analysis/150_scenarios'
-    )
-    # uncertainty_analysis_dir = Path(
-    #     '../S2A_MSIL2A_Analysis'
-    # )
-
-    # extent of study area
-    in_file_aoi = Path(
-        '../shp/AOI_Esch_EPSG32632.shp'
+        '../S2_MSIL2A_Analysis'
     )
 
     # define sample polygons (for visualizing the uncertainty per crop type over time)
@@ -718,9 +735,9 @@ if __name__ == '__main__':
     sample_points = Path('../shp/ZH_Points_2019_EPSG32632_selected-crops.shp')
 
     # vegetation index to consider
-    vi_names = ['NDVI','EVI']
-    ymins = {'NDVI': 0, 'EVI': 0}
-    ymaxs = {'NDVI': 1, 'EVI': 1}
+    vi_names = ['NDVI','EVI', 'GLAI']
+    ymins = {'NDVI': 0, 'EVI': 0, 'GLAI': 0}
+    ymaxs = {'NDVI': 1, 'EVI': 1, 'GLAI': 7}
 
     # directory where to save phenological metrics to
     out_dir_scenarios = Path(f'../S2_TimeSeries_Analysis')
@@ -733,7 +750,7 @@ if __name__ == '__main__':
         out_dir_plots.mkdir()
     
     # number of scenarios to generate
-    n_scenarios = 2 # 1000
+    n_scenarios = 1000
 
     for vi_name in vi_names:
 
@@ -744,7 +761,6 @@ if __name__ == '__main__':
         main(
             vi_dir=vi_dir,
             uncertainty_analysis_dir=uncertainty_analysis_dir,
-            in_file_aoi=in_file_aoi,
             out_dir_scenarios=out_dir_scenarios_vi,
             out_dir_plots=out_dir_plots,
             n_scenarios=n_scenarios,

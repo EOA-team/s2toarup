@@ -13,6 +13,7 @@ EVI are calculated as well; these serve as reference to the scenario runs.
 
 import cv2
 import glob
+import matplotlib.pyplot as plt
 
 from pathlib import Path
 from agrisatpy.operational.resampling.sentinel2.resample_and_stack import _get_output_file_names
@@ -65,7 +66,6 @@ def main(
                     vector_features=shapefile_study_area,
                     read_scl=False
                 )
-                handler.scale(inplace=True)
                 # calculate the spectral indices
                 # define output directory
                 vis_dir = out_dir.joinpath('Vegetation_Indices')
@@ -128,16 +128,17 @@ def resample_and_stack_orig_data(
         out_dir.mkdir(exist_ok=True)
 
         # read dataset from .SAFE for the extent of the study area
-        handler = Sentinel2()
-        handler.from_safe(
+        handler = Sentinel2().from_safe(
             in_dir=Path(orig_dataset), 
-            vector_features=shapefile_study_area
+            vector_features=shapefile_study_area,
+            apply_scaling=False
         )
 
         # resample the bands to 10m using nearest neighbor interpolation
         handler.resample(
             target_resolution=10.,
-            resampling_method=cv2.INTER_NEAREST_EXACT
+            interpolation_method=cv2.INTER_NEAREST_EXACT,
+            inplace=True
         )
 
         fnames = _get_output_file_names(
@@ -152,12 +153,14 @@ def resample_and_stack_orig_data(
         rgb_dir.mkdir(exist_ok=True)
         fname_rgb = rgb_dir.joinpath(fnames['rgb_preview'])
         fig_rgb.savefig(fname=fname_rgb, dpi=300, bbox_inches='tight')
+        plt.close(fig_rgb)
 
         fig_scl = handler.plot_scl()
         scl_dir = out_dir.joinpath('scene_classification')
         scl_dir.mkdir(exist_ok=True)
         fname_scl_preview = scl_dir.joinpath(fnames['scl_preview'])
         fig_scl.savefig(fname=fname_scl_preview, dpi=300, bbox_inches='tight')
+        plt.close(fig_scl)
 
         # save rasters (spectral bands, VIs, SCL)
         fname_bandstack = out_dir.joinpath(fnames['bandstack'])
@@ -181,7 +184,7 @@ def resample_and_stack_orig_data(
         vis_dir.mkdir(exist_ok=True)
 
         for vi_name in vi_names:
-            handler.calc_si(vi_name)
+            handler.calc_si(vi_name, inplace=True)
             vi_fname = vis_dir.joinpath(f'VI_{in_file.split(".")[0]}_{vi_name.upper()}.tif').as_posix()
             # save to raster
             handler.to_rasterio(
@@ -196,7 +199,7 @@ if __name__ == '__main__':
 
     scenario_dir = Path('../S2_MSIL1C_RUT-Scenarios')
     
-    shapefile_study_area = Path('../shp/AOI_Esch_EPSG32632.shp')
+    shapefile_study_area = Path('../shp/AOI_Esch_EPSG32632_crop-bounds.shp')
     
     # vegetation indices on scenarios
     batches = [idx for idx in range(1,6)]
@@ -207,9 +210,9 @@ if __name__ == '__main__':
         )
 
     # # original Sentinel-2 L2A data
-    # orig_l2a_data = Path('../S2A_MSIL1C_orig')
-    #
-    # # resample bandstacks and SCL for original datasets
+    orig_l2a_data = Path('/home/graflu/Documents/uncertainty/S2_MSIL1C_orig')
+    
+    # resample bandstacks and SCL for original datasets
     # resample_and_stack_orig_data(
     #     orig_datasets_dir=orig_l2a_data,
     #     shapefile_study_area=shapefile_study_area

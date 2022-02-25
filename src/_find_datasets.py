@@ -39,13 +39,13 @@ def get_data_and_uncertainty_files(
     # define search expressions
     # vegetation parameter/ index
     search_expression_bandstack = vi_dir.joinpath(
-        '*_pixel_division_10m.tiff'
+        '*_None_10m.jp2'
     )
     search_expr_veg_par = vi_dir.joinpath(
         Path('Vegetation_Indices').joinpath(f'VI_*None_10m_{vi_name.upper()}.tif')
     )
     search_expr_unc = uncertainty_analysis_dir.joinpath(
-        f'S2*/L3_{vi_name.upper()}_*32.tif'
+        f'S2*/L3_{vi_name.upper()}_*bounds.tif'
     )
 
     # get list of files

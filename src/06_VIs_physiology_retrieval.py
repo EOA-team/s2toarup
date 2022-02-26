@@ -64,7 +64,8 @@ def main(
                     in_dir=Path(scenario), 
                     band_selection=['B02','B04','B08'],
                     vector_features=shapefile_study_area,
-                    read_scl=False
+                    read_scl=False,
+                    apply_scaling=False
                 )
                 # calculate the spectral indices
                 # define output directory

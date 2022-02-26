@@ -134,7 +134,7 @@ def read_data_and_uncertainty(
             band_constructor=Band.from_rasterio,
             fpath_raster=vi_file,
             band_idx=1,
-            band_name_dst='NDVI',
+            band_name_dst=vi_name,
             vector_features=parcels
         )
         # read vegetation parameter/index absolute uncertainty band
@@ -293,13 +293,12 @@ def extract_uncertainty_crops(
     gdf_polys = gpd.read_file(sample_polygons)
 
     # loop over crop types and plot their VI curve and its uncertainty over time
-    crop_codes, pixel_counts = np.unique(gdf.crop_code, return_counts=True)
+    crop_codes = np.unique(gdf.crop_code)
 
-    for crop_code, pixel_count in list(zip(crop_codes, pixel_counts)):
+    for crop_code in crop_codes:
 
         # get crop name
         crop_name = gdf_polys[gdf_polys.crop_code == int(crop_code)]['crop_type'].iloc[0]
-
         crop_gdf = gdf[gdf.crop_code == crop_code].copy()
 
         # add relative uncertainty by computing the ratio between the absolute uncertainty
@@ -307,15 +306,15 @@ def extract_uncertainty_crops(
         crop_gdf[f'{vi_name}_rel_unc'] =  crop_gdf[f'{vi_name}_unc'] / crop_gdf[vi_name] * 100
 
         # aggregate by date
-        # TODO: test if that works
         col_selection = ['date', vi_name, f'{vi_name}_unc', f'{vi_name}_rel_unc']
         crop_gdf_grouped = crop_gdf[col_selection].groupby('date').agg(
-            ['mean', 'min', 'max', 'std', percentile(5), percentile(95)]
+            ['mean', 'min', 'max', 'std', percentile(5), percentile(95), 'count']
         )
         crop_gdf_grouped['date'] = pd.to_datetime(crop_gdf_grouped.index)
+        pixel_count = crop_gdf_grouped[vi_name , 'count'].max()
 
         # plot
-        fig, (ax1, ax2, ax3) = plt.subplots(3, sharex=True, figsize=(24,12))
+        fig, (ax1, ax2, ax3) = plt.subplots(3, sharex=True, figsize=(15,20))
 
         # plot original time series showing spread between pixels (not scenarios!)
         ax1.plot(crop_gdf_grouped.date, crop_gdf_grouped[vi_name, 'mean'], color='blue', linewidth=3)
@@ -383,7 +382,7 @@ def extract_uncertainty_crops(
         )
         ax3.set_ylabel(f'Relative Uncertainty [%]', fontsize=24)
        
-        ax3.legend(loc="lower center", bbox_to_anchor=(0.5, -0.5), fontsize=20, ncol=3)
+        ax3.legend(loc="lower center", bbox_to_anchor=(0.5, -0.3), fontsize=20, ncol=3)
 
         fig.suptitle(f'Time Series of {crop_name} (Pixels: {pixel_count})', fontsize=26)
         fname = f'{vi_name}_{crop_name}_all-pixel-timeseries.png'
@@ -663,10 +662,8 @@ def main(
         vi_dir: Path,
         uncertainty_analysis_dir: Path,
         out_dir_scenarios: Path,
-        out_dir_plots: Path,
         n_scenarios: int,
         vi_name: str,
-        sample_points: Path,
         sample_polygons: Path,
         ymin: float,
         ymax: float
@@ -706,14 +703,14 @@ def main(
     )
 
     # actual phenological metrics scenarios
-    vegetation_time_series_scenarios(
-        ts_stack_dict=ts_stack_dict,
-        file_df=file_df,
-        n_scenarios=n_scenarios,
-        out_dir_scenarios=out_dir_scenarios,
-        vi_name=vi_name,
-        sample_points=sample_points
-    )
+    # vegetation_time_series_scenarios(
+    #     ts_stack_dict=ts_stack_dict,
+    #     file_df=file_df,
+    #     n_scenarios=n_scenarios,
+    #     out_dir_scenarios=out_dir_scenarios,
+    #     vi_name=vi_name,
+    #     sample_points=sample_points
+    # )
 
 
 if __name__ == '__main__':
@@ -744,11 +741,6 @@ if __name__ == '__main__':
     if not out_dir_scenarios.exists():
         out_dir_scenarios.mkdir()
 
-    # directory where to save plots to
-    out_dir_plots = uncertainty_analysis_dir.joinpath('scene_quicklooks')
-    if not out_dir_plots.exists():
-        out_dir_plots.mkdir()
-    
     # number of scenarios to generate
     n_scenarios = 1000
 
@@ -762,10 +754,8 @@ if __name__ == '__main__':
             vi_dir=vi_dir,
             uncertainty_analysis_dir=uncertainty_analysis_dir,
             out_dir_scenarios=out_dir_scenarios_vi,
-            out_dir_plots=out_dir_plots,
             n_scenarios=n_scenarios,
             vi_name=vi_name,
-            sample_points=sample_points,
             sample_polygons=sample_polygons,
             ymin=ymins[vi_name],
             ymax=ymaxs[vi_name]

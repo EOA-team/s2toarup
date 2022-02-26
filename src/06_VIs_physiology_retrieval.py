@@ -64,8 +64,7 @@ def main(
                     in_dir=Path(scenario), 
                     band_selection=['B02','B04','B08'],
                     vector_features=shapefile_study_area,
-                    read_scl=False,
-                    apply_scaling=False
+                    read_scl=False
                 )
                 # calculate the spectral indices
                 # define output directory
@@ -213,7 +212,7 @@ if __name__ == '__main__':
     orig_l2a_data = Path('/home/graflu/Documents/uncertainty/S2_MSIL1C_orig')
     
     # resample bandstacks and SCL for original datasets
-    # resample_and_stack_orig_data(
-    #     orig_datasets_dir=orig_l2a_data,
-    #     shapefile_study_area=shapefile_study_area
-    # )
+    resample_and_stack_orig_data(
+        orig_datasets_dir=orig_l2a_data,
+        shapefile_study_area=shapefile_study_area
+    )

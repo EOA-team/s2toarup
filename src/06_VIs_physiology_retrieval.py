@@ -130,8 +130,7 @@ def resample_and_stack_orig_data(
         # read dataset from .SAFE for the extent of the study area
         handler = Sentinel2().from_safe(
             in_dir=Path(orig_dataset), 
-            vector_features=shapefile_study_area,
-            apply_scaling=False
+            vector_features=shapefile_study_area
         )
 
         # resample the bands to 10m using nearest neighbor interpolation

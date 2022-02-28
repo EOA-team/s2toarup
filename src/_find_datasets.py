@@ -44,6 +44,8 @@ def get_data_and_uncertainty_files(
     search_expr_veg_par = vi_dir.joinpath(
         Path('Vegetation_Indices').joinpath(f'VI_*None_10m_{vi_name.upper()}.tif')
     )
+    if vi_name == 'GLAI':
+        vi_name = 'LAI'
     search_expr_unc = uncertainty_analysis_dir.joinpath(
         f'S2*/L3_{vi_name.upper()}_*bounds.tif'
     )

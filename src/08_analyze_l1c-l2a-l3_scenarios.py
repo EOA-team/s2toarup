@@ -1048,7 +1048,7 @@ if __name__ == '__main__':
     }
 
     # directory containing the raster realizations
-    for batch in range(1,4):
+    for batch in range(4,6):
         unc_scenario_dir_home = Path(
             f'../S2_MSIL1C_RUT-Scenarios/batch_{batch}'
         )

@@ -16,14 +16,12 @@ pixels and plots the uncertainty over time for all pixels of the crop types avai
 # TODO: implement full inter-scene correlation
 
 import glob
-import logging
 import matplotlib
 import pandas as pd
 import numpy as np
 import xarray as xr
 
 from pathlib import Path
-from datetime import datetime
 from datetime import date
 from typing import Tuple
 from typing import List
@@ -732,7 +730,7 @@ if __name__ == '__main__':
     sample_points = Path('../shp/ZH_Points_2019_EPSG32632_selected-crops.shp')
 
     # vegetation index to consider
-    vi_names = ['NDVI','EVI', 'GLAI']
+    vi_names = ['GLAI', 'NDVI','EVI']
     ymins = {'NDVI': 0, 'EVI': 0, 'GLAI': 0}
     ymaxs = {'NDVI': 1, 'EVI': 1, 'GLAI': 7}
 

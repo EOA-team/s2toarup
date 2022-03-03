@@ -25,8 +25,10 @@ from pathlib import Path
 from datetime import date
 from typing import Tuple
 from typing import List
+from typing import Optional
 from typing import Dict
 from copy import deepcopy
+from scipy.stats import truncnorm
 import geopandas as gpd
 import matplotlib.pyplot as plt
 
@@ -156,20 +158,20 @@ def read_data_and_uncertainty(
             band_name_dst='SCL',
             vector_features=parcels
         )
-        collection.add_band(
-            band_constructor=Band.from_rasterio,
-            fpath_raster=Path(record.filename_bandstack),
-            band_idx=1,
-            band_name_dst='blue',
-            vector_features=parcels,
-        )
-        collection.add_band(
-            band_constructor=Band.from_rasterio,
-            fpath_raster=Path(record.filename_bandstack),
-            band_idx=3,
-            band_name_dst='red',
-            vector_features=parcels,
-        )
+        # collection.add_band(
+        #     band_constructor=Band.from_rasterio,
+        #     fpath_raster=Path(record.filename_bandstack),
+        #     band_idx=1,
+        #     band_name_dst='blue',
+        #     vector_features=parcels,
+        # )
+        # collection.add_band(
+        #     band_constructor=Band.from_rasterio,
+        #     fpath_raster=Path(record.filename_bandstack),
+        #     band_idx=3,
+        #     band_name_dst='red',
+        #     vector_features=parcels,
+        # )
         # add crop codes
         collection.add_band(
             band_constructor=Band.from_vector,
@@ -438,7 +440,10 @@ def vegetation_time_series_scenarios(
         n_scenarios: int,
         out_dir_scenarios: Path,
         vi_name: str,
-        sample_points: Path
+        sample_points: Path,
+        minval: float,
+        maxval: float,
+        fully_correlated: Optional[bool] = False
     ) -> None:
     """
     Generates the vegetation time series scenarios applying the uncertainty
@@ -470,20 +475,27 @@ def vegetation_time_series_scenarios(
     :param sample_points:
         shapefile with points to use for time series pixels samples. The extracted
         time series are plotted and saved to a sub-directory called 'pixel_plots'
+    :param minval:
+        minimum allowed parameter value
+    :param maxval:
+        maximum allowed parameter value
+    :param fully_correlated:
+        if False assumes that the single scenes are complete uncorrelated (def); if True
+        assumes that the scenes are fully correlated
     """
 
     # get coordinates for xarray dataset
-    coords = ts_stack_dict[list(ts_stack_dict.keys())[0]].get_coordinates(vi_name)
+    coords = ts_stack_dict[list(ts_stack_dict.keys())[0]][vi_name].coordinates
     dates = ts_stack_dict.keys()
     dates_np = [np.datetime64(x) for x in dates]
     coords.update({'time': dates_np})
 
     # add stack atttributes for xarray dataset
     attrs = {}
-    crs = ts_stack_dict[list(ts_stack_dict.keys())[0]].geo_info.crs
+    crs = ts_stack_dict[list(ts_stack_dict.keys())[0]][vi_name].crs
     attrs['crs'] = crs
     attrs['transform'] = tuple(
-        ts_stack_dict[list(ts_stack_dict.keys())[0]].geo_info.as_affine()
+        ts_stack_dict[list(ts_stack_dict.keys())[0]][vi_name].geo_info.as_affine()
     )
 
     # calculate the x and y array indices required to extract the pixel values
@@ -517,8 +529,8 @@ def vegetation_time_series_scenarios(
         sample_list = []
         gdf_list = []
         for _date in list(dates):
-            vi_data = ts_stack_dict[_date].get_values(vi_name)
-            vi_unc = ts_stack_dict[_date].get_values(f'{vi_name}_unc')
+            vi_data = ts_stack_dict[_date].get_values([vi_name])
+            vi_unc = ts_stack_dict[_date].get_values([f'{vi_name}_unc'])
 
             # sample the test points
             # sample original pixel (SCL classes have been masked) values only in first scenario run
@@ -527,7 +539,8 @@ def vegetation_time_series_scenarios(
                 vegpar_file = file_df[file_df.date == _date]['filename_veg_par_scl'].iloc[0]
                 gdf_sample_data = RasterCollection.read_pixels(
                     vector_features=sample_points,
-                    fpath_raster=vegpar_file
+                    fpath_raster=vegpar_file,
+                    band_names_src=[vi_name]
                 )
                 colnames = list(gdf_sample_data.columns)
                 if None in colnames:
@@ -565,22 +578,28 @@ def vegetation_time_series_scenarios(
             # get samples from uncertainty distribution and add it to the vi_data
             # (can be done directly because we deal with absolute uncertainties)
             # TODO: implement also fully correlated case here
-            samples = np.random.normal(
-                loc=0,
-                scale=vi_unc,
-                size=vi_data.shape
-            )
-            samples += vi_data
+            if fully_correlated:
+                pass
+            else:
+                samples = np.random.normal(
+                    loc=0,
+                    scale=vi_unc[0,:,:],
+                    size=vi_data.shape[1::]
+                )
+                
+            samples += vi_data[0,:,:]
+            samples[samples < minval] = minval
+            samples[samples > maxval] = maxval
             sample_list.append(samples)
 
         # create the 3d numpy array to pass as xarray dataset
-        stack = {'veg_index': tuple([('y','x','time'), np.dstack(sample_list)])}
+        stack = {'veg_index': tuple([('time', 'y','x'), np.stack(sample_list)])}
 
         # create stack for the reference run and the pixel time series of the reference
         # data (do it in the first iteration only to avoid overwritten the data again and
         # again)
         if scenario == 0:
-            orig_stack = {'veg_index': tuple([('y','x','time'), np.dstack(orig_ts_list)])}
+            orig_stack = {'veg_index': tuple([('time', 'y','x'), np.stack(orig_ts_list)])}
             gdf = pd.concat(gdf_list)
 
         # construct xarray dataset for the scenario run
@@ -711,7 +730,8 @@ def main(
         vi_name: str,
         sample_polygons: Path,
         ymin: float,
-        ymax: float
+        ymax: float,
+        fully_correlated: Optional[bool] = False
     ):
     """
     main executable function of this module generating the scenarios for the
@@ -730,11 +750,11 @@ def main(
     )
 
     # read the data and mask clouds, shadows, and unclassified pixels based on SCL information
-    # file_df, ts_stack_dict = read_data_and_uncertainty(
-    #     data_df=data_df,
-    #     vi_name=vi_name,
-    #     parcels=sample_polygons
-    # )
+    file_df, ts_stack_dict = read_data_and_uncertainty(
+        data_df=data_df,
+        vi_name=vi_name,
+        parcels=sample_polygons
+    )
     #
     # # check uncertainty in different crop types over time
     # extract_uncertainty_crops(
@@ -744,27 +764,33 @@ def main(
     #     vi_name=vi_name,
     # )
 
-    # visualize it
-    fname_csv = out_dir_scenarios.joinpath(
-        f'{vi_name}_crops.csv'
-    )
-    plot_uncertainty_tim_series(
-        sample_polygons=sample_polygons,
-        vi_data_fpath=fname_csv,
-        out_dir=out_dir_scenarios,
-        ymin=ymin,
-        ymax=ymax
-    )
+    # # visualize it
+    # fname_csv = out_dir_scenarios.joinpath(
+    #     f'{vi_name}_crops.csv'
+    # )
+    # plot_uncertainty_tim_series(
+    #     sample_polygons=sample_polygons,
+    #     vi_data_fpath=fname_csv,
+    #     out_dir=out_dir_scenarios,
+    #     ymin=ymin,
+    #     ymax=ymax
+    # )
 
     # actual phenological metrics scenarios
-    # vegetation_time_series_scenarios(
-    #     ts_stack_dict=ts_stack_dict,
-    #     file_df=file_df,
-    #     n_scenarios=n_scenarios,
-    #     out_dir_scenarios=out_dir_scenarios,
-    #     vi_name=vi_name,
-    #     sample_points=sample_points
-    # )
+    if fully_correlated:
+        out_dir_scenarios_c = out_dir_scenarios.joinpath('correlated')
+    else:
+        out_dir_scenarios_c = out_dir_scenarios.joinpath('uncorrelated')
+    vegetation_time_series_scenarios(
+        ts_stack_dict=ts_stack_dict,
+        file_df=file_df,
+        n_scenarios=n_scenarios,
+        out_dir_scenarios=out_dir_scenarios_c,
+        vi_name=vi_name,
+        sample_points=sample_points,
+        minval=ymin,
+        maxval=ymax
+    )
 
 
 if __name__ == '__main__':

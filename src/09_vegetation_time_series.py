@@ -480,9 +480,11 @@ def vegetation_time_series_scenarios(
 
     # add stack atttributes for xarray dataset
     attrs = {}
-    crs = ts_stack_dict[list(ts_stack_dict.keys())[0]].get_epsg(vi_name)
+    crs = ts_stack_dict[list(ts_stack_dict.keys())[0]].geo_info.crs
     attrs['crs'] = crs
-    attrs['transform'] = tuple(ts_stack_dict[list(ts_stack_dict.keys())[0]].get_meta(vi_name)['transform'])
+    attrs['transform'] = tuple(
+        ts_stack_dict[list(ts_stack_dict.keys())[0]].geo_info.as_affine()
+    )
 
     # calculate the x and y array indices required to extract the pixel values
     # at the sample locations from the array holding the smoothed vegetation
@@ -515,8 +517,8 @@ def vegetation_time_series_scenarios(
         sample_list = []
         gdf_list = []
         for _date in list(dates):
-            vi_data = ts_stack_dict[_date].get_band(vi_name).data
-            vi_unc = ts_stack_dict[_date].get_band(f'{vi_name}_unc').data
+            vi_data = ts_stack_dict[_date].get_values(vi_name)
+            vi_unc = ts_stack_dict[_date].get_values(f'{vi_name}_unc')
 
             # sample the test points
             # sample original pixel (SCL classes have been masked) values only in first scenario run
@@ -649,15 +651,16 @@ def vegetation_time_series_scenarios(
 
         for pheno_metric in pheno_metrics:
             pheno_handler.add_band(
+                band_constructor=Band,
                 band_name=pheno_metric,
-                band_data=eval(f'pheno_ds.{pheno_metric}.data'),
-                snap_band=vi_name
+                values=eval(f'pheno_ds.{pheno_metric}.data'),
+                geo_info=pheno_handler[vi_name].geo_info
             )
 
         # remove "template" files
         bands_to_drop = [vi_name, f'{vi_name}_unc']
         for band_to_drop in bands_to_drop:
-            pheno_handler.drop_band(band_to_drop)
+            pheno_handler.drop_band(band_to_drop, inplace=True)
 
         # save to geoTiff
         pheno_handler.write_bands(out_file)

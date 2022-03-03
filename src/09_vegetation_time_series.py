@@ -231,16 +231,13 @@ def percentile(n):
 def extract_uncertainty_crops(
         ts_stack_dict: Dict[date, RasterCollection],
         file_df: pd.DataFrame,
-        sample_polygons: Path,
         vi_name: str,
         out_dir: Path,
-        ymin: float,
-        ymax: float
     ) -> None:
     """
     Extracts the uncertainty information for the field parcel polygons alongside
-    the time series of the vegetation index/parameter. The data is visualized as
-    time series plot and saved to CSV file as backup.
+    the time series of the vegetation index/parameter. The data is saved to CSV file
+    as backup.
 
     :param ts_stack_dict:
         dictionary with ``RasterCollection`` instances holding the vegetation parameter
@@ -248,13 +245,10 @@ def extract_uncertainty_crops(
     :param file_df:
         pandas dataframe with links to the original files (parameter values + uncertainty)
         for carrying out the reference run
-    :param sample_polygons:
-        polygon features with crop type information. The time series are generated per
-        crop type, i.e., there will be as many plots as crop types.
     :param vi_name:
         name of the vegetation index/ parameter to process
     :param out_dir:
-        directory where to save the plots (*.png) and CSV files to
+        directory where to save the CSV files to
     :param ymin:
         minimum y value to be used for plotting the vegetation index/parameter values
     :param ymax:
@@ -287,10 +281,34 @@ def extract_uncertainty_crops(
     gdf = pd.concat(gdf_list)
     gdf.to_csv(out_dir.joinpath(f'{vi_name}_crops.csv'), index=False)
 
+def plot_uncertainty_tim_series(
+        sample_polygons: Path,
+        vi_data_fpath: Path,
+        out_dir: Path,
+        ymin: float,
+        ymax: float
+    ):
+    """
+    Plots the VI and its uncertainty
+
+    :param sample_polygon:
+        shapefile with field parcel polygons
+    :param vi_data_fpath:
+        path to the CSV file with extracted VI data for the different crop types
+        and field parcels
+    :param out_dir:
+        directory where to save the CSV files to
+    :param ymin:
+        minimum y value to be used for plotting the vegetation index/parameter values
+    :param ymax:
+        maximum y value to be used for plotting the vegetation index/parameter values
+    """
+
     # add crop name from original shape file
     gdf_polys = gpd.read_file(sample_polygons)
 
     # loop over crop types and plot their VI curve and its uncertainty over time
+    gdf = pd.read_csv(vi_data_fpath)
     crop_codes = np.unique(gdf.crop_code)
 
     for crop_code in crop_codes:
@@ -316,7 +334,7 @@ def extract_uncertainty_crops(
 
         # plot original time series showing spread between pixels (not scenarios!)
         ax1.plot(crop_gdf_grouped.date, crop_gdf_grouped[vi_name, 'mean'], color='blue', linewidth=3)
-        # TODO: test plot central 90% of values
+        # central 90% of values
         ax1.fill_between(
             x=crop_gdf_grouped.date,
             y1=crop_gdf_grouped[vi_name, 'percentile_5'],
@@ -324,10 +342,17 @@ def extract_uncertainty_crops(
             color='orange',
             alpha=0.4
         )
+        # standard deviation around the mean.
+        y1 = crop_gdf_grouped[vi_name, 'mean'] - crop_gdf_grouped[vi_name, 'std']
+        # standard deviations smaller ymin are not possible
+        y1[y1 < ymin] = ymin
+        y2 = crop_gdf_grouped[vi_name, 'mean'] + crop_gdf_grouped[vi_name, 'std']
+        # standard deviations larger then ymax are not possible
+        y2[y2 > ymax] = ymax
         ax1.fill_between(
             x=crop_gdf_grouped.index,
-            y1=crop_gdf_grouped[vi_name, 'mean']-crop_gdf_grouped[vi_name, 'std'],
-            y2=crop_gdf_grouped[vi_name, 'mean']+crop_gdf_grouped[vi_name, 'std'],
+            y1=y1,
+            y2=y2,
             color='red',
             alpha=0.45
         )
@@ -335,9 +360,9 @@ def extract_uncertainty_crops(
         ax1.set_ylabel(f'{vi_name} [-]', fontsize=24)
         ax1.set_ylim(ymin, ymax)
 
-        # plot uncertainties
+        # plot uncertainties (absolute)
         unc_name = vi_name + '_unc'
-        ax2.plot(crop_gdf_grouped[unc_name, 'mean'], label='Mean', color='blue', linewidth=3)
+        ax2.plot(crop_gdf_grouped.date, crop_gdf_grouped[unc_name, 'mean'], label='Mean', color='blue', linewidth=3)
         ax2.fill_between(
             x=crop_gdf_grouped.index,
             y1=crop_gdf_grouped[unc_name, 'percentile_5'],
@@ -346,11 +371,16 @@ def extract_uncertainty_crops(
             alpha=0.4
         )
 
-        # absolute uncertainties
+        # standard deviation around the mean. Values below ymin are not possible
+        y1 = crop_gdf_grouped[unc_name, 'mean'] - crop_gdf_grouped[unc_name, 'std']
+        y1[y1 < ymin] = ymin
+        # the same applies to the upper bound
+        y2 = crop_gdf_grouped[unc_name, 'mean'] + crop_gdf_grouped[unc_name, 'std']
+        y2[y2 > ymax] = ymax
         ax2.fill_between(
             x=crop_gdf_grouped.index,
-            y1=crop_gdf_grouped[unc_name, 'mean']-crop_gdf_grouped[unc_name, 'std'],
-            y2=crop_gdf_grouped[unc_name, 'mean']+crop_gdf_grouped[unc_name, 'std'],
+            y1=y1,
+            y2=y2,
             color='red',
             alpha=0.45
         )
@@ -359,7 +389,7 @@ def extract_uncertainty_crops(
 
         # relative uncertainties
         unc_name = vi_name + '_rel_unc'
-        ax3.plot(crop_gdf_grouped[unc_name, 'mean'], label='Mean', color='blue', linewidth=3)
+        ax3.plot(crop_gdf_grouped.date,crop_gdf_grouped[unc_name, 'mean'], label='Mean', color='blue', linewidth=3)
         ax3.fill_between(
             x=crop_gdf_grouped.index,
             y1=crop_gdf_grouped[unc_name, 'percentile_5'],
@@ -370,10 +400,14 @@ def extract_uncertainty_crops(
         )
 
         # absolute uncertainties
+        # negative values are not possible for relative uncertainties
+        y1 = crop_gdf_grouped[unc_name, 'mean']-crop_gdf_grouped[unc_name, 'std']
+        y1[y1 < 0] = 0
+        y2 = crop_gdf_grouped[unc_name, 'mean']+crop_gdf_grouped[unc_name, 'std']
         ax3.fill_between(
             x=crop_gdf_grouped.index,
-            y1=crop_gdf_grouped[unc_name, 'mean']-crop_gdf_grouped[unc_name, 'std'],
-            y2=crop_gdf_grouped[unc_name, 'mean']+crop_gdf_grouped[unc_name, 'std'],
+            y1=y1,
+            y2=y2,
             color='red',
             alpha=0.45,
             label=r'$\pm$ 1 Stddev'
@@ -387,6 +421,16 @@ def extract_uncertainty_crops(
         fig.savefig(out_dir.joinpath(fname), dpi=300, bbox_inches='tight')
         plt.close(fig)
 
+        # plot histograms of uncertainty values
+        fig = plt.figure(figsize=(7,7))
+        ax = fig.add_subplot(111)
+        crop_gdf[f'{vi_name}_unc'].hist(ax=ax, bins=100, density=True)
+        ax.set_title(f'{crop_name}', fontsize=20)
+        ax.set_xlabel(f'{vi_name} Absolute Uncertainty (k=1)', fontsize=24)
+        ax.set_ylabel('Relative Frequency [%]', fontsize=24)
+        fname = f'{vi_name}_{crop_name}_abs-unc-histogram.png'
+        fig.savefig(out_dir.joinpath(fname), dpi=300, bbox_inches='tight')
+        plt.close(fig)
 
 def vegetation_time_series_scenarios(
         ts_stack_dict: Dict[date, Sentinel2],
@@ -683,19 +727,28 @@ def main(
     )
 
     # read the data and mask clouds, shadows, and unclassified pixels based on SCL information
-    file_df, ts_stack_dict = read_data_and_uncertainty(
-        data_df=data_df,
-        vi_name=vi_name,
-        parcels=sample_polygons
-    )
+    # file_df, ts_stack_dict = read_data_and_uncertainty(
+    #     data_df=data_df,
+    #     vi_name=vi_name,
+    #     parcels=sample_polygons
+    # )
+    #
+    # # check uncertainty in different crop types over time
+    # extract_uncertainty_crops(
+    #     file_df=file_df,
+    #     ts_stack_dict=ts_stack_dict,
+    #     out_dir=out_dir_scenarios,
+    #     vi_name=vi_name,
+    # )
 
-    # check uncertainty in different crop types over time
-    extract_uncertainty_crops(
-        file_df=file_df,
-        ts_stack_dict=ts_stack_dict,
+    # visualize it
+    fname_csv = out_dir_scenarios.joinpath(
+        f'{vi_name}_crops.csv'
+    )
+    plot_uncertainty_tim_series(
         sample_polygons=sample_polygons,
+        vi_data_fpath=fname_csv,
         out_dir=out_dir_scenarios,
-        vi_name=vi_name,
         ymin=ymin,
         ymax=ymax
     )

@@ -202,11 +202,11 @@ if __name__ == '__main__':
     
     # vegetation indices on scenarios
     batches = [idx for idx in range(1,6)]
-    # for batch in batches:
-    #     main(
-    #         scenario_dir=scenario_dir.joinpath(f'batch_{batch}'),
-    #         shapefile_study_area=shapefile_study_area
-    #     )
+    for batch in batches:
+        main(
+            scenario_dir=scenario_dir.joinpath(f'batch_{batch}'),
+            shapefile_study_area=shapefile_study_area
+        )
 
     # # original Sentinel-2 L2A data
     orig_l2a_data = Path('/home/graflu/Documents/uncertainty/S2_MSIL1C_orig')

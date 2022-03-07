@@ -6,7 +6,6 @@ indices and functional canopy traits together with their uncertainty.
 import matplotlib
 import pandas as pd
 import numpy as np
-import xarray as xr
 
 from pathlib import Path
 from datetime import date
@@ -96,20 +95,20 @@ def read_data_and_uncertainty(
             band_name_dst='SCL',
             vector_features=parcels
         )
-        collection.add_band(
-            band_constructor=Band.from_rasterio,
-            fpath_raster=Path(record.filename_bandstack),
-            band_idx=1,
-            band_name_dst='blue',
-            vector_features=parcels,
-        )
-        collection.add_band(
-            band_constructor=Band.from_rasterio,
-            fpath_raster=Path(record.filename_bandstack),
-            band_idx=3,
-            band_name_dst='red',
-            vector_features=parcels,
-        )
+        # collection.add_band(
+        #     band_constructor=Band.from_rasterio,
+        #     fpath_raster=Path(record.filename_bandstack),
+        #     band_idx=1,
+        #     band_name_dst='blue',
+        #     vector_features=parcels,
+        # )
+        # collection.add_band(
+        #     band_constructor=Band.from_rasterio,
+        #     fpath_raster=Path(record.filename_bandstack),
+        #     band_idx=3,
+        #     band_name_dst='red',
+        #     vector_features=parcels,
+        # )
         # add crop codes
         collection.add_band(
             band_constructor=Band.from_vector,
@@ -451,9 +450,6 @@ if __name__ == '__main__':
     if not out_dir_scenarios.exists():
         out_dir_scenarios.mkdir()
 
-    # number of scenarios to generate
-    n_scenarios = 1000
-
     for vi_name in vi_names:
 
         out_dir_scenarios_vi = out_dir_scenarios.joinpath(vi_name)
@@ -464,7 +460,6 @@ if __name__ == '__main__':
             vi_dir=vi_dir,
             uncertainty_analysis_dir=uncertainty_analysis_dir,
             out_dir_scenarios=out_dir_scenarios_vi,
-            n_scenarios=n_scenarios,
             vi_name=vi_name,
             sample_polygons=sample_polygons,
             ymin=ymins[vi_name],

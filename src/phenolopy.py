@@ -222,36 +222,6 @@ from scipy.stats import zscore
 from scipy.signal import savgol_filter
 from scipy.ndimage import gaussian_filter
 from statsmodels.tsa.seasonal import STL as stl
-from typing import List
-
-def blue_filtering(ds):
-    """
-    Blue filtering to remove undetected clouds and haze based on the blue-filtering
-    approach proposed in the MAJA ATBD by Hagolle et al., (2017), used by Bolton et
-    al. (2020, https://doi.org/10.1016/j.rse.2020.111685) for continental phenology
-    extraction from Landsat-Sentinel2 High Resolution Data-set.
-
-    For the algorithm the blue and red band are required.
-    """
-    def _blue_filter(blue: np.ndarray, red: np.ndarray, dates: np.ndarray) -> List[np.ndarray]:
-        n_dates = dates.shape[0]
-        filters = []
-        for idx in range(1,n_dates):
-            blue_criterion = blue[idx,:,:] - blue[idx-1,:,:] > 0.03 * (1 + (dates[idx] - dates[idx-1]) / 30)
-            red_criterion = red[idx,:,:] - red[idx-1,:,:] > 1.5 * (blue[idx,:,:] - blue[idx-1,:,:])
-            # do not apply filter if blue and red criterion are True
-            blue_and_red = np.logical_and(blue_criterion, red_criterion)
-            blue_filter = np.logical_and(blue_criterion, ~blue_and_red)
-            filters.append(blue_filter)
-        return filters
-        
-    # calc mask of existing nan values (nan = True) in orig ds
-    ds_mask = xr.where(ds.isnull(), True, False)
-    # get blue and red band values from data-set
-    
-    # apply blue filter to veg_index entry
-    return ds
-    
 
 def remove_outliers(ds, method='median', user_factor=2, z_pval=0.05):
     """

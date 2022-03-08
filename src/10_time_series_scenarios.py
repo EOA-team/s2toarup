@@ -427,7 +427,7 @@ if __name__ == '__main__':
     ymaxs = {'NDVI': 1, 'EVI': 1, 'GLAI': 7}
 
     # number of scenarios to generate
-    n_scenarios = 2
+    n_scenarios = 1000
 
     # directory where to save phenological metrics to
     out_dir_scenarios = Path(f'../S2_TimeSeries_Analysis')

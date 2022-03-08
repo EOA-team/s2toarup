@@ -434,7 +434,7 @@ if __name__ == '__main__':
     if not out_dir_scenarios.exists():
         out_dir_scenarios.mkdir()
 
-    fully_correlated = [False, True]
+    fully_correlated = [False] # [False, True]
 
     for idx, vi_name in enumerate(vi_names):
 

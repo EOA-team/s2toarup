@@ -116,17 +116,17 @@ def vegetation_time_series_scenarios(
     """
 
     # get coordinates for xarray dataset
-    coords = ts_stack_dict[list(ts_stack_dict.keys())[0]].get_coordinates(vi_name)
+    coords = ts_stack_dict[list(ts_stack_dict.keys())[0]][vi_name].coordinates
     dates = ts_stack_dict.keys()
     dates_np = [np.datetime64(x) for x in dates]
     coords.update({'time': dates_np})
 
     # add stack atttributes for xarray dataset
     attrs = {}
-    crs = ts_stack_dict[list(ts_stack_dict.keys())[0]].geo_info.crs
+    crs = ts_stack_dict[list(ts_stack_dict.keys())[0]][vi_name].crs
     attrs['crs'] = crs
     attrs['transform'] = tuple(
-        ts_stack_dict[list(ts_stack_dict.keys())[0]].geo_info.as_affine()
+        ts_stack_dict[list(ts_stack_dict.keys())[0]][vi_name].geo_info.as_affine()
     )
 
     # calculate the x and y array indices required to extract the pixel values
@@ -160,8 +160,8 @@ def vegetation_time_series_scenarios(
         sample_list = []
         gdf_list = []
         for _date in list(dates):
-            vi_data = ts_stack_dict[_date].get_values(vi_name)
-            vi_unc = ts_stack_dict[_date].get_values(f'{vi_name}_unc')
+            vi_data = ts_stack_dict[_date][vi_name].values
+            vi_unc = ts_stack_dict[_date][f'{vi_name}_unc'].values
             # sample the test points
             # sample original pixel (SCL classes have been masked) values only in first scenario run
             if scenario == 0:
@@ -169,7 +169,8 @@ def vegetation_time_series_scenarios(
                 vegpar_file = file_df[file_df.date == _date]['filename_veg_par_scl'].iloc[0]
                 gdf_sample_data = RasterCollection.read_pixels(
                     vector_features=sample_points,
-                    fpath_raster=vegpar_file
+                    fpath_raster=vegpar_file,
+                    band_names_src=[vi_name]
                 )
                 colnames = list(gdf_sample_data.columns)
                 if None in colnames:
@@ -220,13 +221,13 @@ def vegetation_time_series_scenarios(
             sample_list.append(samples)
 
         # create the 3d numpy array to pass as xarray dataset
-        stack = {'veg_index': tuple([('y','x','time'), np.dstack(sample_list)])}
+        stack = {'veg_index': tuple([('time', 'y','x'), np.stack(sample_list)])}
 
         # create stack for the reference run and the pixel time series of the reference
         # data (do it in the first iteration only to avoid overwritten the data again and
         # again)
         if scenario == 0:
-            orig_stack = {'veg_index': tuple([('y','x','time'), np.dstack(orig_ts_list)])}
+            orig_stack = {'veg_index': tuple([('time','y','x'), np.stack(orig_ts_list)])}
             gdf = pd.concat(gdf_list)
 
         # construct xarray dataset for the scenario run
@@ -257,7 +258,7 @@ def vegetation_time_series_scenarios(
             gdf.loc[
                 (gdf.row == unique_point.row) & (gdf.col == unique_point.col) & (gdf.id == unique_point.id),
                 scenario_col
-            ] = ts_values[0,0,:]
+            ] = ts_values[:,0,0]
 
         # do the same for the reference run
         if scenario == 0:
@@ -281,7 +282,7 @@ def vegetation_time_series_scenarios(
                 gdf.loc[
                     (gdf.row == unique_point.row) & (gdf.col == unique_point.col) & (gdf.id == unique_point.id),
                     ref_col
-                ] = ts_values[0,0,:]
+                ] = ts_values[:,0,0]
 
         # save to raster files using the SatDataHandler object since it has the full geoinformation
         # available
@@ -306,10 +307,10 @@ def vegetation_time_series_scenarios(
         # remove "template" files
         bands_to_drop = [vi_name, f'{vi_name}_unc']
         for band_to_drop in bands_to_drop:
-            pheno_handler.drop_band(band_to_drop, inplace=True)
+            pheno_handler.drop_band(band_to_drop)
 
         # save to geoTiff
-        pheno_handler.write_bands(out_file)
+        pheno_handler.to_rasterio(out_file)
 
         # write original data
         if scenario == 0:
@@ -323,9 +324,10 @@ def vegetation_time_series_scenarios(
 
             for pheno_metric in pheno_metrics:
                 pheno_handler.add_band(
+                    band_constructor=Band,
                     band_name=pheno_metric,
-                    band_data=eval(f'pheno_ds_ref.{pheno_metric}.data'),
-                    snap_band=vi_name
+                    values=eval(f'pheno_ds_ref.{pheno_metric}.data'),
+                    geo_info=pheno_handler[vi_name].geo_info
                 )
 
             # remove "template" files
@@ -334,7 +336,7 @@ def vegetation_time_series_scenarios(
                 pheno_handler.drop_band(band_to_drop)
 
             # save to geoTiff
-            pheno_handler.write_bands(out_file)
+            pheno_handler.to_rasterio(out_file)
 
         logger.info(f'Finished scenario ({scenario+1}/{n_scenarios})')
 
@@ -346,6 +348,7 @@ def vegetation_time_series_scenarios(
     gdf['x'] = gdf.geometry.x
     gdf['y'] = gdf.geometry.y
     gdf.drop('geometry', axis=1, inplace=True)
+    gdf.dropna(inplace=True)
     gdf.to_csv(fname_csv, index=False)
 
 def main(
@@ -386,6 +389,8 @@ def main(
         out_dir_scenarios_c = out_dir_scenarios.joinpath('fully_correlated')
     else:
         out_dir_scenarios_c = out_dir_scenarios.joinpath('uncorrelated')
+    out_dir_scenarios_c.mkdir(exist_ok=True)
+
     vegetation_time_series_scenarios(
         ts_stack_dict=ts_stack_dict,
         file_df=file_df,
@@ -422,7 +427,7 @@ if __name__ == '__main__':
     ymaxs = {'NDVI': 1, 'EVI': 1, 'GLAI': 7}
 
     # number of scenarios to generate
-    n_scenarios = 100
+    n_scenarios = 2
 
     # directory where to save phenological metrics to
     out_dir_scenarios = Path(f'../S2_TimeSeries_Analysis')

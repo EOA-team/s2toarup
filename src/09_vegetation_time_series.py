@@ -9,20 +9,14 @@ import numpy as np
 
 from pathlib import Path
 from datetime import date
-from typing import Tuple
-from typing import List
 from typing import Dict
 from copy import deepcopy
 import geopandas as gpd
 import matplotlib.pyplot as plt
 
-from _find_datasets import get_data_and_uncertainty_files
-from agrisatpy.core.sensors import Sentinel2
+from _find_datasets import get_data_and_uncertainty_files, read_data_and_uncertainty
 from agrisatpy.core.raster import RasterCollection
-
 from logger import get_logger
-from agrisatpy.core.band import Band
-
 
 # setup logger -> will write log file to the /../log directory
 logger = get_logger('l4_phenology')
@@ -35,130 +29,6 @@ matplotlib.rc('ytick', labelsize=20)
 # see https://sentinels.copernicus.eu/web/sentinel/technical-guides/sentinel-2-msi/level-2a/algorithm
 # for a legend of the class labels
 scl_mask_values = [1,2,3,7,8,9,10,11]
-
-def read_data_and_uncertainty(
-        data_df: pd.DataFrame,
-        parcels: Path,
-        vi_name: str
-    ) -> Tuple[pd.DataFrame, List[Sentinel2]]:
-    """
-    This function reads the selected vegetation index (computed in step 7)
-    and the associated standard (absolute) uncertainty and stores the read
-    data as new columns in data_df.
-
-    :param data_df:
-        dataframe returned from ``get_data_and_uncertainty``
-    :param parcels:
-        shapefile defining the crop parcels
-    :param vi_name:
-        name of the vegetation index or parameter to process (e.g., NDVI)
-    :return:
-        input dataframe with read data + list of read vegetation data and
-        their absolute uncertainty per image acquisition date
-    """
-
-    # loop over datasets (single acquisition dates) and read the data
-    # (vegetation index/ parameter + standard uncertainty)
-    update_list = []
-    ts_stack_dict = {}
-
-    for _, record in data_df.iterrows():
-
-        # read VI data
-        vi_file = Path(record.filename_veg_par)
-        collection = Sentinel2()
-        collection.add_band(
-            band_constructor=Band.from_rasterio,
-            fpath_raster=vi_file,
-            band_idx=1,
-            band_name_dst=vi_name,
-            vector_features=parcels
-        )
-        # read vegetation parameter/index absolute uncertainty band
-        vi_unc_file = Path(record.filename_unc)
-        collection.add_band(
-            band_constructor=Band.from_rasterio,
-            fpath_raster=vi_unc_file,
-            band_idx=4,
-            vector_features=parcels,
-            band_name_dst=f'{vi_name}_unc'
-        )
-
-        # read S2 blue and red bands plus SCL file to mask out clouds and shadows
-        scl_file = next(
-            Path(record.filename_bandstack).parent.rglob('scene_classification/*.tiff')
-        )
-        collection.add_band(
-            band_constructor=Band.from_rasterio,
-            fpath_raster=scl_file,
-            band_idx=1,
-            band_name_dst='SCL',
-            vector_features=parcels
-        )
-        # collection.add_band(
-        #     band_constructor=Band.from_rasterio,
-        #     fpath_raster=Path(record.filename_bandstack),
-        #     band_idx=1,
-        #     band_name_dst='blue',
-        #     vector_features=parcels,
-        # )
-        # collection.add_band(
-        #     band_constructor=Band.from_rasterio,
-        #     fpath_raster=Path(record.filename_bandstack),
-        #     band_idx=3,
-        #     band_name_dst='red',
-        #     vector_features=parcels,
-        # )
-        # add crop codes
-        collection.add_band(
-            band_constructor=Band.from_vector,
-            vector_features=parcels,
-            geo_info=collection[vi_name].geo_info,
-            band_name_src='crop_code',
-            band_name_dst='crop_code',
-            snap_bounds=collection[vi_name].bounds
-        )
-        collection.mask(
-            mask=collection[vi_name].values.mask,
-            bands_to_mask=['crop_code'],
-            inplace=True
-        )
-        # mask clouds, shadows and snow
-        collection.mask_clouds_and_shadows(
-            bands_to_mask=collection.band_names,
-            cloud_classes=[1,2,3,6,7,8,9,10,11],
-            inplace=True
-        )
-        cloud_coverage = collection.get_cloudy_pixel_percentage(cloud_classes=[1,2,3,6,7,8,9,10,11])
-
-        # save masked files to disk (thus, the reference run will also have the correct
-        # input)
-        vi_masked = record.filename_veg_par
-        vi_masked = Path(vi_masked.replace('.tif', '_scl-filtered.tif'))
-        collection.to_rasterio(
-            fpath_raster=vi_masked,
-            band_selection=[vi_name]
-        )
-        vi_unc_masked = record.filename_unc
-        vi_unc_masked = Path(vi_unc_masked.replace('.tif', '_scl-filtered.tif'))
-        collection.to_rasterio(
-            fpath_raster=vi_unc_masked,
-            band_selection=[f'{vi_name}_unc']
-        )
-        ts_stack_dict[record.date] = collection
-
-        update_list.append({
-            'date': record.date,
-            'cloudy_pixel_percentage': cloud_coverage,
-            'filename_veg_par_scl': vi_masked,
-            'filename_unc_scl': vi_unc_masked
-        })
-
-    # added update columns to input data frame
-    update_df = pd.DataFrame(update_list)
-    merged = pd.merge(data_df, update_df, on='date')
-    return merged, ts_stack_dict
-
 
 def percentile(n):
     def percentile_(x):
@@ -370,7 +240,6 @@ def plot_uncertainty_tim_series(
         fname = f'{vi_name}_{crop_name}_abs-unc-histogram.png'
         fig.savefig(out_dir.joinpath(fname), dpi=300, bbox_inches='tight')
         plt.close(fig)
-
 
 def main(
         vi_dir: Path,

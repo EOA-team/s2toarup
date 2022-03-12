@@ -205,16 +205,20 @@ def vegetation_time_series_scenarios(
 
             # get samples from uncertainty distribution and add it to the vi_data
             # (can be done directly because we deal with absolute uncertainties)
-            # TODO: implement also fully correlated case here
+            # two extreme cases are possible:
+            # - full inter-scene correlation
+            # - no inter-scene correlation
+            # (the "truth" most likely lies somewhere in between)
             if fully_correlated:
-                pass
+                samples = np.ones(shape=vi_data.shape) * vi_unc
+                samples = np.random.normal(0, 1, 1)[0] * samples
             else:
                 samples = np.random.normal(
                     loc=0,
                     scale=vi_unc,
                     size=vi_data.shape
                 )
-                samples += vi_data
+            samples += vi_data
             # constrain samples to min and max of the parameter
             samples[samples > max_val] = max_val
             samples[samples < min_val] = min_val
@@ -422,7 +426,7 @@ if __name__ == '__main__':
     sample_points = Path('../shp/ZH_Points_2019_EPSG32632_selected-crops.shp')
 
     # vegetation index to consider
-    vi_names = ['EVI'] # ['GLAI', 'NDVI','EVI']
+    vi_names = ['GLAI', 'NDVI','EVI']
     ymins = {'NDVI': -1, 'EVI': -1, 'GLAI': 0}
     ymaxs = {'NDVI': 1, 'EVI': 1, 'GLAI': 7}
 
@@ -434,7 +438,7 @@ if __name__ == '__main__':
     if not out_dir_scenarios.exists():
         out_dir_scenarios.mkdir()
 
-    fully_correlated = [False] # [False, True]
+    fully_correlated = [True] # [False, True]
 
     for idx, vi_name in enumerate(vi_names):
 

@@ -422,7 +422,7 @@ if __name__ == '__main__':
     sample_points = Path('../shp/ZH_Points_2019_EPSG32632_selected-crops.shp')
 
     # vegetation index to consider
-    vi_names = ['GLAI', 'NDVI','EVI']
+    vi_names = ['EVI'] # ['GLAI', 'NDVI','EVI']
     ymins = {'NDVI': -1, 'EVI': -1, 'GLAI': 0}
     ymaxs = {'NDVI': 1, 'EVI': 1, 'GLAI': 7}
 

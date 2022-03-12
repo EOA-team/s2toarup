@@ -21,7 +21,8 @@ from typing import Union
 from typing import Any
 from typing import Optional
 
-from agrisatpy.io import SatDataHandler
+from agrisatpy.core.band import Band
+from agrisatpy.core.raster import RasterCollection
 from logger import get_logger
 from copy import deepcopy
 
@@ -100,22 +101,21 @@ def calc_l4_uncertainty(
     # pheno-metrics available
     handler_list = []
     for idx, scenario in enumerate(scenarios):
-        handler = SatDataHandler()
-        handler.read_from_bandstack(
-            fname_bandstack=Path(scenario)
+        handler = RasterCollection.from_multi_band_raster(
+            fpath_raster=Path(scenario)
         )
         handler_list.append(handler)
         handler = None
         logger.info(f'Reading scenario {idx+1}/{len(scenarios)} ({scenario})')
 
     # calculate the absolute uncertainty for each phenological metric
-    pheno_metrics = dict.fromkeys(handler_list[0].bandnames)
+    pheno_metrics = dict.fromkeys(handler_list[0].band_names)
 
     for pheno_metric in pheno_metrics:
         
         # get bandstack of all scenarios of the pheno metric to calculate the standard
         # deviation (=standard uncertainty)
-        stack_list = [x.get_band(pheno_metric) for x in handler_list]
+        stack_list = [x[pheno_metric].values for x in handler_list]
         stack_array = np.stack(stack_list)
         standard_unc = np.nanstd(stack_array, axis=0)
         # calculate mean of scenarios
@@ -123,15 +123,16 @@ def calc_l4_uncertainty(
 
         # save to raster files and create a preview plot
         unc_handler = deepcopy(handler_list[0])
-        snap_band = unc_handler.bandnames[0]
+        snap_band = unc_handler.band_names[0]
         band_names = [f'{pheno_metric} Uncertainty', f'{pheno_metric} Mean']
         band_data = [standard_unc, scenario_mean]
 
         for bdx, band_name in enumerate(band_names):
             unc_handler.add_band(
+                band_constructor=Band,
                 band_name=band_name,
-                band_data=band_data[bdx],
-                snap_band=snap_band
+                values=band_data[bdx],
+                geo_info=unc_handler[snap_band].geo_info
             )
 
         # plot as map
@@ -162,7 +163,6 @@ def calc_l4_uncertainty(
             out_file=fname_out_raster,
             band_names=band_names
         )
-
 
 def get_uncertainty_maps_and_histograms_by_croptype(
         result_dir: Path,
@@ -206,14 +206,13 @@ def get_uncertainty_maps_and_histograms_by_croptype(
     unc_file = glob.glob(result_dir.joinpath(search_expr).as_posix())[0]
 
     # read data, mask out all pixels not belonging to crop selection
-    handler = SatDataHandler()
-    handler.read_from_bandstack(
-        fname_bandstack=unc_file,
-        in_file_aoi=shapefile_crops
+    handler = RasterCollection.from_multi_band_raster(
+        fpath_raster=unc_file,
+        vector_features=shapefile_crops
     )
 
     # add shapefile data with crop type codes
-    band_names = handler.bandnames
+    band_names = handler.band_names
     unc_band = band_names[0]
     mean_band = band_names[1]
     handler.add_bands_from_vector(
@@ -227,7 +226,8 @@ def get_uncertainty_maps_and_histograms_by_croptype(
     handler.mask(
         name_mask_band=column_crop_code,
         mask_values=-9999.,
-        bands_to_mask=[unc_band]
+        bands_to_mask=[unc_band],
+        inplace=True
     )
 
     # plot the uncertainty band now masked to the crop selection
@@ -379,9 +379,9 @@ def visualize_sample_time_series(
 
     # extract the timing of SOS, POS and EOS from the reference run
     metrics = ['sos_times', 'pos_times', 'eos_times']
-    gdf = SatDataHandler.read_pixels(
-        point_features=gdf,
-        raster=sample_points_pheno_metrics_reference,
+    gdf = RasterCollection.read_pixels(
+        vector_features=gdf,
+        fapth_raster=sample_points_pheno_metrics_reference,
         band_selection=metrics
     )
 
@@ -392,9 +392,9 @@ def visualize_sample_time_series(
                 f'{vi_name}_{metric}_abs-uncertainty.tif'
             ).as_posix()
         )[0]
-        gdf = SatDataHandler.read_pixels(
-            point_features=gdf,
-            raster=metric_uncertainty_file
+        gdf = RasterCollection.read_pixels(
+            vector_features=gdf,
+            fpath_raster=metric_uncertainty_file
         )
 
     # loop over the point (using their unique id) and visualize the time series
@@ -488,7 +488,7 @@ def visualize_sample_time_series(
 
 if __name__ == '__main__':
 
-    uncertainty_dir = Path('../S2_TimeSeries_Analysis')
+    uncertainty_dir = Path('../S2_TimeSeries_Analysis/uncorrelated')
     out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
     if not out_dir.exists():
         out_dir.mkdir()

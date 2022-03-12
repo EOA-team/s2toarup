@@ -524,7 +524,6 @@ def gen_rad_unc_scenarios(
             meta = deepcopy(band_georeference_info[s2_band])
 
             # update meta to the extent of the region of interest
-            # TODO!!!
             pixres_x = meta['transform'][0]
             pixres_y = meta['transform'][4]
             ulx = meta['transform'][2] + pixres_x * roi_bounds_all[s2_band_res[s2_band]][0]

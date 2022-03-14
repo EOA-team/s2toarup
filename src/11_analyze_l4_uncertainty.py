@@ -92,7 +92,7 @@ def calc_l4_uncertainty(
 
     plt.style.use('default')
     # search the scenarios, organized by vegetation index/ parameter
-    vi_uncertainty_dir = uncertainty_dir.joinpath(vi_name)
+    vi_uncertainty_dir = uncertainty_dir
 
     # search scenarios
     vi_search_expr = vi_uncertainty_dir.joinpath('*/pheno_metrics.tif').as_posix()
@@ -101,6 +101,8 @@ def calc_l4_uncertainty(
     # pheno-metrics available
     handler_list = []
     for idx, scenario in enumerate(scenarios):
+        if 'reference' in scenario:
+            continue
         handler = RasterCollection.from_multi_band_raster(
             fpath_raster=Path(scenario)
         )
@@ -110,8 +112,11 @@ def calc_l4_uncertainty(
 
     # calculate the absolute uncertainty for each phenological metric
     pheno_metrics = dict.fromkeys(handler_list[0].band_names)
-
+    
     for pheno_metric in pheno_metrics:
+
+        if pheno_metric == 'SCL' or pheno_metric == 'crop_code':
+            continue
         
         # get bandstack of all scenarios of the pheno metric to calculate the standard
         # deviation (=standard uncertainty)
@@ -148,7 +153,7 @@ def calc_l4_uncertainty(
 
         fig_unc = unc_handler.plot_band(
             band_names[0],
-            colormap='coolwarm',
+            colormap='Oranges',
             colorbar_label=label,
             vmin=vmin,
             vmax=vmax
@@ -159,9 +164,9 @@ def calc_l4_uncertainty(
         plt.close(fig_unc)
 
         fname_out_raster = fname_out_fig.as_posix().replace('.png','.tif')
-        unc_handler.write_bands(
-            out_file=fname_out_raster,
-            band_names=band_names
+        unc_handler.to_rasterio(
+            fpath_raster=fname_out_raster,
+            band_selection=band_names
         )
 
 def get_uncertainty_maps_and_histograms_by_croptype(
@@ -215,16 +220,19 @@ def get_uncertainty_maps_and_histograms_by_croptype(
     band_names = handler.band_names
     unc_band = band_names[0]
     mean_band = band_names[1]
-    handler.add_bands_from_vector(
-        in_file_vector=shapefile_crops,
-        snap_band=unc_band,
-        attribute_selection=[column_crop_code],
-        blackfill_value=-9999.
+    handler.add_band(
+        band_constructor=Band.from_vector,
+        vector_features=shapefile_crops,
+        geo_info=handler[unc_band].geo_info,
+        band_name_src=column_crop_code,
+        band_name_dst=column_crop_code,
+        snap_bounds=handler[unc_band].bounds,
+        nodata_dst=-9999.
     )
 
     # mask out all other pixels (not having one of the selected crop types)
     handler.mask(
-        name_mask_band=column_crop_code,
+        mask=column_crop_code,
         mask_values=-9999.,
         bands_to_mask=[unc_band],
         inplace=True
@@ -242,7 +250,7 @@ def get_uncertainty_maps_and_histograms_by_croptype(
     label = f'Absolute Uncertainty (k=1) [{unit}]'
     fig_unc = handler.plot_band(
         band_name=unc_band,
-        colormap='coolwarm',
+        colormap='Oranges',
         colorbar_label=label,
         vmin=vmin,
         vmax=vmax
@@ -258,6 +266,8 @@ def get_uncertainty_maps_and_histograms_by_croptype(
 
     # drop nan's
     gdf = gdf[~np.isnan(gdf[unc_band])]
+    nodata_idxs = gdf[gdf.crop_code == -9999.].index
+    gdf.drop(nodata_idxs, inplace=True)
 
     # plot histograms by crop type (add crop names first)
     gdf['crop'] = gdf.crop_code.apply(
@@ -321,7 +331,7 @@ def get_uncertainty_maps_and_histograms_by_croptype(
     crop_unc_stats.drop('textstr', axis=1, inplace=True)
     crop_unc_stats.to_csv(f'{fname_out_base}_uncertainty-crops-stats.csv', index=False)
 
-    crop_mean_stats = pd.concat(crop_mean_list)
+    crop_mean_stats = pd.DataFrame(crop_mean_list)
     crop_mean_stats.drop('textstr', axis=1, inplace=True)
     crop_mean_stats.to_csv(f'{fname_out_base}_scenario-means-crops-stats.csv', index=False)
 
@@ -381,8 +391,7 @@ def visualize_sample_time_series(
     metrics = ['sos_times', 'pos_times', 'eos_times']
     gdf = RasterCollection.read_pixels(
         vector_features=gdf,
-        fapth_raster=sample_points_pheno_metrics_reference,
-        band_selection=metrics
+        fpath_raster=sample_points_pheno_metrics_reference
     )
 
     # extract the uncertainty and scenario means of the metrics
@@ -471,11 +480,12 @@ def visualize_sample_time_series(
         ax.plot(point_gdf.date, point_gdf[f'{vi_name}_ts_sm'], color='blue',
                 label='original smoothed')
 
-        # TODO: legend below the plot
-        ax.legend(loc="lower center", bbox_to_anchor=(0.5, -0.5), ncol=4, fontsize=20)
+        # legend below the plot
+        ax.legend(loc="lower center", bbox_to_anchor=(0.5, -0.3), ncol=4, fontsize=20)
         ax.set_ylabel(f'{vi_name} [-]', fontsize=24)
         ax.set_title(title_str, fontsize=24)
         ax.set_ylim(ymin, ymax)
+        plt.xticks(rotation=45)
 
         # save figure
         fname = out_dir.joinpath(
@@ -488,23 +498,9 @@ def visualize_sample_time_series(
 
 if __name__ == '__main__':
 
-    uncertainty_dir = Path('../S2_TimeSeries_Analysis/uncorrelated')
-    out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
-    if not out_dir.exists():
-        out_dir.mkdir()
-    result_dir = out_dir
-
-    out_dir_crops = out_dir.joinpath('selected_crops')
-    if not out_dir_crops.exists():
-        out_dir_crops.mkdir()
-
-    out_dir_ts_plots = out_dir.joinpath('pixel_time_series')
-    if not out_dir_ts_plots.exists():
-        out_dir_ts_plots.mkdir()
-
-    vi_names = ['NDVI', 'EVI']
-    ymins = {'NDVI': 0, 'EVI': 0}
-    ymaxs = {'NDVI': 1, 'EVI': 1}
+    vi_names = vi_name = ['NDVI', 'EVI', 'GLAI']
+    ymins = {'NDVI': 0, 'EVI': 0, 'GLAI': 0}
+    ymaxs = {'NDVI': 1, 'EVI': 1, 'GLAI': 7}
 
     # pheno-metrics to analyze
     pheno_metrics = [
@@ -523,15 +519,43 @@ if __name__ == '__main__':
     gdf = gpd.read_file(shapefile_crops)
     crop_code_mapping = dict(list(gdf.groupby([column_crop_code, column_crop_names]).groups))
 
+    # for vi_name in vi_names:
+    #
+    #     uncertainty_dir = Path(f'../S2_TimeSeries_Analysis/{vi_name}/uncorrelated')
+    #     out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
+    #     if not out_dir.exists():
+    #         out_dir.mkdir()
+    #     result_dir = out_dir
+    #
+    #     out_dir_crops = out_dir.joinpath('selected_crops')
+    #     if not out_dir_crops.exists():
+    #         out_dir_crops.mkdir()
+    #
+    #     out_dir_ts_plots = out_dir.joinpath('pixel_time_series')
+    #     if not out_dir_ts_plots.exists():
+    #         out_dir_ts_plots.mkdir()
+    #
+    #
+    #     calc_l4_uncertainty(
+    #         uncertainty_dir=uncertainty_dir,
+    #         out_dir=out_dir,
+    #         vi_name=vi_name
+    #     )
+
+    # change plot style here to ggplot (therefore, use two different loops)
+    plt.style.use('ggplot')
+    matplotlib.rc('xtick', labelsize=20) 
+    matplotlib.rc('ytick', labelsize=20) 
+
     for vi_name in vi_names:
-    
-        calc_l4_uncertainty(
-            uncertainty_dir=uncertainty_dir,
-            out_dir=out_dir,
-            vi_name=vi_name
-        )
-    
-        # # create maps and histograms of phenometrics
+
+        uncertainty_dir = Path(f'../S2_TimeSeries_Analysis/{vi_name}/uncorrelated')
+        out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
+        result_dir = out_dir
+        out_dir_crops = out_dir.joinpath('selected_crops')
+        out_dir_ts_plots = out_dir.joinpath('pixel_time_series')
+
+        # create maps and histograms of phenometrics
         # for idx, pheno_metric in enumerate(pheno_metrics):
         #     pheno_metric_alias = pheno_metrics_aliases[idx]
         #     get_uncertainty_maps_and_histograms_by_croptype(
@@ -544,30 +568,9 @@ if __name__ == '__main__':
         #         crop_code_mapping=crop_code_mapping,
         #         out_dir=out_dir_crops
         #     )
-        
-    # change plot style here to ggplot (therefore, use two different loops)
-    plt.style.use('ggplot')
-    matplotlib.rc('xtick', labelsize=20) 
-    matplotlib.rc('ytick', labelsize=20) 
-
-    for vi_name in vi_names:
-
-        # create maps and histograms of phenometrics
-        for idx, pheno_metric in enumerate(pheno_metrics):
-            pheno_metric_alias = pheno_metrics_aliases[idx]
-            get_uncertainty_maps_and_histograms_by_croptype(
-                result_dir=result_dir,
-                vi_name=vi_name,
-                pheno_metric=pheno_metric,
-                pheno_metric_alias=pheno_metric_alias,
-                shapefile_crops=shapefile_crops,
-                column_crop_code=column_crop_code,
-                crop_code_mapping=crop_code_mapping,
-                out_dir=out_dir_crops
-            )
 
         # visualize the randomly selected pixel time series samples
-        vi_dir = uncertainty_dir.joinpath(vi_name)
+        vi_dir = uncertainty_dir
         # path to pixel samples
         sample_points_scenarios = glob.glob(
             vi_dir.joinpath(f'{vi_name}_*time_series.csv').as_posix()
@@ -580,9 +583,7 @@ if __name__ == '__main__':
                 'pheno_metrics.tif'
             )
 
-        out_dir_ts_plots_vi = out_dir_ts_plots.joinpath(vi_name)
-        if not out_dir_ts_plots_vi.exists():
-            out_dir_ts_plots_vi.mkdir()
+        out_dir_ts_plots_vi = out_dir_ts_plots
         
         visualize_sample_time_series(
             sample_points_scenarios=sample_points_scenarios,

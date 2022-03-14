@@ -341,7 +341,6 @@ def get_uncertainty_maps_and_histograms_by_croptype(
     gdf.drop('geometry', axis=1, inplace=True)
     gdf.to_csv(f'{fname_out_base}_data.csv', index=False)
 
-
 def visualize_sample_time_series(
         sample_points_scenarios: Path,
         sample_points_pheno_metrics_reference: Path,
@@ -493,7 +492,6 @@ def visualize_sample_time_series(
         )
         fig.savefig(fname, dpi=300, bbox_inches='tight')
         plt.close(fig)
-        
 
 
 if __name__ == '__main__':

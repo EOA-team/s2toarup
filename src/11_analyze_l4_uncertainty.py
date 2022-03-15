@@ -31,7 +31,6 @@ logger = get_logger('l5_uncertainty')
 # define start date for converting DOYs (day of year) to date
 start_date = datetime.date(2019,1,1)
 
-
 def get_stats(
         gdf: Union[pd.DataFrame, gpd.GeoDataFrame],
         col_name: str,

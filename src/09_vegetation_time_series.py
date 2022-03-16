@@ -236,7 +236,7 @@ def plot_uncertainty_tim_series(
         crop_gdf[f'{vi_name}_unc'].hist(ax=ax, bins=100, density=True)
         ax.set_title(f'{crop_name}', fontsize=20)
         ax.set_xlabel(f'{vi_name} Absolute Uncertainty (k=1)', fontsize=24)
-        ax.set_ylabel('Relative Frequency [%]', fontsize=24)
+        ax.set_ylabel('Frequency', fontsize=24)
         fname = f'{vi_name}_{crop_name}_abs-unc-histogram.png'
         fig.savefig(out_dir.joinpath(fname), dpi=300, bbox_inches='tight')
         plt.close(fig)

@@ -155,7 +155,8 @@ def calc_l4_uncertainty(
             colormap='Oranges',
             colorbar_label=label,
             vmin=vmin,
-            vmax=vmax
+            vmax=vmax,
+            fontsize=20
         )
 
         fname_out_fig = out_dir.joinpath(f'{vi_name}_{pheno_metric}_abs-uncertainty.png')
@@ -492,7 +493,6 @@ def visualize_sample_time_series(
         fig.savefig(fname, dpi=300, bbox_inches='tight')
         plt.close(fig)
 
-
 if __name__ == '__main__':
 
     vi_names = vi_name = ['NDVI', 'EVI', 'GLAI']
@@ -516,33 +516,33 @@ if __name__ == '__main__':
     gdf = gpd.read_file(shapefile_crops)
     crop_code_mapping = dict(list(gdf.groupby([column_crop_code, column_crop_names]).groups))
 
-    # for vi_name in vi_names:
-    #
-    #     uncertainty_dir = Path(f'../S2_TimeSeries_Analysis/{vi_name}/uncorrelated')
-    #     out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
-    #     if not out_dir.exists():
-    #         out_dir.mkdir()
-    #     result_dir = out_dir
-    #
-    #     out_dir_crops = out_dir.joinpath('selected_crops')
-    #     if not out_dir_crops.exists():
-    #         out_dir_crops.mkdir()
-    #
-    #     out_dir_ts_plots = out_dir.joinpath('pixel_time_series')
-    #     if not out_dir_ts_plots.exists():
-    #         out_dir_ts_plots.mkdir()
-    #
-    #
-    #     calc_l4_uncertainty(
-    #         uncertainty_dir=uncertainty_dir,
-    #         out_dir=out_dir,
-    #         vi_name=vi_name
-    #     )
+    for vi_name in vi_names:
+    
+        uncertainty_dir = Path(f'../S2_TimeSeries_Analysis/{vi_name}/uncorrelated')
+        out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
+        if not out_dir.exists():
+            out_dir.mkdir()
+        result_dir = out_dir
+    
+        out_dir_crops = out_dir.joinpath('selected_crops')
+        if not out_dir_crops.exists():
+            out_dir_crops.mkdir()
+    
+        out_dir_ts_plots = out_dir.joinpath('pixel_time_series')
+        if not out_dir_ts_plots.exists():
+            out_dir_ts_plots.mkdir()
+    
+    
+        calc_l4_uncertainty(
+            uncertainty_dir=uncertainty_dir,
+            out_dir=out_dir,
+            vi_name=vi_name
+        )
 
     # change plot style here to ggplot (therefore, use two different loops)
     plt.style.use('ggplot')
-    matplotlib.rc('xtick', labelsize=20) 
-    matplotlib.rc('ytick', labelsize=20) 
+    matplotlib.rc('xtick', labelsize=18) 
+    matplotlib.rc('ytick', labelsize=18) 
 
     for vi_name in vi_names:
 
@@ -553,18 +553,18 @@ if __name__ == '__main__':
         out_dir_ts_plots = out_dir.joinpath('pixel_time_series')
 
         # create maps and histograms of phenometrics
-        # for idx, pheno_metric in enumerate(pheno_metrics):
-        #     pheno_metric_alias = pheno_metrics_aliases[idx]
-        #     get_uncertainty_maps_and_histograms_by_croptype(
-        #         result_dir=result_dir,
-        #         vi_name=vi_name,
-        #         pheno_metric=pheno_metric,
-        #         pheno_metric_alias=pheno_metric_alias,
-        #         shapefile_crops=shapefile_crops,
-        #         column_crop_code=column_crop_code,
-        #         crop_code_mapping=crop_code_mapping,
-        #         out_dir=out_dir_crops
-        #     )
+        for idx, pheno_metric in enumerate(pheno_metrics):
+            pheno_metric_alias = pheno_metrics_aliases[idx]
+            get_uncertainty_maps_and_histograms_by_croptype(
+                result_dir=result_dir,
+                vi_name=vi_name,
+                pheno_metric=pheno_metric,
+                pheno_metric_alias=pheno_metric_alias,
+                shapefile_crops=shapefile_crops,
+                column_crop_code=column_crop_code,
+                crop_code_mapping=crop_code_mapping,
+                out_dir=out_dir_crops
+            )
 
         # visualize the randomly selected pixel time series samples
         vi_dir = uncertainty_dir

@@ -516,78 +516,83 @@ if __name__ == '__main__':
     gdf = gpd.read_file(shapefile_crops)
     crop_code_mapping = dict(list(gdf.groupby([column_crop_code, column_crop_names]).groups))
 
-    for vi_name in vi_names:
-    
-        uncertainty_dir = Path(f'../S2_TimeSeries_Analysis/{vi_name}/uncorrelated')
-        out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
-        if not out_dir.exists():
-            out_dir.mkdir()
-        result_dir = out_dir
-    
-        out_dir_crops = out_dir.joinpath('selected_crops')
-        if not out_dir_crops.exists():
-            out_dir_crops.mkdir()
-    
-        out_dir_ts_plots = out_dir.joinpath('pixel_time_series')
-        if not out_dir_ts_plots.exists():
-            out_dir_ts_plots.mkdir()
-    
-    
-        calc_l4_uncertainty(
-            uncertainty_dir=uncertainty_dir,
-            out_dir=out_dir,
-            vi_name=vi_name
-        )
+    # two ways of inter-scene correlation
+    corr_types = ['uncorrelated', 'fully_correlated']
+
+    for corr_type in corr_types:
+        for vi_name in vi_names:
+        
+            uncertainty_dir = Path(f'../S2_TimeSeries_Analysis/{vi_name}/{corr_type}')
+            out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
+            if not out_dir.exists():
+                out_dir.mkdir()
+            result_dir = out_dir
+        
+            out_dir_crops = out_dir.joinpath('selected_crops')
+            if not out_dir_crops.exists():
+                out_dir_crops.mkdir()
+        
+            out_dir_ts_plots = out_dir.joinpath('pixel_time_series')
+            if not out_dir_ts_plots.exists():
+                out_dir_ts_plots.mkdir()
+        
+        
+            calc_l4_uncertainty(
+                uncertainty_dir=uncertainty_dir,
+                out_dir=out_dir,
+                vi_name=vi_name
+            )
 
     # change plot style here to ggplot (therefore, use two different loops)
     plt.style.use('ggplot')
     matplotlib.rc('xtick', labelsize=18) 
     matplotlib.rc('ytick', labelsize=18) 
 
-    for vi_name in vi_names:
-
-        uncertainty_dir = Path(f'../S2_TimeSeries_Analysis/{vi_name}/uncorrelated')
-        out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
-        result_dir = out_dir
-        out_dir_crops = out_dir.joinpath('selected_crops')
-        out_dir_ts_plots = out_dir.joinpath('pixel_time_series')
-
-        # create maps and histograms of phenometrics
-        for idx, pheno_metric in enumerate(pheno_metrics):
-            pheno_metric_alias = pheno_metrics_aliases[idx]
-            get_uncertainty_maps_and_histograms_by_croptype(
-                result_dir=result_dir,
+    for corr_type in corr_types:
+        for vi_name in vi_names:
+    
+            uncertainty_dir = Path(f'../S2_TimeSeries_Analysis/{vi_name}/{corr_type}')
+            out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
+            result_dir = out_dir
+            out_dir_crops = out_dir.joinpath('selected_crops')
+            out_dir_ts_plots = out_dir.joinpath('pixel_time_series')
+    
+            # create maps and histograms of phenometrics
+            for idx, pheno_metric in enumerate(pheno_metrics):
+                pheno_metric_alias = pheno_metrics_aliases[idx]
+                get_uncertainty_maps_and_histograms_by_croptype(
+                    result_dir=result_dir,
+                    vi_name=vi_name,
+                    pheno_metric=pheno_metric,
+                    pheno_metric_alias=pheno_metric_alias,
+                    shapefile_crops=shapefile_crops,
+                    column_crop_code=column_crop_code,
+                    crop_code_mapping=crop_code_mapping,
+                    out_dir=out_dir_crops
+                )
+    
+            # visualize the randomly selected pixel time series samples
+            vi_dir = uncertainty_dir
+            # path to pixel samples
+            sample_points_scenarios = glob.glob(
+                vi_dir.joinpath(f'{vi_name}_*time_series.csv').as_posix()
+            )[0]
+            
+            # path to reference pheno metric results (calculated on original time series data)
+            sample_points_pheno_metrics_reference = vi_dir.joinpath(
+                'reference'
+                ).joinpath(
+                    'pheno_metrics.tif'
+                )
+    
+            out_dir_ts_plots_vi = out_dir_ts_plots
+            
+            visualize_sample_time_series(
+                sample_points_scenarios=sample_points_scenarios,
+                sample_points_pheno_metrics_reference=sample_points_pheno_metrics_reference,
+                pheno_metrics_uncertainty_dir=result_dir,
                 vi_name=vi_name,
-                pheno_metric=pheno_metric,
-                pheno_metric_alias=pheno_metric_alias,
-                shapefile_crops=shapefile_crops,
-                column_crop_code=column_crop_code,
-                crop_code_mapping=crop_code_mapping,
-                out_dir=out_dir_crops
+                ymin=ymins[vi_name],
+                ymax=ymaxs[vi_name],
+                out_dir=out_dir_ts_plots_vi
             )
-
-        # visualize the randomly selected pixel time series samples
-        vi_dir = uncertainty_dir
-        # path to pixel samples
-        sample_points_scenarios = glob.glob(
-            vi_dir.joinpath(f'{vi_name}_*time_series.csv').as_posix()
-        )[0]
-        
-        # path to reference pheno metric results (calculated on original time series data)
-        sample_points_pheno_metrics_reference = vi_dir.joinpath(
-            'reference'
-            ).joinpath(
-                'pheno_metrics.tif'
-            )
-
-        out_dir_ts_plots_vi = out_dir_ts_plots
-        
-        visualize_sample_time_series(
-            sample_points_scenarios=sample_points_scenarios,
-            sample_points_pheno_metrics_reference=sample_points_pheno_metrics_reference,
-            pheno_metrics_uncertainty_dir=result_dir,
-            vi_name=vi_name,
-            ymin=ymins[vi_name],
-            ymax=ymaxs[vi_name],
-            out_dir=out_dir_ts_plots_vi
-        )

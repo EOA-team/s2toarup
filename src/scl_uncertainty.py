@@ -22,6 +22,10 @@ def scl_uncertainty(
         output_dir: Path,
         aoi: Path
     ) -> None:
+    """
+    Classification uncertainty of the scene classification layer (SCL)
+    of the L2A Sentinel-2 product
+    """
     # find scenes for which scenarios are available
     scenes = glob.glob(scenario_dir.joinpath('S2*_MSIL1C*').as_posix())
 
@@ -73,7 +77,9 @@ def scl_uncertainty(
         for scl_class in scl_classes.values():
             mu = mean_pixel_num_per_class.at[scl_class]
             sigma = std_pixel_num_per_class.at[scl_class]
-            area_stats_unc[scl_class] = ufloat(nominal_value=mu, std_dev=sigma)
+            # convert into relative uncertainties
+            sigma_rel = sigma / mu * 100.
+            area_stats_unc[scl_class] = ufloat(nominal_value=mu, std_dev=sigma_rel)
         area_stats_scenes_list.append(area_stats_unc)
 
         # For the class assignment confidence use scipy.stats mode and check how

@@ -130,7 +130,7 @@ def plot_uncertainty_time_series(
         # and the original index value (multiplied by 100 to get % relative uncertainty)
         crop_gdf[f'{vi_name}_rel_unc'] =  crop_gdf[f'{vi_name}_unc'] / crop_gdf[vi_name] * 100
         # cut off relative uncertainty values larger than 25%
-        crop_gdf[crop_gdf[f'{vi_name}_rel_unc'] >= 25.] = 25.
+        crop_gdf[f'{vi_name}_rel_unc'][crop_gdf[f'{vi_name}_rel_unc'] >= 25.] = 25.
 
         # aggregate by date
         col_selection = ['date', vi_name, f'{vi_name}_unc', f'{vi_name}_rel_unc']
@@ -147,7 +147,8 @@ def plot_uncertainty_time_series(
         ax1.plot(
             crop_gdf_grouped.date,
             crop_gdf_grouped[vi_name, 'mean'],
-            'x',
+            marker='x',
+            linestyle='solid',
             color='blue',
             linewidth=3
         )
@@ -182,7 +183,8 @@ def plot_uncertainty_time_series(
         ax2.plot(
             crop_gdf_grouped.date,
             crop_gdf_grouped[unc_name, 'mean'],
-            'x',
+            marker='x',
+            linestyle='solid',
             label='Mean',
             color='blue',
             linewidth=3
@@ -216,7 +218,8 @@ def plot_uncertainty_time_series(
         ax3.plot(
             crop_gdf_grouped.date,
             crop_gdf_grouped[unc_name, 'mean'],
-            'x',
+            marker='x',
+            linestyle='solid',
             label='Mean',
             color='blue',
             linewidth=3

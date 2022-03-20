@@ -129,6 +129,8 @@ def plot_uncertainty_tim_series(
         # add relative uncertainty by computing the ratio between the absolute uncertainty
         # and the original index value (multiplied by 100 to get % relative uncertainty)
         crop_gdf[f'{vi_name}_rel_unc'] =  crop_gdf[f'{vi_name}_unc'] / crop_gdf[vi_name] * 100
+        # cut off relative uncertainty values larger than 25%
+        crop_gdf[crop_gdf[f'{vi_name}_rel_unc'] >= 25.] = 25.
 
         # aggregate by date
         col_selection = ['date', vi_name, f'{vi_name}_unc', f'{vi_name}_rel_unc']
@@ -142,7 +144,13 @@ def plot_uncertainty_tim_series(
         fig, (ax1, ax2, ax3) = plt.subplots(3, sharex=True, figsize=(15,20))
 
         # plot original time series showing spread between pixels (not scenarios!)
-        ax1.plot(crop_gdf_grouped.date, crop_gdf_grouped[vi_name, 'mean'], color='blue', linewidth=3)
+        ax1.plot(
+            crop_gdf_grouped.date,
+            crop_gdf_grouped[vi_name, 'mean'],
+            'x',
+            color='blue',
+            linewidth=3
+        )
         # central 90% of values
         ax1.fill_between(
             x=crop_gdf_grouped.date,
@@ -171,7 +179,14 @@ def plot_uncertainty_tim_series(
 
         # plot uncertainties (absolute)
         unc_name = vi_name + '_unc'
-        ax2.plot(crop_gdf_grouped.date, crop_gdf_grouped[unc_name, 'mean'], label='Mean', color='blue', linewidth=3)
+        ax2.plot(
+            crop_gdf_grouped.date,
+            crop_gdf_grouped[unc_name, 'mean'],
+            'x',
+            label='Mean',
+            color='blue',
+            linewidth=3
+        )
         ax2.fill_between(
             x=crop_gdf_grouped.index,
             y1=crop_gdf_grouped[unc_name, 'percentile_5'],
@@ -198,7 +213,14 @@ def plot_uncertainty_tim_series(
 
         # relative uncertainties
         unc_name = vi_name + '_rel_unc'
-        ax3.plot(crop_gdf_grouped.date,crop_gdf_grouped[unc_name, 'mean'], label='Mean', color='blue', linewidth=3)
+        ax3.plot(
+            crop_gdf_grouped.date,
+            crop_gdf_grouped[unc_name, 'mean'],
+            'x',
+            label='Mean',
+            color='blue',
+            linewidth=3
+        )
         ax3.fill_between(
             x=crop_gdf_grouped.index,
             y1=crop_gdf_grouped[unc_name, 'percentile_5'],
@@ -222,6 +244,7 @@ def plot_uncertainty_tim_series(
             label=r'$\pm$ 1 Stddev'
         )
         ax3.set_ylabel(f'Relative Uncertainty [%]', fontsize=24)
+        ax3.set_ylim(0, 25) # cut-off uncertainty values higher than 25%
        
         ax3.legend(loc="lower center", bbox_to_anchor=(0.5, -0.3), fontsize=20, ncol=3)
 
@@ -230,14 +253,15 @@ def plot_uncertainty_tim_series(
         fig.savefig(out_dir.joinpath(fname), dpi=300, bbox_inches='tight')
         plt.close(fig)
 
-        # plot histograms of uncertainty values
+        # plot histograms of relative uncertainty values
         fig = plt.figure(figsize=(7,7))
         ax = fig.add_subplot(111)
-        crop_gdf[f'{vi_name}_unc'].hist(ax=ax, bins=100, density=True)
+        crop_gdf[f'{vi_name}_rel_unc'].hist(ax=ax, bins=100, density=True)
         ax.set_title(f'{crop_name}', fontsize=20)
-        ax.set_xlabel(f'{vi_name} Absolute Uncertainty (k=1)', fontsize=24)
+        ax.set_xlabel(f'{vi_name} Relative Uncertainty (k=1) [%]', fontsize=24)
         ax.set_ylabel('Frequency', fontsize=24)
-        fname = f'{vi_name}_{crop_name}_abs-unc-histogram.png'
+        ax.set_xlim(0, 25)
+        fname = f'{vi_name}_{crop_name}_rel-unc-histogram.png'
         fig.savefig(out_dir.joinpath(fname), dpi=300, bbox_inches='tight')
         plt.close(fig)
 

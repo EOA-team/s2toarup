@@ -3,11 +3,15 @@ Uncertainty in the scene classification layer (SCL).
 '''
 
 import glob
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from datetime import datetime
 from scipy.stats import mode
 from uncertainties import ufloat
 from pathlib import Path
+from sklearn.metrics import confusion_matrix
+from pretty_print_confusion import pp_matrix
 
 from agrisatpy.core.sensors import Sentinel2
 from agrisatpy.utils.constants.sentinel2 import SCL_Classes
@@ -92,6 +96,38 @@ def scl_uncertainty(
         majority = scl_analysis.mode[0,:,:]
         # confidence of the majority vote
         confidence = scl_analysis.count[0,:,:] / n_scenarios * 100.
+
+        # create confusion matrix
+        # the majority vote serves as the "truth" against which the scenario outcomes are evaluated
+        y_test = np.empty(shape=(len(scl_array_list), majority.shape[0], majority.shape[1]))
+        y_pred = np.empty_like(y_test)
+        for ii in range(len(scl_array_list)):
+            y_test[ii,:,:] = majority
+            y_pred[ii,:,:] = scl_array_list[ii][0,:,:]
+        y_test = y_test.flatten()
+        y_pred = y_pred.flatten()
+        conf_matrix = confusion_matrix(y_true=y_test, y_pred=y_pred)
+        # label classes correctly based on their occurence in the scene
+        unique_scl_classes = np.unique(majority)
+        full_conf_matrix = np.zeros(shape=(12,12), dtype=int)
+        for ii, unique_scl_class in enumerate(unique_scl_classes):
+            for jj, _unique_scl_class in enumerate(unique_scl_classes):
+                full_conf_matrix[unique_scl_class,_unique_scl_class] = conf_matrix[ii,jj]
+        # convert to pandas data-frame and assign scl class labels
+        scene_date = datetime.strptime((Path(scene).name.split('_')[2][0:8]), '%Y%m%d').date()
+        conf_df = pd.DataFrame(
+            full_conf_matrix,
+            columns=list(scl_classes.values()),
+            index=list(scl_classes.values())
+        )
+        fname_conf = output_dir.joinpath(f'{scene_date}_SCL_conf.png')
+        f = pp_matrix(conf_df, cmap='Accent_r', figsize=(12,12))
+        f.savefig(fname_conf, bbox_inches='tight')
+        plt.close(f)
+
+        fname_csv = output_dir.joinpath(f'{scene_date}_SCL_conf.csv')
+        conf_df.to_csv(fname_csv)
+
         # go through the majority votes and check the variability of the majority
         # vote confidence
         majority_confidence_variability = {}

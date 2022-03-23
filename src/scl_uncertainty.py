@@ -108,7 +108,15 @@ def scl_uncertainty(
         y_pred = y_pred.flatten()
         conf_matrix = confusion_matrix(y_true=y_test, y_pred=y_pred)
         # label classes correctly based on their occurence in the scene
-        unique_scl_classes = np.unique(majority)
+        unique_true_scl_classes = np.unique(majority)
+        unique_pred_scl_classes = np.unique(y_pred).astype(int)
+        # check how many SCL classes are in the confusion matrix
+        if len(unique_true_scl_classes) < len(unique_pred_scl_classes):
+            unique_scl_classes = unique_pred_scl_classes
+        elif len(unique_true_scl_classes) > len(unique_pred_scl_classes):
+            unique_scl_classes = unique_true_scl_classes
+        else:
+            unique_scl_classes = unique_true_scl_classes
         full_conf_matrix = np.zeros(shape=(12,12), dtype=int)
         for ii, unique_scl_class in enumerate(unique_scl_classes):
             for jj, _unique_scl_class in enumerate(unique_scl_classes):

@@ -131,6 +131,7 @@ def plot_uncertainty_time_series(
         crop_gdf[f'{vi_name}_rel_unc'] =  crop_gdf[f'{vi_name}_unc'] / crop_gdf[vi_name] * 100
         # cut off relative uncertainty values larger than 25%
         crop_gdf[f'{vi_name}_rel_unc'][crop_gdf[f'{vi_name}_rel_unc'] >= 25.] = 25.
+        crop_gdf[f'{vi_name}_rel_unc'][crop_gdf[f'{vi_name}_rel_unc'] < 0.] = 0.
 
         # aggregate by date
         col_selection = ['date', vi_name, f'{vi_name}_unc', f'{vi_name}_rel_unc']
@@ -259,11 +260,13 @@ def plot_uncertainty_time_series(
         # plot histograms of relative uncertainty values
         fig = plt.figure(figsize=(7,7))
         ax = fig.add_subplot(111)
-        crop_gdf[f'{vi_name}_rel_unc'].hist(ax=ax, bins=100, density=True)
-        ax.set_title(f'{crop_name}', fontsize=20)
+        rel_unc = crop_gdf[f'{vi_name}_rel_unc']
+        rel_unc.hist(ax=ax, bins=100, density=True)
+        # ax.set_title(f'{crop_name}', fontsize=20)
         ax.set_xlabel(f'{vi_name} Relative Uncertainty (k=1) [%]', fontsize=24)
-        ax.set_ylabel('Frequency', fontsize=24)
-        ax.set_xlim(0, 25)
+        ax.set_ylabel('Relative Frequency', fontsize=24)
+        ax.set_xlim(-0.01, 25)
+        ax.set_ylim(0., 1.)
         fname = f'{vi_name}_{crop_name}_rel-unc-histogram.png'
         fig.savefig(out_dir.joinpath(fname), dpi=300, bbox_inches='tight')
         plt.close(fig)
@@ -337,7 +340,7 @@ if __name__ == '__main__':
     sample_points = Path('../shp/ZH_Points_2019_EPSG32632_selected-crops.shp')
 
     # vegetation index to consider
-    vi_names = ['GLAI', 'NDVI','EVI']
+    vi_names = ['NDVI', 'GLAI', 'EVI']
     ymins = {'NDVI': 0, 'EVI': 0, 'GLAI': 0}
     ymaxs = {'NDVI': 1, 'EVI': 1, 'GLAI': 7}
 

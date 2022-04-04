@@ -70,7 +70,6 @@ def get_stats(
 
     return stats
 
-
 def calc_l4_uncertainty(
         uncertainty_dir: Path,
         out_dir: Path,
@@ -508,7 +507,7 @@ if __name__ == '__main__':
     ]
 
     # shapefile with crop type information for the single field parcels
-    shapefile_crops = Path('../shp/ZH_Polygons_2019_EPSG32632_selected-crops_buffered.shp')
+    shapefile_crops = Path('../shp/ZH_Polygons_2019_EPSG32632_selected-crops.shp')
     column_crop_code = 'crop_code'
     column_crop_names = 'crop_type'
 
@@ -519,29 +518,29 @@ if __name__ == '__main__':
     # two ways of inter-scene correlation
     corr_types = ['uncorrelated', 'fully_correlated']
 
-    for corr_type in corr_types:
-        for vi_name in vi_names:
-        
-            uncertainty_dir = Path(f'../S2_TimeSeries_Analysis/{vi_name}/{corr_type}')
-            out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
-            if not out_dir.exists():
-                out_dir.mkdir()
-            result_dir = out_dir
-        
-            out_dir_crops = out_dir.joinpath('selected_crops')
-            if not out_dir_crops.exists():
-                out_dir_crops.mkdir()
-        
-            out_dir_ts_plots = out_dir.joinpath('pixel_time_series')
-            if not out_dir_ts_plots.exists():
-                out_dir_ts_plots.mkdir()
-        
-        
-            calc_l4_uncertainty(
-                uncertainty_dir=uncertainty_dir,
-                out_dir=out_dir,
-                vi_name=vi_name
-            )
+    # for corr_type in corr_types:
+    #     for vi_name in vi_names:
+    #
+    #         uncertainty_dir = Path(f'../S2_TimeSeries_Analysis/{vi_name}/{corr_type}')
+    #         out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
+    #         if not out_dir.exists():
+    #             out_dir.mkdir()
+    #         result_dir = out_dir
+    #
+    #         out_dir_crops = out_dir.joinpath('selected_crops')
+    #         if not out_dir_crops.exists():
+    #             out_dir_crops.mkdir()
+    #
+    #         out_dir_ts_plots = out_dir.joinpath('pixel_time_series')
+    #         if not out_dir_ts_plots.exists():
+    #             out_dir_ts_plots.mkdir()
+    #
+    #
+    #         calc_l4_uncertainty(
+    #             uncertainty_dir=uncertainty_dir,
+    #             out_dir=out_dir,
+    #             vi_name=vi_name
+    #         )
 
     # change plot style here to ggplot (therefore, use two different loops)
     plt.style.use('ggplot')

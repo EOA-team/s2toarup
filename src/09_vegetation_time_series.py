@@ -136,7 +136,7 @@ def plot_uncertainty_time_series(
         # aggregate by date
         col_selection = ['date', vi_name, f'{vi_name}_unc', f'{vi_name}_rel_unc']
         crop_gdf_grouped = crop_gdf[col_selection].groupby('date').agg(
-            ['mean', 'min', 'max', 'std', percentile(5), percentile(95), 'count']
+            ['median', 'min', 'max', percentile(5), percentile(25), percentile(75), percentile(95), 'count']
         )
         crop_gdf_grouped['date'] = pd.to_datetime(crop_gdf_grouped.index)
         pixel_count = crop_gdf_grouped[vi_name , 'count'].max()
@@ -147,7 +147,7 @@ def plot_uncertainty_time_series(
         # plot original time series showing spread between pixels (not scenarios!)
         ax1.plot(
             crop_gdf_grouped.date,
-            crop_gdf_grouped[vi_name, 'mean'],
+            crop_gdf_grouped[vi_name, 'median'],
             marker='x',
             linestyle='solid',
             color='blue',
@@ -161,17 +161,11 @@ def plot_uncertainty_time_series(
             color='orange',
             alpha=0.4
         )
-        # standard deviation around the mean.
-        y1 = crop_gdf_grouped[vi_name, 'mean'] - crop_gdf_grouped[vi_name, 'std']
-        # standard deviations smaller ymin are not possible
-        y1[y1 < ymin] = ymin
-        y2 = crop_gdf_grouped[vi_name, 'mean'] + crop_gdf_grouped[vi_name, 'std']
-        # standard deviations larger then ymax are not possible
-        y2[y2 > ymax] = ymax
+        # central 50% of values
         ax1.fill_between(
             x=crop_gdf_grouped.index,
-            y1=y1,
-            y2=y2,
+            y1=crop_gdf_grouped[vi_name, 'percentile_25'],
+            y2=crop_gdf_grouped[vi_name, 'percentile_75'],
             color='red',
             alpha=0.45
         )
@@ -183,10 +177,10 @@ def plot_uncertainty_time_series(
         unc_name = vi_name + '_unc'
         ax2.plot(
             crop_gdf_grouped.date,
-            crop_gdf_grouped[unc_name, 'mean'],
+            crop_gdf_grouped[unc_name, 'median'],
             marker='x',
             linestyle='solid',
-            label='Mean',
+            label='Median',
             color='blue',
             linewidth=3
         )
@@ -197,17 +191,10 @@ def plot_uncertainty_time_series(
             color='orange',
             alpha=0.4
         )
-
-        # standard deviation around the mean. Values below ymin are not possible
-        y1 = crop_gdf_grouped[unc_name, 'mean'] - crop_gdf_grouped[unc_name, 'std']
-        y1[y1 < ymin] = ymin
-        # the same applies to the upper bound
-        y2 = crop_gdf_grouped[unc_name, 'mean'] + crop_gdf_grouped[unc_name, 'std']
-        y2[y2 > ymax] = ymax
         ax2.fill_between(
             x=crop_gdf_grouped.index,
-            y1=y1,
-            y2=y2,
+            y1=crop_gdf_grouped[unc_name, 'percentile_25'],
+            y2=crop_gdf_grouped[unc_name, 'percentile_75'],
             color='red',
             alpha=0.45
         )
@@ -218,10 +205,10 @@ def plot_uncertainty_time_series(
         unc_name = vi_name + '_rel_unc'
         ax3.plot(
             crop_gdf_grouped.date,
-            crop_gdf_grouped[unc_name, 'mean'],
+            crop_gdf_grouped[unc_name, 'median'],
             marker='x',
             linestyle='solid',
-            label='Mean',
+            label='Median',
             color='blue',
             linewidth=3
         )
@@ -231,21 +218,18 @@ def plot_uncertainty_time_series(
             y2=crop_gdf_grouped[unc_name, 'percentile_95'],
             color='orange',
             alpha=0.4,
-            label='5-95% Quantile Spread'
+            label='5-95% Percentile Spread'
         )
 
         # absolute uncertainties
         # negative values are not possible for relative uncertainties
-        y1 = crop_gdf_grouped[unc_name, 'mean']-crop_gdf_grouped[unc_name, 'std']
-        y1[y1 < 0] = 0
-        y2 = crop_gdf_grouped[unc_name, 'mean']+crop_gdf_grouped[unc_name, 'std']
         ax3.fill_between(
             x=crop_gdf_grouped.index,
-            y1=y1,
-            y2=y2,
+            y1=crop_gdf_grouped[unc_name, 'percentile_25'],
+            y2=crop_gdf_grouped[unc_name, 'percentile_75'],
             color='red',
             alpha=0.45,
-            label=r'$\pm$ 1 Stddev'
+            label=r'25-75% Percentile Spread'
         )
         ax3.set_ylabel(f'Relative Uncertainty [%]', fontsize=24)
         ax3.set_ylim(0, 25) # cut-off uncertainty values higher than 25%

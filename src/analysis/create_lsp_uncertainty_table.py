@@ -31,7 +31,7 @@ def combine_results(
                     path_res = next(
                         lsp_res_dir.rglob(
                             f'{vi}/{interscene_correlation}/Uncertainty_Maps/' + \
-                            f'selected_crops/{vi}_{lsp_metric}_*uncertainty-' + \
+                            f'selected_crops/{vi}_{lsp_metric}_*buffered_uncertainty-' + \
                             f'crops-stats.csv'
                         )
                     )
@@ -64,13 +64,12 @@ def combine_results(
 
 if __name__ == '__main__':
 
-    # lsp_res_dir = Path('../../S2_TimeSeries_Analysis')
-    lsp_res_dir = Path('/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/01_Uncertainty/ESCH/scripts_paper_uncertainty/S2_TimeSeries_Analysis')
+    lsp_res_dir = Path('../../S2_TimeSeries_Analysis')
     vis = ['EVI', 'NDVI', 'GLAI']
-    interscene_correlations = ['fully_correlated', 'uncorrelated']
+    interscene_correlations = ['uncorrelated','fully_correlated']
     lsp_metrics = ['sos_times', 'eos_times']
 
-    output_dir = lsp_res_dir
+    output_dir = Path('/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/01_Uncertainty/ESCH/scripts_paper_uncertainty/S2_TimeSeries_Analysis')
 
     combine_results(lsp_res_dir, vis, interscene_correlations, lsp_metrics, output_dir)
 

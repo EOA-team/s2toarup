@@ -72,6 +72,7 @@ def get_stats(
 
 def calc_l4_uncertainty(
         uncertainty_dir: Path,
+        shp_crops: Path,
         out_dir: Path,
         vi_name: str
     ) -> None:
@@ -102,7 +103,8 @@ def calc_l4_uncertainty(
         if 'reference' in scenario:
             continue
         handler = RasterCollection.from_multi_band_raster(
-            fpath_raster=Path(scenario)
+            fpath_raster=Path(scenario),
+            vector_features=shp_crops
         )
         handler_list.append(handler)
         handler = None
@@ -211,8 +213,7 @@ def get_uncertainty_maps_and_histograms_by_croptype(
 
     # read data, mask out all pixels not belonging to crop selection
     handler = RasterCollection.from_multi_band_raster(
-        fpath_raster=unc_file,
-        vector_features=shapefile_crops
+        fpath_raster=unc_file
     )
 
     # add shapefile data with crop type codes
@@ -500,14 +501,14 @@ if __name__ == '__main__':
 
     # pheno-metrics to analyze
     pheno_metrics = [
-        'sos_times', 'pos_times', 'eos_times', 'sos_values', 'pos_values', 'eos_values'
+        'sos_times', 'pos_times', 'eos_times'
     ]
     pheno_metrics_aliases = [
-        'SOS', 'POS', 'EOS', 'SOS Value', 'POS Value', 'EOS Value'
+        'SOS', 'POS', 'EOS'
     ]
 
     # shapefile with crop type information for the single field parcels
-    shapefile_crops = Path('../shp/ZH_Polygons_2019_EPSG32632_selected-crops.shp')
+    shapefile_crops = Path('../shp/ZH_Polygons_2019_EPSG32632_selected-crops_buffered.shp')
     column_crop_code = 'crop_code'
     column_crop_names = 'crop_type'
 
@@ -539,7 +540,8 @@ if __name__ == '__main__':
     #         calc_l4_uncertainty(
     #             uncertainty_dir=uncertainty_dir,
     #             out_dir=out_dir,
-    #             vi_name=vi_name
+    #             vi_name=vi_name,
+    #             shp_crops=shapefile_crops
     #         )
 
     # change plot style here to ggplot (therefore, use two different loops)

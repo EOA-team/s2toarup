@@ -4,6 +4,7 @@ uncertainty information for all scenes available.
 '''
 
 import glob
+import geopandas as gpd
 import pandas as pd
 
 from datetime import datetime
@@ -12,6 +13,10 @@ from typing import List, Tuple
 
 from agrisatpy.core.band import Band
 from agrisatpy.core.sensors import Sentinel2
+
+from logger import get_logger
+
+logger = get_logger('read_data')
 
 
 def get_data_and_uncertainty_files(
@@ -86,7 +91,8 @@ def get_data_and_uncertainty_files(
 def read_data_and_uncertainty(
         data_df: pd.DataFrame,
         parcels: Path,
-        vi_name: str
+        vi_name: str,
+        crop_periods: Path
     ) -> Tuple[pd.DataFrame, List[Sentinel2]]:
     """
     This function reads the selected vegetation index (computed in step 7)
@@ -99,6 +105,9 @@ def read_data_and_uncertainty(
         shapefile defining the crop parcels
     :param vi_name:
         name of the vegetation index or parameter to process (e.g., NDVI)
+    :param crop_periods:
+        CSV file specifying temporal range of crop growth to avoid errors in the LSP
+        metrics due to inter-crops
     :return:
         input dataframe with read data + list of read vegetation data and
         their absolute uncertainty per image acquisition date
@@ -109,7 +118,18 @@ def read_data_and_uncertainty(
     update_list = []
     ts_stack_dict = {}
 
+    # read crop periods into data frame
+    crop_periods = pd.read_csv(crop_periods)
+
+    rdx = 1
     for _, record in data_df.iterrows():
+
+        # read field parcels into dataframe and delete those parcels with crops that
+        # are not in their main growing period
+        parcels_df = gpd.read_file(parcels)
+        # drop empty geometries
+        drop_idx = parcels_df[parcels_df.geometry == None].index
+        parcels_df.drop(index=drop_idx, inplace=True)
 
         # read VI data
         vi_file = Path(record.filename_veg_par)
@@ -119,7 +139,7 @@ def read_data_and_uncertainty(
             fpath_raster=vi_file,
             band_idx=1,
             band_name_dst=vi_name,
-            vector_features=parcels
+            vector_features=parcels_df
         )
         # read vegetation parameter/index absolute uncertainty band
         vi_unc_file = Path(record.filename_unc)
@@ -127,7 +147,7 @@ def read_data_and_uncertainty(
             band_constructor=Band.from_rasterio,
             fpath_raster=vi_unc_file,
             band_idx=4,
-            vector_features=parcels,
+            vector_features=parcels_df,
             band_name_dst=f'{vi_name}_unc'
         )
 
@@ -140,26 +160,12 @@ def read_data_and_uncertainty(
             fpath_raster=scl_file,
             band_idx=1,
             band_name_dst='SCL',
-            vector_features=parcels
+            vector_features=parcels_df
         )
-        # collection.add_band(
-        #     band_constructor=Band.from_rasterio,
-        #     fpath_raster=Path(record.filename_bandstack),
-        #     band_idx=1,
-        #     band_name_dst='blue',
-        #     vector_features=parcels,
-        # )
-        # collection.add_band(
-        #     band_constructor=Band.from_rasterio,
-        #     fpath_raster=Path(record.filename_bandstack),
-        #     band_idx=3,
-        #     band_name_dst='red',
-        #     vector_features=parcels,
-        # )
         # add crop codes
         collection.add_band(
             band_constructor=Band.from_vector,
-            vector_features=parcels,
+            vector_features=parcels_df,
             geo_info=collection[vi_name].geo_info,
             band_name_src='crop_code',
             band_name_dst='crop_code',
@@ -170,6 +176,24 @@ def read_data_and_uncertainty(
             bands_to_mask=['crop_code'],
             inplace=True
         )
+        # check the current sensing date and mask crops not in their growing season
+        sensing_date = record.date
+        for _,crop in crop_periods.iterrows():
+            start = datetime.strptime(crop.Start, '%Y-%m-%d').date()
+            end = datetime.strptime(crop.End, '%Y-%m-%d').date()
+            if not start <= sensing_date <= end:
+                crop_name = crop.Crop
+                if crop_name == 'Grain Maize':
+                    crop_name = 'Corn'
+                if crop_name == 'Rapeseed':
+                    crop_name = 'Canola'
+                crop_code = parcels_df[parcels_df.crop_type == crop_name]['crop_code'].iloc[0]
+                collection.mask(
+                    mask='crop_code',
+                    mask_values=[crop_code],
+                    bands_to_mask=collection.band_names,
+                    inplace=True
+                )
         # mask clouds, shadows and snow
         collection.mask_clouds_and_shadows(
             bands_to_mask=collection.band_names,
@@ -200,6 +224,8 @@ def read_data_and_uncertainty(
             'filename_veg_par_scl': vi_masked,
             'filename_unc_scl': vi_unc_masked
         })
+        logger.info(f'Read record {rdx}/{data_df.shape[0]}')
+        rdx += 1
 
     # added update columns to input data frame
     update_df = pd.DataFrame(update_list)

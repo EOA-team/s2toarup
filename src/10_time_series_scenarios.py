@@ -50,7 +50,7 @@ def _calc_pheno_metrics(xds: xr.Dataset) -> Dict[str, xr.Dataset]:
     ds = interpolate(ds=ds, method='interpolate_na')
 
     #smooth data using Savitzky-Golay filtering
-    ds = smooth(ds=ds, method='savitsky', window_length=3, polyorder=1)
+    ds = smooth(ds=ds, method='savitsky', window_length=11, polyorder=1)
 
     # calculate the phenometrics using 20% seasonal amplitude
     pheno_ds = calc_phenometrics(
@@ -61,7 +61,6 @@ def _calc_pheno_metrics(xds: xr.Dataset) -> Dict[str, xr.Dataset]:
         factor=0.2,
         thresh_sides='two_sided'
     )
-
     return {'pheno_metrics': pheno_ds, 'ds': ds}
 
 def vegetation_time_series_scenarios(
@@ -211,27 +210,39 @@ def vegetation_time_series_scenarios(
             # (the "truth" most likely lies somewhere in between)
             if fully_correlated:
                 samples = np.ones(shape=vi_data.shape) * vi_unc
-                samples = np.random.normal(0, 1, 1)[0] * samples
+            #     samples = np.random.normal(0, 1, 1)[0] * samples
             else:
                 samples = np.random.normal(
                     loc=0,
                     scale=vi_unc,
                     size=vi_data.shape
                 )
-            samples += vi_data
-            # constrain samples to min and max of the parameter
-            samples[samples > max_val] = max_val
-            samples[samples < min_val] = min_val
+                samples += vi_data
+                # constrain samples to min and max of the parameter
+                samples[samples > max_val] = max_val
+                samples[samples < min_val] = min_val
             sample_list.append(samples)
 
+        stacked = np.ma.stack(sample_list)
+        stacked_org = np.ma.stack(orig_ts_list)
+        # fully correlated case - sample along the temporal axis
+        if fully_correlated:
+            for row in range(stacked.shape[1]):
+                for col in range(stacked.shape[2]):
+                    if stacked[:,row,col].mask.all(): continue
+                    stacked[:,row,col] = np.random.normal(0,1,1)[0] * stacked[:,row,col] + stacked_org[:,row,col]
+                    # constrain samples to min and max of the parameter
+                    stacked[:,row,col][stacked[:,row,col] > max_val] = max_val
+                    stacked[:,row,col][stacked[:,row,col] < min_val] = min_val
+
         # create the 3d numpy array to pass as xarray dataset
-        stack = {'veg_index': tuple([('time', 'y','x'), np.stack(sample_list)])}
+        stack = {'veg_index': tuple([('time', 'y','x'), stacked])}
 
         # create stack for the reference run and the pixel time series of the reference
         # data (do it in the first iteration only to avoid overwritten the data again and
         # again)
         if scenario == 0:
-            orig_stack = {'veg_index': tuple([('time','y','x'), np.stack(orig_ts_list)])}
+            orig_stack = {'veg_index': tuple([('time','y','x'), stacked_org])}
             gdf = pd.concat(gdf_list)
 
         # construct xarray dataset for the scenario run
@@ -365,6 +376,7 @@ def main(
         ymin: float,
         ymax: float,
         n_scenarios: int,
+        crop_periods: Path,
         fully_correlated: Optional[bool] = False
     ):
     """
@@ -385,7 +397,8 @@ def main(
     file_df, ts_stack_dict = read_data_and_uncertainty(
         data_df=data_df,
         vi_name=vi_name,
-        parcels=sample_polygons
+        parcels=sample_polygons,
+        crop_periods=crop_periods
     )
 
     # generate scenarios and calculate the pheno-metrics
@@ -425,6 +438,12 @@ if __name__ == '__main__':
     # define point sampling locations for visualizing pixel time series
     sample_points = Path('../shp/ZH_Points_2019_EPSG32632_selected-crops.shp')
 
+
+    # define key crop growth periods
+    crop_periods = Path(
+        '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/01_Uncertainty/ESCH/scripts_paper_uncertainty/S2_TimeSeries_Analysis/crop_growth_periods-CH.csv'
+    )
+
     # vegetation index to consider
     vi_names = ['EVI'] # ['NDVI', 'EVI'] # ['GLAI', 'NDVI','EVI']
     ymins = {'NDVI': -1, 'EVI': -1, 'GLAI': 0}
@@ -456,5 +475,6 @@ if __name__ == '__main__':
             ymin=ymins[vi_name],
             ymax=ymaxs[vi_name],
             fully_correlated=fully_correlated[idx],
+            crop_periods=crop_periods,
             n_scenarios=n_scenarios
         )

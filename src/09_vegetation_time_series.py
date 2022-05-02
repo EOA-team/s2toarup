@@ -272,38 +272,38 @@ def main(
     """
 
     # search files, join and order them by date
-    # data_df = get_data_and_uncertainty_files(
-    #     vi_dir=vi_dir,
-    #     uncertainty_analysis_dir=uncertainty_analysis_dir,
-    #     vi_name=vi_name
-    # )
-    #
-    # # read the data and mask clouds, shadows, and unclassified pixels based on SCL information
-    # file_df, ts_stack_dict = read_data_and_uncertainty(
-    #     data_df=data_df,
-    #     vi_name=vi_name,
-    #     parcels=sample_polygons
-    # )
-    #
-    # # check uncertainty in different crop types over time
-    # extract_uncertainty_crops(
-    #     file_df=file_df,
-    #     ts_stack_dict=ts_stack_dict,
-    #     out_dir=out_dir_scenarios,
-    #     vi_name=vi_name,
-    # )
+    data_df = get_data_and_uncertainty_files(
+        vi_dir=vi_dir,
+        uncertainty_analysis_dir=uncertainty_analysis_dir,
+        vi_name=vi_name
+    )
+    
+    # read the data and mask clouds, shadows, and unclassified pixels based on SCL information
+    file_df, ts_stack_dict = read_data_and_uncertainty(
+        data_df=data_df,
+        vi_name=vi_name,
+        parcels=sample_polygons
+    )
+    
+    # check uncertainty in different crop types over time
+    extract_uncertainty_crops(
+        file_df=file_df,
+        ts_stack_dict=ts_stack_dict,
+        out_dir=out_dir_scenarios,
+        vi_name=vi_name,
+    )
 
     # visualize it
-    fname_csv = out_dir_scenarios.joinpath(
-        f'{vi_name}_crops.csv'
-    )
-    plot_uncertainty_time_series(
-        sample_polygons=sample_polygons,
-        vi_data_fpath=fname_csv,
-        out_dir=out_dir_scenarios,
-        ymin=ymin,
-        ymax=ymax
-    )
+    # fname_csv = out_dir_scenarios.joinpath(
+    #     f'{vi_name}_crops.csv'
+    # )
+    # plot_uncertainty_time_series(
+    #     sample_polygons=sample_polygons,
+    #     vi_data_fpath=fname_csv,
+    #     out_dir=out_dir_scenarios,
+    #     ymin=ymin,
+    #     ymax=ymax
+    # )
 
 if __name__ == '__main__':
     # original Sentinel-2 scenes with vegetation indices

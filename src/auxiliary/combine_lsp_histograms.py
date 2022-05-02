@@ -6,11 +6,8 @@ Created on Apr 4, 2022
 
 from pathlib import Path
 import pandas as pd
-import geopandas as gpd
 import matplotlib.pyplot as plt
-import numpy as np
-
-from agrisatpy.core.band import Band, GeoInfo
+import seaborn as sns
 
 plt.style.use('ggplot')
 
@@ -18,7 +15,7 @@ plt.style.use('ggplot')
 if __name__ == '__main__':
 
     lsp_res_dir = Path(
-        '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/01_Uncertainty/ESCH/scripts_paper_uncertainty/S2_TimeSeries_Analysis'
+        '../../S2_TimeSeries_Analysis'
     )
 
     vis = ['EVI', 'NDVI', 'GLAI']
@@ -28,7 +25,7 @@ if __name__ == '__main__':
     # read all data into a large data frame
     for run in runs:
         res = []
-        f, axes = plt.subplots(nrows=4, ncols=3)
+        f, axes = plt.subplots(nrows=2, ncols=3, figsize=(15,8))
         for vidx, vi in enumerate(vis):
             search_path = lsp_res_dir.joinpath(f'{vi}/{run}/Uncertainty_Maps/selected_crops')
             counter = 0
@@ -36,61 +33,35 @@ if __name__ == '__main__':
                 fpath = next(search_path.glob(f'{vi}_{metric}_*_data.csv'))
                 df = pd.read_csv(fpath)
                 # drop grassland pixels (no meaningful LSP metrics)
-                drop_idx = df[
-                    df.crop.isin(['Extensively Used Grasland', 'Permament Grasland'])
-                ].index
-                df.drop(index=drop_idx, inplace=True)
+                # drop_idx = df[
+                #     df.crop.isin(['Extensively Used Grasland', 'Permament Grasland'])
+                # ].index
+                # df.drop(index=drop_idx, inplace=True)
+                df['crop'] = df['crop'].apply(lambda x: 'Rapeseed' if x == 'Canola' else x)
+                df['crop'] = df['crop'].apply(lambda x: 'Grain Maize' if x == 'Corn' else x)
+                # crop_count = df.crop.value_counts()
+                # df['crop'] = df['crop'].apply(lambda x, crop_count=crop_count:
+                #     f'{x} ({crop_count[crop_count.index == x].values[0]})'
+                # )
 
-                # cutoff uncertainties larger than 50 days
-                unc = df[f'{metric} Uncertainty'].copy()
-                unc[unc > 50] = 50
+                sns.boxplot(x='crop', y=f'{metric} Uncertainty', data=df, ax=axes[midx,vidx])
+                axes[midx,vidx].set_ylim(0,160)
+                axes[midx,vidx].set_xlabel('')
 
-                # plot histogram of LSP metric uncertainty values (all crops)
-                unc.hist(
-                    bins=100,
-                    ax=axes[counter, vidx],
-                    density=True
-                )
-                axes[counter,vidx].set_xlim(0,50)
-                metric_label = metric.split('_')[0].upper()
-                title = f'{vi} {metric_label}\nUncertainties'
-                axes[counter,vidx].set_title(title, fontdict={'fontsize':9})
                 if vidx == 0:
-                    axes[counter, vidx].set_ylabel('Relative Frequency')
-
-                # plot map
-                gdf = df[['x', 'y', f'{metric} Uncertainty', 'crop']].copy()
-                gdf = gpd.GeoDataFrame(gdf, geometry=gpd.points_from_xy(gdf.x, gdf.y))
-                gdf.set_crs(epsg=32632, inplace=True)
-                # convert vector geometry to Band object (rasterize)
-                ulx, uly = gdf.total_bounds[0], gdf.total_bounds[-1]
-                geo_info = GeoInfo(epsg=32632, ulx=ulx, uly=uly, pixres_x=10, pixres_y=10)
-                band = Band.from_vector(
-                    vector_features=gdf,
-                    geo_info=geo_info,
-                    band_name_src=f'{metric} Uncertainty',
-                    band_name_dst=f'{metric} Uncertainty',
-                    nodata_dst=np.nan,
-                    dtype_src='float32'
-                )
+                    axes[midx,vidx].set_ylabel(metric.split('_')[0].upper() + ' Uncertainty (k=1) [days]', fontsize=14)
+                if midx == 0:
+                    axes[midx,vidx].set_xlabel('')
+                    axes[midx,vidx].xaxis.set_ticklabels([])
+                    axes[midx,vidx].xaxis.set_ticks_position('none')
+                    axes[midx,vidx].title.set_text(vi)
+                if midx == 1:
+                    plt.setp(axes[midx,vidx].get_xticklabels(), rotation=90)
+                if vidx > 0:
+                    axes[midx,vidx].set_ylabel('')
+                    axes[midx,vidx].yaxis.set_ticklabels([])
+                    axes[midx,vidx].yaxis.set_ticks_position('none')
+        fpath_fig = lsp_res_dir.joinpath(f'{run}_lsp_boxplots.png')
+        f.savefig(fpath_fig, dpi=300, bbox_inches='tight')
                 
-                counter += 1
-                band.plot(
-                    colormap='Oranges',
-                    vmin=0,
-                    vmax=50,
-                    ax=axes[counter, vidx]
-                )
-                axes[counter,vidx].set_title('')
-                axes[counter,vidx].set_xlabel('')
-                axes[counter,vidx].set_ylabel('')
-
-               
-                
-
-                df['vi'] = vi
-                res.append(df)
-        df_large = pd.concat(res)
-
-        df_large
                 

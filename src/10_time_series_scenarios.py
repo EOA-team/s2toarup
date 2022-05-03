@@ -421,6 +421,9 @@ def main(
     )
 
 if __name__ == '__main__':
+
+    import sys
+
     # original Sentinel-2 scenes with vegetation indices
     vi_dir = Path(
         # '../S2A_MSIL1C_orig/*.VIs'
@@ -445,7 +448,10 @@ if __name__ == '__main__':
     )
 
     # vegetation index to consider
-    vi_names = ['EVI'] # ['NDVI', 'EVI'] # ['GLAI', 'NDVI','EVI']
+    arg = sys.argv
+    with open(arg[1], 'r') as src:
+        vi = src.readlines()
+        vi_names = [vi[0].replace('\n','')]
     ymins = {'NDVI': -1, 'EVI': -1, 'GLAI': 0}
     ymaxs = {'NDVI': 1, 'EVI': 1, 'GLAI': 7}
 
@@ -457,7 +463,7 @@ if __name__ == '__main__':
     if not out_dir_scenarios.exists():
         out_dir_scenarios.mkdir()
 
-    fully_correlated = [True] # [False, True]
+    fully_correlated = [False, True]
 
     for idx, vi_name in enumerate(vi_names):
 
@@ -465,16 +471,17 @@ if __name__ == '__main__':
         if not out_dir_scenarios_vi.exists():
             out_dir_scenarios_vi.mkdir()
 
-        main(
-            vi_dir=vi_dir,
-            uncertainty_analysis_dir=uncertainty_analysis_dir,
-            out_dir_scenarios=out_dir_scenarios_vi,
-            vi_name=vi_name,
-            sample_polygons=sample_polygons,
-            sample_points=sample_points,
-            ymin=ymins[vi_name],
-            ymax=ymaxs[vi_name],
-            fully_correlated=fully_correlated[idx],
-            crop_periods=crop_periods,
-            n_scenarios=n_scenarios
-        )
+        for corr in fully_correlated:
+            main(
+                vi_dir=vi_dir,
+                uncertainty_analysis_dir=uncertainty_analysis_dir,
+                out_dir_scenarios=out_dir_scenarios_vi,
+                vi_name=vi_name,
+                sample_polygons=sample_polygons,
+                sample_points=sample_points,
+                ymin=ymins[vi_name],
+                ymax=ymaxs[vi_name],
+                fully_correlated=corr,
+                crop_periods=crop_periods,
+                n_scenarios=n_scenarios
+            )

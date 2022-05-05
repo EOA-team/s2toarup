@@ -50,7 +50,7 @@ def _calc_pheno_metrics(xds: xr.Dataset) -> Dict[str, xr.Dataset]:
     ds = interpolate(ds=ds, method='interpolate_na')
 
     #smooth data using Savitzky-Golay filtering
-    ds = smooth(ds=ds, method='savitsky', window_length=11, polyorder=1)
+    ds = smooth(ds=ds, method='savitsky', window_length=3, polyorder=1)
 
     # calculate the phenometrics using 20% seasonal amplitude
     pheno_ds = calc_phenometrics(
@@ -252,6 +252,7 @@ def vegetation_time_series_scenarios(
                 coords=coords,
                 attrs=attrs
             )
+            xds = xds.resample(time="1D").interpolate("linear")
             res = _calc_pheno_metrics(xds)
             pheno_ds = res['pheno_metrics'] # pheno metric results
             ds = res['ds'] # smoothed time series values
@@ -283,6 +284,7 @@ def vegetation_time_series_scenarios(
                     coords=coords,
                     attrs=attrs
                 )
+                xds_ref = xds_ref.resample(time="1D").interpolate("linear")
                 res_ref = _calc_pheno_metrics(xds_ref)
                 pheno_ds_ref = res_ref['pheno_metrics'] # pheno metric results
                 ds_ref = res_ref['ds'] # smoothed time series values
@@ -456,10 +458,10 @@ if __name__ == '__main__':
     ymaxs = {'NDVI': 1, 'EVI': 1, 'GLAI': 7}
 
     # number of scenarios to generate
-    n_scenarios = 1000
+    n_scenarios = 10
 
     # directory where to save phenological metrics to
-    out_dir_scenarios = Path(f'../S2_TimeSeries_Analysis')
+    out_dir_scenarios = Path(f'../S2_TimeSeries_Analysis_Test')
     if not out_dir_scenarios.exists():
         out_dir_scenarios.mkdir()
 

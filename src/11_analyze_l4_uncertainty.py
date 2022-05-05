@@ -587,13 +587,13 @@ if __name__ == '__main__':
                 )
     
             out_dir_ts_plots_vi = out_dir_ts_plots
-            
-            visualize_sample_time_series(
-                sample_points_scenarios=sample_points_scenarios,
-                sample_points_pheno_metrics_reference=sample_points_pheno_metrics_reference,
-                pheno_metrics_uncertainty_dir=result_dir,
-                vi_name=vi_name,
-                ymin=ymins[vi_name],
-                ymax=ymaxs[vi_name],
-                out_dir=out_dir_ts_plots_vi
-            )
+
+            # visualize_sample_time_series(
+            #     sample_points_scenarios=sample_points_scenarios,
+            #     sample_points_pheno_metrics_reference=sample_points_pheno_metrics_reference,
+            #     pheno_metrics_uncertainty_dir=result_dir,
+            #     vi_name=vi_name,
+            #     ymin=ymins[vi_name],
+            #     ymax=ymaxs[vi_name],
+            #     out_dir=out_dir_ts_plots_vi
+            # )

@@ -249,11 +249,6 @@ def vegetation_time_series_scenarios(
                 out_dir_scenario.mkdir()
             out_file = out_dir_scenario.joinpath('pheno_metrics.tif')
 
-            # save entire xarray for potential future analysis
-            xds_ref.to_netcdf(out_dir_scenario.joinpath('original_time_series_cube.nc'))
-            ds_ref.to_netcdf(out_dir_scenario.joinpath('smoothed_time_series_cube.nc'))
-            pheno_ds_ref.to_netcdf(out_dir_scenario.joinpath('pheno_metrics.nc'))
-
             for pheno_metric in pheno_metrics:
                 pheno_handler.add_band(
                     band_constructor=Band,

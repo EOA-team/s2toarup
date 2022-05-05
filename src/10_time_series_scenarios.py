@@ -4,7 +4,6 @@ Created on Mar 7, 2022
 @author: graflu
 '''
 
-import geopandas as gpd
 import pandas as pd
 import numpy as np
 import xarray as xr
@@ -68,11 +67,9 @@ def _calc_pheno_metrics(xds: xr.Dataset) -> Dict[str, xr.Dataset]:
 
 def vegetation_time_series_scenarios(
         ts_stack_dict: Dict[date, Sentinel2],
-        file_df: pd.DataFrame,
         n_scenarios: int,
         out_dir_scenarios: Path,
         vi_name: str,
-        sample_points: Path,
         min_val: float,
         max_val: float,
         fully_correlated: Optional[bool] = False
@@ -92,9 +89,6 @@ def vegetation_time_series_scenarios(
     :param ts_stack_dict:
         dictionary with ``SatDataHandler`` instances holding the vegetation parameter
         as one band and its uncertainty as another band per scene date
-    :param file_df:
-        pandas dataframe with links to the original files (parameter values + uncertainty)
-        for carrying out the reference run
     :param n_scenarios:
         number of scenarios to generate
     :param out_dir_scenarios:
@@ -104,9 +98,6 @@ def vegetation_time_series_scenarios(
     :param dates:
         list of dates. Must equal the length of the ``ts_stack_list``. Is used
         to assign a date to each handler to construct the time series.
-    :param sample_points:
-        shapefile with points to use for time series pixels samples. The extracted
-        time series are plotted and saved to a sub-directory called 'pixel_plots'
     :param min_val:
         minimum allowed value of the index or parameter in order to avoid impossible
         values
@@ -131,26 +122,6 @@ def vegetation_time_series_scenarios(
         ts_stack_dict[list(ts_stack_dict.keys())[0]][vi_name].geo_info.as_affine()
     )
 
-    # calculate the x and y array indices required to extract the pixel values
-    # at the sample locations from the array holding the smoothed vegetation
-    gdf_points = gpd.read_file(sample_points)
-    gdf_points['x'] = gdf_points.geometry.x
-    gdf_points['y'] = gdf_points.geometry.y
-
-    # map the coordinates to array indices
-    def find_nearest_array_index(array, value):
-        return np.abs(array - value).argmin()
-    # get column (x) indices
-    gdf_points['col'] = gdf_points['x'].apply(
-        lambda x, coords=coords, find_nearest_array_index=find_nearest_array_index:
-        find_nearest_array_index(coords['x'], x)
-    )
-    # get row (y) indices
-    gdf_points['row'] = gdf_points['y'].apply(
-        lambda y, coords=coords, find_nearest_array_index=find_nearest_array_index:
-        find_nearest_array_index(coords['y'], y)
-    )
-
     # loop over the scenarios. In each scenario run generate a xarray containing vegetation
     # index/parameter samples order by date (i.e., the xarray dataset is 3-dimensional: x,y,time)
     # save the calculated Pheno-metrics by the end of each scenario run to a raster file
@@ -164,46 +135,6 @@ def vegetation_time_series_scenarios(
         for _date in list(dates):
             vi_data = ts_stack_dict[_date][vi_name].values
             vi_unc = ts_stack_dict[_date][f'{vi_name}_unc'].values
-            # sample the test points
-            # sample original pixel (SCL classes have been masked) values only in first scenario run
-            if scenario == 0:
-
-                vegpar_file = file_df[file_df.date == _date]['filename_veg_par_scl'].iloc[0]
-                gdf_sample_data = RasterCollection.read_pixels(
-                    vector_features=sample_points,
-                    fpath_raster=vegpar_file,
-                    band_names_src=[vi_name]
-                )
-                colnames = list(gdf_sample_data.columns)
-                if None in colnames:
-                    colnames[colnames.index(None)] = vi_name
-                gdf_sample_data.columns = colnames
-
-                vegpar_unc = file_df[file_df.date == _date]['filename_unc_scl'].iloc[0]
-                gdf_sample_unc = RasterCollection.read_pixels(
-                    vector_features=sample_points,
-                    fpath_raster=vegpar_unc,
-                    band_names_src=[f'{vi_name}_unc']
-                )
-                gdf_sample_unc.rename({f'{vi_name}_unc': 'unc'}, axis=1, inplace=True)
-
-                # join the data frames
-                gdf = pd.merge(
-                    gdf_sample_data[['id', 'crop_type', 'geometry', vi_name]],
-                    gdf_sample_unc[['id', 'unc']],
-                    on='id'
-                )
-                gdf['date'] = _date
-
-                # join row and column
-                gdf_joined = pd.merge(
-                    gdf,
-                    gdf_points[['id', 'row', 'col']],
-                    on='id'
-                )
-                gdf_list.append(gdf_joined)
-                # append original raster data to stack once
-                orig_ts_list.append(vi_data)
 
             # get samples from uncertainty distribution and add it to the vi_data
             # (can be done directly because we deal with absolute uncertainties)
@@ -238,7 +169,7 @@ def vegetation_time_series_scenarios(
                     stacked[:,row,col] = np.random.normal(0,1,1)[0] * stacked[:,row,col] + stacked_org[:,row,col]
                     # constrain samples to min and max of the parameter
                     stacked[:,row,col][stacked[:,row,col] > max_val] = max_val
-                    stacked[:,row,col][sttheacked[:,row,col] < min_val] = min_val
+                    stacked[:,row,col][stacked[:,row,col] < min_val] = min_val
 
         # create the 3d numpy array to pass as xarray dataset
         stack = {'veg_index': tuple([('time', 'y','x'), stacked])}
@@ -248,7 +179,6 @@ def vegetation_time_series_scenarios(
         # again)
         if scenario == 0:
             orig_stack = {'veg_index': tuple([('time','y','x'), stacked_org])}
-            gdf = pd.concat(gdf_list)
 
         # gdf[(gdf.row == 690)&(gdf.col == 478)][['date','GLAI']]
         # construct xarray dataset for the scenario run
@@ -265,23 +195,6 @@ def vegetation_time_series_scenarios(
         except Exception as e:
             logger.error(f'Error in scenario ({scenario+1}/{n_scenarios}): {e}')
 
-        # get the smoothed time series values from the dataset at the sample locations
-        # unfortunately, there seems to be no ready-to-use solution
-        unique_points = gdf[gdf.date == gdf.date.unique()[0]][['id', 'row', 'col']]
-
-        scenario_col = f'{vi_name}_{scenario+1}'
-        # time series values
-        gdf[scenario_col] = np.empty(gdf.shape[0])
-
-        # loop over sample points and add them as new entries to the dataframe
-        for _, unique_point in unique_points.iterrows():
-            # get time series values
-            ts_values = ds[dict(x=[unique_point.col], y=[unique_point.row])]['veg_index'].data
-            gdf.loc[
-                (gdf.row == unique_point.row) & (gdf.col == unique_point.col) & (gdf.id == unique_point.id),
-                scenario_col
-            ] = ts_values[:,0,0]
-
         # do the same for the reference run
         if scenario == 0:
             try:
@@ -296,16 +209,6 @@ def vegetation_time_series_scenarios(
                 ds_ref = res_ref['ds'] # smoothed time series values
             except Exception as e:
                 logger.error(f'Error in reference run: {e}')
-
-            ref_col = f'{vi_name}_ts_sm'
-            gdf[ref_col] = np.empty(gdf.shape[0])
-            # loop over sample points and add them as new entries to the dataframe
-            for _, unique_point in unique_points.iterrows():
-                ts_values = ds_ref[dict(x=[unique_point.col], y=[unique_point.row])]['veg_index'].data
-                gdf.loc[
-                    (gdf.row == unique_point.row) & (gdf.col == unique_point.col) & (gdf.id == unique_point.id),
-                    ref_col
-                ] = ts_values[:,0,0]
 
         # save to raster files using the SatDataHandler object since it has the full geoinformation
         # available
@@ -345,6 +248,11 @@ def vegetation_time_series_scenarios(
                 out_dir_scenario.mkdir()
             out_file = out_dir_scenario.joinpath('pheno_metrics.tif')
 
+            # save entire xarray for potential future analysis
+            xds_ref.to_netcdf(out_dir_scenario.joinpath('original_time_series_cube.nc'))
+            ds_ref.to_netcdf(out_dir_scenario.joinpath('smoothed_time_series_cube.nc'))
+            pheno_ds_ref.to_netcdf(out_dir_scenario.joinpath('pheno_metrics.nc'))
+
             for pheno_metric in pheno_metrics:
                 pheno_handler.add_band(
                     band_constructor=Band,
@@ -363,24 +271,12 @@ def vegetation_time_series_scenarios(
 
         logger.info(f'Finished scenario ({scenario+1}/{n_scenarios})')
 
-    # save sample points to CSV (can be used for analyzing pixel time series)
-    fname_csv = out_dir_scenarios.joinpath(
-        f'{vi_name}_{sample_points.name}_pixel_time_series.csv'
-    )
-    gdf['date'] = gdf['date'].apply(lambda x: x.strftime('%Y-%m-%d'))
-    gdf['x'] = gdf.geometry.x
-    gdf['y'] = gdf.geometry.y
-    gdf.drop('geometry', axis=1, inplace=True)
-    gdf.dropna(inplace=True)
-    gdf.to_csv(fname_csv, index=False)
-
 def main(
         vi_dir: Path,
         uncertainty_analysis_dir: Path,
         out_dir_scenarios: Path,
         vi_name: str,
         sample_polygons: Path,
-        sample_points: Path,
         ymin: float,
         ymax: float,
         n_scenarios: int,
@@ -418,11 +314,9 @@ def main(
 
     vegetation_time_series_scenarios(
         ts_stack_dict=ts_stack_dict,
-        file_df=file_df,
         n_scenarios=n_scenarios,
         out_dir_scenarios=out_dir_scenarios_c,
         vi_name=vi_name,
-        sample_points=sample_points,
         min_val=ymin,
         max_val=ymax,
         fully_correlated=fully_correlated
@@ -486,7 +380,6 @@ if __name__ == '__main__':
                 out_dir_scenarios=out_dir_scenarios_vi,
                 vi_name=vi_name,
                 sample_polygons=sample_polygons,
-                sample_points=sample_points,
                 ymin=ymins[vi_name],
                 ymax=ymaxs[vi_name],
                 fully_correlated=corr,

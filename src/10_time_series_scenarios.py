@@ -50,7 +50,7 @@ def _calc_pheno_metrics(xds: xr.Dataset) -> Dict[str, xr.Dataset]:
     ds = interpolate(ds=ds, method='interpolate_na')
 
     #smooth data using Savitzky-Golay filtering
-    ds = smooth(ds=ds, method='savitsky', window_length=3, polyorder=1)
+    ds = smooth(ds=ds, method='savitsky', window_length=11, polyorder=1)
 
     # calculate the phenometrics using 20% seasonal amplitude
     pheno_ds = calc_phenometrics(

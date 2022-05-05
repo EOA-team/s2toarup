@@ -49,6 +49,9 @@ def _calc_pheno_metrics(xds: xr.Dataset) -> Dict[str, xr.Dataset]:
     # interpolate nans linearly
     ds = interpolate(ds=ds, method='interpolate_na')
 
+    # interpolate to daily values
+    ds = ds.resample(time="1D").interpolate("linear")
+
     #smooth data using Savitzky-Golay filtering
     ds = smooth(ds=ds, method='savitsky', window_length=11, polyorder=1)
 
@@ -209,7 +212,7 @@ def vegetation_time_series_scenarios(
             # - no inter-scene correlation
             # (the "truth" most likely lies somewhere in between)
             if fully_correlated:
-                samples = np.ones(shape=vi_data.shape) * vi_unc
+                samples = vi_unc
             #     samples = np.random.normal(0, 1, 1)[0] * samples
             else:
                 samples = np.random.normal(
@@ -224,16 +227,18 @@ def vegetation_time_series_scenarios(
             sample_list.append(samples)
 
         stacked = np.ma.stack(sample_list)
+        stacked = stacked.filled(np.nan)
         stacked_org = np.ma.stack(orig_ts_list)
+        stacked_org  = stacked_org.filled(np.nan)
         # fully correlated case - sample along the temporal axis
         if fully_correlated:
             for row in range(stacked.shape[1]):
                 for col in range(stacked.shape[2]):
-                    if stacked[:,row,col].mask.all(): continue
+                    if np.isnan(stacked[:,row,col]).all(): continue
                     stacked[:,row,col] = np.random.normal(0,1,1)[0] * stacked[:,row,col] + stacked_org[:,row,col]
                     # constrain samples to min and max of the parameter
                     stacked[:,row,col][stacked[:,row,col] > max_val] = max_val
-                    stacked[:,row,col][stacked[:,row,col] < min_val] = min_val
+                    stacked[:,row,col][sttheacked[:,row,col] < min_val] = min_val
 
         # create the 3d numpy array to pass as xarray dataset
         stack = {'veg_index': tuple([('time', 'y','x'), stacked])}
@@ -245,6 +250,7 @@ def vegetation_time_series_scenarios(
             orig_stack = {'veg_index': tuple([('time','y','x'), stacked_org])}
             gdf = pd.concat(gdf_list)
 
+        # gdf[(gdf.row == 690)&(gdf.col == 478)][['date','GLAI']]
         # construct xarray dataset for the scenario run
         try:
             xds = xr.Dataset(
@@ -252,7 +258,7 @@ def vegetation_time_series_scenarios(
                 coords=coords,
                 attrs=attrs
             )
-            xds = xds.resample(time="1D").interpolate("linear")
+            # xds = xds.resample(time="1D").interpolate("linear")
             res = _calc_pheno_metrics(xds)
             pheno_ds = res['pheno_metrics'] # pheno metric results
             ds = res['ds'] # smoothed time series values
@@ -284,7 +290,7 @@ def vegetation_time_series_scenarios(
                     coords=coords,
                     attrs=attrs
                 )
-                xds_ref = xds_ref.resample(time="1D").interpolate("linear")
+                # xds_ref = xds_ref.resample(time="1D").interpolate("linear")
                 res_ref = _calc_pheno_metrics(xds_ref)
                 pheno_ds_ref = res_ref['pheno_metrics'] # pheno metric results
                 ds_ref = res_ref['ds'] # smoothed time series values

@@ -156,6 +156,7 @@ def vegetation_time_series_scenarios(
                 samples[samples > max_val] = max_val
                 samples[samples < min_val] = min_val
             sample_list.append(samples)
+            orig_ts_list.append(vi_data)
 
         stacked = np.ma.stack(sample_list)
         stacked = stacked.filled(np.nan)

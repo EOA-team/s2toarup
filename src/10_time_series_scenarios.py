@@ -63,6 +63,21 @@ def _calc_pheno_metrics(xds: xr.Dataset) -> Dict[str, xr.Dataset]:
         factor=0.2,
         thresh_sides='two_sided'
     )
+
+    # debug
+    # import matplotlib.pyplot as plt
+    #
+    # plt.plot(ds['time'].values, ds['veg_index'].values[:,490,690], label='smoothed')
+    # sos = pheno_ds['sos_times'].values[490,690]
+    # eos = pheno_ds['eos_times'].values[490,690]
+    # first_date = ds['time'].values[0]
+    # sos_date = first_date + np.timedelta64(int(sos), 'D')
+    # eos_date = first_date + np.timedelta64(int(eos), 'D')
+    # plt.vlines(sos_date, ymin=0,ymax=6)
+    # plt.vlines(eos_date, ymin=0,ymax=6)
+    # plt.ylim(0,6)
+    # plt.xticks(rotation=90)
+
     return {'pheno_metrics': pheno_ds, 'ds': ds}
 
 def vegetation_time_series_scenarios(
@@ -127,6 +142,13 @@ def vegetation_time_series_scenarios(
     # save the calculated Pheno-metrics by the end of each scenario run to a raster file
     orig_ts_list = []
     for scenario in range(n_scenarios):
+
+        out_dir_scenario = out_dir_scenarios.joinpath(str(scenario+1))
+        if not out_dir_scenario.exists():
+            out_dir_scenario.mkdir()
+        else:
+            logger.info(f'Scenario {scenario+1}/{n_scenarios} already exists - skipping')
+            continue
 
         logger.info(f'Running scenario ({scenario+1}/{n_scenarios})')
         # add vegetation samples to 3d numpy array and pass it to xarray dataset
@@ -218,9 +240,6 @@ def vegetation_time_series_scenarios(
             'sos_values', 'sos_times', 'pos_values', 'pos_times', 'eos_values', 'eos_times'
         ]
 
-        out_dir_scenario = out_dir_scenarios.joinpath(str(scenario+1))
-        if not out_dir_scenario.exists():
-            out_dir_scenario.mkdir()
         out_file = out_dir_scenario.joinpath('pheno_metrics.tif')
 
         for pheno_metric in pheno_metrics:

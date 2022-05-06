@@ -17,7 +17,8 @@ import os
 import seaborn as sns
 import re
 
-from agrisatpy.io import SatDataHandler
+from agrisatpy.core.band import Band
+from agrisatpy.core.raster import RasterCollection
 from agrisatpy.utils.constants.sentinel2 import s2_gain_factor
 from pathlib import Path
 
@@ -32,104 +33,104 @@ s2_band_selection = ['B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B8A', 'B1
 
 
 def calc_uncertainty(
-        scenario_dir: Path,
+        scene_dir: Path,
         out_dir: Path
     ):
     """
     Calculates absolute uncertainty per uncertainty type (random or systematic)
     and spectral band as the standard deviation of all scenario members.
 
-    :param scenario_dir:
-        directory where the Monte-Carlo scenarios are stored (organized by scene)
+    :param scene_dir:
+        directory where the scenes and their MC results are stored
     :param out_dir:
         directory where to store the results (create sub-directories for the
         scenes analyzed)
     """
 
-    # get scenes
-    search_expr = 'S2*_MSIL1C_*'
-    scenes = glob.glob(scenario_dir.joinpath(search_expr).as_posix())
+    # get scenarios (numbered from 1 to N)
+    m = re.compile('\d')
+    scenarios = [f for f in os.listdir(scene_dir) if m.search(f)]
+    scenarios = [Path(scene_dir).joinpath(x) for x in scenarios]
 
-    for scene in scenes:
+    out_dir_scene = out_dir.joinpath(Path(scene_dir).name)
+    out_dir_scene.mkdir(exist_ok=True)
 
-        # get scenarios (numbered from 1 to N)
-        m = re.compile('\d')
-        scenarios = [f for f in os.listdir(scene) if m.search(f)]
-        scenarios = [Path(scene).joinpath(x) for x in scenarios]
+    logger.info(f'Working on {scene_dir}')
 
-        out_dir_scene = out_dir.joinpath(Path(scene).name)
-        out_dir_scene.mkdir(exist_ok=True)
+    # loop over spectral bands (uncertainty is always calculated per band)
+    for band in s2_band_selection:
+        # loop over scenarios
+        for idx, scenario in enumerate(scenarios):
 
-        logger.info(f'Working on {scene}')
-
-        # loop over spectral bands (uncertainty is always calculated per band)
-        for band in s2_band_selection:
-            # loop over scenarios
-            for idx, scenario in enumerate(scenarios):
-
-                # get random and systematic results
-                fname_rand = Path(scenario).joinpath(
-                    f'uncorrelated_contributors_sample_{band}.jp2'
-                )
-                fname_sys = Path(scenario).joinpath(
-                    f'correlated_contributors_sample_{band}.jp2'
-                )
-
-                # read data into memory
-                rand_handler = SatDataHandler()
-                rand_handler.read_from_bandstack(
-                    fname_bandstack=fname_rand
-                )
-                rand_data = rand_handler.get_band('B1')
-
-                sys_handler = SatDataHandler()
-                sys_handler.read_from_bandstack(
-                    fname_bandstack=fname_sys
-                )
-                sys_data = sys_handler.get_band('B1')
-
-                if idx == 0:
-                    rand_array = np.zeros(
-                        shape=(len(scenarios), rand_data.shape[0], rand_data.shape[1]),
-                        dtype=rand_data.dtype
-                    )
-                    sys_array = np.zeros(
-                        shape=(len(scenarios), sys_data.shape[0], sys_data.shape[1]),
-                        dtype=sys_data.dtype
-                    )
-
-                rand_array[idx,:,:] = rand_data
-                sys_array[idx,:,:] = sys_data
-
-            # calculate standard uncertainty
-            rand_unc = np.nanstd(rand_array, axis=0)
-            sys_unc = np.nanstd(sys_array, axis=0)
-
-            fname_sys = out_dir_scene.joinpath(f'systematic_uncertainty_{band}.tif')
-            fname_rand = out_dir_scene.joinpath(f'random_uncertainty_{band}.tif')
-
-            sys_handler.add_band(
-                band_data=sys_unc,
-                band_name='sys_unc',
-                snap_band='B1'
+            # get random and systematic results
+            fname_rand = Path(scenario).joinpath(
+                f'uncorrelated_contributors_sample_{band}.jp2'
             )
+            fname_sys = Path(scenario).joinpath(
+                f'correlated_contributors_sample_{band}.jp2'
+            )
+
+            # read data into memory
+            rand_handler = RasterCollection()
             rand_handler.add_band(
-                band_data=rand_unc,
-                band_name='rand_unc',
-                snap_band='B1'
+                band_constructor=Band.from_rasterio,
+                fpath_raster=fname_rand,
+                band_name_dst='random'
             )
+            rand_data = rand_handler.get_band('random').values
 
-            # save as raster
-            sys_handler.write_bands(
-                out_file=fname_sys,
-                band_names=['sys_unc']
+            sys_handler = RasterCollection()
+            sys_handler.add_band(
+                band_constructor=Band.from_rasterio,
+                fpath_raster=fname_sys,
+                band_name_dst='systematic'
             )
-            rand_handler.write_bands(
-                out_file=fname_rand,
-                band_names=['rand_unc']
-            )
+            sys_data = sys_handler.get_band('systematic').values
 
-        logger.info(f'Finished {scene}')
+            if idx == 0:
+                rand_array = np.zeros(
+                    shape=(len(scenarios), rand_data.shape[0], rand_data.shape[1]),
+                    dtype=rand_data.dtype
+                )
+                sys_array = np.zeros(
+                    shape=(len(scenarios), sys_data.shape[0], sys_data.shape[1]),
+                    dtype=sys_data.dtype
+                )
+
+            rand_array[idx,:,:] = rand_data
+            sys_array[idx,:,:] = sys_data
+
+        # calculate standard uncertainty
+        rand_unc = np.nanstd(rand_array, axis=0)
+        sys_unc = np.nanstd(sys_array, axis=0)
+
+        fname_sys = out_dir_scene.joinpath(f'systematic_uncertainty_{band}.tif')
+        fname_rand = out_dir_scene.joinpath(f'random_uncertainty_{band}.tif')
+
+        sys_handler.add_band(
+            band_constructor=Band,
+            values=sys_unc,
+            band_name='sys_unc',
+            geo_info=sys_handler['systematic'].geo_info
+        )
+        rand_handler.add_band(
+            band_constructor=Band,
+            values=rand_unc,
+            band_name='rand_unc',
+            geo_info=rand_handler['random'].geo_info
+        )
+
+        # save as raster
+        sys_handler.to_rasterio(
+            fpath_raster=fname_sys,
+            band_selection=['sys_unc']
+        )
+        rand_handler.to_rasterio(
+            fpath_raster=fname_rand,
+            band_selection=['rand_unc']
+        )
+
+    logger.info(f'Finished {scene_dir}')
 
 
 def map_uncertainty(unc_results_dir: Path):
@@ -150,14 +151,20 @@ def map_uncertainty(unc_results_dir: Path):
 
             # random results
             fname_random = Path(scene).joinpath(f'random_uncertainty_{band}.tif')
-            random_unc_handler = SatDataHandler()
-            random_unc_handler.read_from_bandstack(fname_random)
+            random_unc_handler = RasterCollection()
+            random_unc_handler.from_multi_band_raster(
+                fpath_raster=fname_random,
+                band_names_dst=[f'Random Radiometric Uncertainty {band}']
+            )
             random_unc_stats = random_unc_handler.get_band_summaries()
 
             # systematic results
             fname_sys = Path(scene).joinpath(f'systematic_uncertainty_{band}.tif')
-            sys_unc_handler = SatDataHandler()
-            sys_unc_handler.read_from_bandstack(fname_sys)
+            sys_unc_handler = RasterCollection()
+            sys_unc_handler.from_multi_band_raster(
+                fpath_raster=fname_sys,
+                band_name_dst=[f'Systematic Radiometric Uncertainty {band}']
+            )
             sys_unc_stats = sys_unc_handler.get_band_summaries()
 
             # determine vmin and vmax for plotting
@@ -168,7 +175,6 @@ def map_uncertainty(unc_results_dir: Path):
                 [random_unc_stats['nanmax'].iloc[0], sys_unc_stats['nanmax'].iloc[0]]
             )
 
-            random_unc_handler.reset_bandnames([f'Random Radiometric Uncertainty {band}'])
             fig_random_unc = random_unc_handler.plot_band(
                 band_name=f'Random Radiometric Uncertainty {band}',
                 colormap='terrain',
@@ -211,25 +217,24 @@ def analyze_rois(
 
         # random results
         fname_random = scene_path.joinpath(f'random_uncertainty_{band}.tif')
-        random_unc_handler = SatDataHandler()
-        random_unc_handler.read_from_bandstack(
-            fname_random,
-            in_file_aoi=rois
+        random_unc_handler = RasterCollection()
+        random_unc_handler.add_band(
+            band_constructor=Band.from_rasterio,
+            fpath_raster=fname_random,
+            vector_features=rois,
+            band_name_dst='random uncertainty'
         )
-        random_unc_handler.add_bands_from_vector(
+        random_unc_handler.aad_band(
             in_file_vector=rois,
             snap_band=random_unc_handler.bandnames[0],
             attribute_selection=['luc_code']
         )
         gdf_rand = random_unc_handler.to_dataframe()
-        gdf_rand = gdf_rand.rename(
-            columns={'rand_unc': f'random uncertainty'}
-        )
 
         # systematic results
         fname_sys = scene_path.joinpath(f'systematic_uncertainty_{band}.tif')
-        sys_unc_handler = SatDataHandler()
-        sys_unc_handler.read_from_bandstack(
+        sys_unc_handler = RasterCollection()
+        sys_unc_handler.add_band(
             fname_sys,
             in_file_aoi=rois
         )
@@ -298,35 +303,36 @@ def analyze_rois(
         # save figure
         fname = scene_path.joinpath(f'{roi.replace(" ","_")}_histogram_plots.png')
         f.savefig(fname, dpi=150, bbox_inches='tight')
-        
-                
-            
-            
-        
 
 
 if __name__ == '__main__':
 
-    scenario_dir = Path('../S2A_MSIL1C_RUT-Scenarios/contributor_analysis')
-    out_dir = Path('../S2A_MSIL1C_RUT-Scenarios/L1C_Analysis')
-    out_dir.mkdir(exist_ok=True)
+    batches = [str(x) for x in range(1,6)]
 
-    # calc_uncertainty(scenario_dir, out_dir)
-    # map_uncertainty(unc_results_dir=out_dir)
+    for batch in batches:
 
-    plt.style.use('ggplot')
-    matplotlib.rc('xtick', labelsize=20) 
-    matplotlib.rc('ytick', labelsize=20)
+        scenario_dir = Path(f'/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2_MSIL1C_RUT-Scenarios/batch_{batch}')
+        out_dir = Path('/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2_MSIL1C_RUT-Scenarios/L1C_Analysis')
+        out_dir.mkdir(exist_ok=True)
+        # calc_uncertainty(scenario_dir, out_dir)
+        # map_uncertainty(unc_results_dir=out_dir)
+    
+        plt.style.use('ggplot')
+        matplotlib.rc('xtick', labelsize=20) 
+        matplotlib.rc('ytick', labelsize=20)
 
-    scene_path = out_dir.joinpath('S2A_MSIL1C_20190530T103031_N0207_R108_T32TMT_20190530T123429')
-    roi_file = Path('../shp/ZH_Sampling_Locations_Contributor_Analysis.shp')
-    luc_mapping = {
-        1: 'Water (Lake)',
-        2: 'Cumulus Cloud',
-        3: 'Mixed Forest',
-        4: 'Arable land (green vegetation)'
-    }
+        for scene_path in scenario_dir.glob('*MSIL1C*'):
+            calc_uncertainty(scene_dir=scene_path, out_dir=out_dir)
+    
+        scene_path = out_dir.joinpath('S2A_MSIL1C_20190530T103031_N0207_R108_T32TMT_20190530T123429')
+        roi_file = Path('../shp/ZH_Sampling_Locations_Contributor_Analysis.shp')
+        luc_mapping = {
+            1: 'Water (Lake)',
+            2: 'Cumulus Cloud',
+            3: 'Mixed Forest',
+            4: 'Arable land (green vegetation)'
+        }
 
-    analyze_rois(scene_path, roi_file, luc_mapping)
+        analyze_rois(scene_path, roi_file, luc_mapping)
     
     

@@ -152,20 +152,22 @@ def map_uncertainty(unc_results_dir: Path):
             # random results
             fname_random = Path(scene).joinpath(f'random_uncertainty_{band}.tif')
             random_unc_handler = RasterCollection()
-            random_unc_handler.from_multi_band_raster(
+            random_unc_handler.add_band(
+                band_constructor=Band.from_rasterio,
                 fpath_raster=fname_random,
-                band_names_dst=[f'Random Radiometric Uncertainty {band}']
+                band_name_dst=f'Random Radiometric Uncertainty {band}'
             )
-            random_unc_stats = random_unc_handler.get_band_summaries()
+            random_unc_stats = random_unc_handler.band_summaries()
 
             # systematic results
             fname_sys = Path(scene).joinpath(f'systematic_uncertainty_{band}.tif')
             sys_unc_handler = RasterCollection()
-            sys_unc_handler.from_multi_band_raster(
+            sys_unc_handler.add_band(
+                band_constructor=Band.from_rasterio,
                 fpath_raster=fname_sys,
-                band_name_dst=[f'Systematic Radiometric Uncertainty {band}']
+                band_name_dst=f'Systematic Radiometric Uncertainty {band}'
             )
-            sys_unc_stats = sys_unc_handler.get_band_summaries()
+            sys_unc_stats = sys_unc_handler.band_summaries()
 
             # determine vmin and vmax for plotting
             minmin = np.min(
@@ -186,8 +188,7 @@ def map_uncertainty(unc_results_dir: Path):
             fname_fig_random_unc = Path(scene).joinpath(f'random_uncertainty_{band}.png')
             fig_random_unc.savefig(fname_fig_random_unc, dpi=150, bbox_inches='tight')
             plt.close(fig_random_unc)
-            
-            sys_unc_handler.reset_bandnames([f'Systematic Radiometric Uncertainty {band}'])
+
             fig_sys_unc = sys_unc_handler.plot_band(
                 band_name=f'Systematic Radiometric Uncertainty {band}',
                 colormap='terrain',
@@ -323,16 +324,19 @@ if __name__ == '__main__':
 
         for scene_path in scenario_dir.glob('*MSIL1C*'):
             calc_uncertainty(scene_dir=scene_path, out_dir=out_dir)
-    
-        scene_path = out_dir.joinpath('S2A_MSIL1C_20190530T103031_N0207_R108_T32TMT_20190530T123429')
-        roi_file = Path('../shp/ZH_Sampling_Locations_Contributor_Analysis.shp')
-        luc_mapping = {
-            1: 'Water (Lake)',
-            2: 'Cumulus Cloud',
-            3: 'Mixed Forest',
-            4: 'Arable land (green vegetation)'
-        }
+            break
 
-        analyze_rois(scene_path, roi_file, luc_mapping)
+        map_uncertainty(unc_results_dir=out_dir)
+    
+        # scene_path = out_dir.joinpath('S2A_MSIL1C_20190530T103031_N0207_R108_T32TMT_20190530T123429')
+        # roi_file = Path('../shp/ZH_Sampling_Locations_Contributor_Analysis.shp')
+        # luc_mapping = {
+        #     1: 'Water (Lake)',
+        #     2: 'Cumulus Cloud',
+        #     3: 'Mixed Forest',
+        #     4: 'Arable land (green vegetation)'
+        # }
+        #
+        # analyze_rois(scene_path, roi_file, luc_mapping)
     
     

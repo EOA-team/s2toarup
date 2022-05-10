@@ -15,7 +15,7 @@ plt.style.use('ggplot')
 if __name__ == '__main__':
 
     lsp_res_dir = Path(
-        '../../S2_TimeSeries_Analysis'
+        '../../S2_TimeSeries_Analysis_Test'
     )
 
     vis = ['EVI', 'NDVI', 'GLAI']

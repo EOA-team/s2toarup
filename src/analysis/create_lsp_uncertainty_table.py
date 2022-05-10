@@ -64,12 +64,12 @@ def combine_results(
 
 if __name__ == '__main__':
 
-    lsp_res_dir = Path('../../S2_TimeSeries_Analysis')
+    lsp_res_dir = Path('../../S2_TimeSeries_Analysis_Test')
     vis = ['EVI', 'NDVI', 'GLAI']
     interscene_correlations = ['uncorrelated','fully_correlated']
     lsp_metrics = ['sos_times', 'eos_times']
 
-    output_dir = Path('/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/01_Uncertainty/ESCH/scripts_paper_uncertainty/S2_TimeSeries_Analysis')
+    output_dir = Path('../../S2_TimeSeries_Analysis_Test')
 
     combine_results(lsp_res_dir, vis, interscene_correlations, lsp_metrics, output_dir)
 

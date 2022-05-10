@@ -140,7 +140,6 @@ def vegetation_time_series_scenarios(
     # loop over the scenarios. In each scenario run generate a xarray containing vegetation
     # index/parameter samples order by date (i.e., the xarray dataset is 3-dimensional: x,y,time)
     # save the calculated Pheno-metrics by the end of each scenario run to a raster file
-    orig_ts_list = []
     for scenario in range(n_scenarios):
 
         out_dir_scenario = out_dir_scenarios.joinpath(str(scenario+1))
@@ -154,6 +153,7 @@ def vegetation_time_series_scenarios(
         # add vegetation samples to 3d numpy array and pass it to xarray dataset
         sample_list = []
         gdf_list = []
+        orig_ts_list = []
         for _date in list(dates):
             vi_data = ts_stack_dict[_date][vi_name].values
             vi_unc = ts_stack_dict[_date][f'{vi_name}_unc'].values
@@ -380,7 +380,7 @@ if __name__ == '__main__':
     if not out_dir_scenarios.exists():
         out_dir_scenarios.mkdir()
 
-    fully_correlated = [False, True]
+    fully_correlated = [True] # [False, True]
 
     for idx, vi_name in enumerate(vi_names):
 

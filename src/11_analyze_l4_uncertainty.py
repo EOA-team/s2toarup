@@ -495,7 +495,7 @@ def visualize_sample_time_series(
 
 if __name__ == '__main__':
 
-    vi_names = ['GLAI'] #['NDVI', 'EVI', 'GLAI']
+    vi_names = ['NDVI', 'EVI', 'GLAI']
     ymins = {'NDVI': 0, 'EVI': 0, 'GLAI': 0}
     ymaxs = {'NDVI': 1, 'EVI': 1, 'GLAI': 7}
 
@@ -519,30 +519,30 @@ if __name__ == '__main__':
     # two ways of inter-scene correlation
     corr_types = ['uncorrelated', 'fully_correlated']
 
-    for corr_type in corr_types:
-        for vi_name in vi_names:
-    
-            uncertainty_dir = Path(f'../S2_TimeSeries_Analysis_Test/{vi_name}/{corr_type}')
-            out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
-            if not out_dir.exists():
-                out_dir.mkdir()
-            result_dir = out_dir
-    
-            out_dir_crops = out_dir.joinpath('selected_crops')
-            if not out_dir_crops.exists():
-                out_dir_crops.mkdir()
-    
-            out_dir_ts_plots = out_dir.joinpath('pixel_time_series')
-            if not out_dir_ts_plots.exists():
-                out_dir_ts_plots.mkdir()
-    
-    
-            calc_l4_uncertainty(
-                uncertainty_dir=uncertainty_dir,
-                out_dir=out_dir,
-                vi_name=vi_name,
-                shp_crops=shapefile_crops
-            )
+    # for corr_type in corr_types:
+    #     for vi_name in vi_names:
+    #
+    #         uncertainty_dir = Path(f'../S2_TimeSeries_Analysis_Test/{vi_name}/{corr_type}')
+    #         out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
+    #         if not out_dir.exists():
+    #             out_dir.mkdir()
+    #         result_dir = out_dir
+    #
+    #         out_dir_crops = out_dir.joinpath('selected_crops')
+    #         if not out_dir_crops.exists():
+    #             out_dir_crops.mkdir()
+    #
+    #         out_dir_ts_plots = out_dir.joinpath('pixel_time_series')
+    #         if not out_dir_ts_plots.exists():
+    #             out_dir_ts_plots.mkdir()
+    #
+    #
+    #         calc_l4_uncertainty(
+    #             uncertainty_dir=uncertainty_dir,
+    #             out_dir=out_dir,
+    #             vi_name=vi_name,
+    #             shp_crops=shapefile_crops
+    #         )
 
     # change plot style here to ggplot (therefore, use two different loops)
     plt.style.use('ggplot')
@@ -573,20 +573,20 @@ if __name__ == '__main__':
                 )
     
             # visualize the randomly selected pixel time series samples
-            vi_dir = uncertainty_dir
-            # path to pixel samples
-            sample_points_scenarios = glob.glob(
-                vi_dir.joinpath(f'{vi_name}_*time_series.csv').as_posix()
-            )[0]
-            
-            # path to reference pheno metric results (calculated on original time series data)
-            sample_points_pheno_metrics_reference = vi_dir.joinpath(
-                'reference'
-                ).joinpath(
-                    'pheno_metrics.tif'
-                )
-    
-            out_dir_ts_plots_vi = out_dir_ts_plots
+            # vi_dir = uncertainty_dir
+            # # path to pixel samples
+            # sample_points_scenarios = glob.glob(
+            #     vi_dir.joinpath(f'{vi_name}_*time_series.csv').as_posix()
+            # )[0]
+            #
+            # # path to reference pheno metric results (calculated on original time series data)
+            # sample_points_pheno_metrics_reference = vi_dir.joinpath(
+            #     'reference'
+            #     ).joinpath(
+            #         'pheno_metrics.tif'
+            #     )
+            #
+            # out_dir_ts_plots_vi = out_dir_ts_plots
 
             # visualize_sample_time_series(
             #     sample_points_scenarios=sample_points_scenarios,

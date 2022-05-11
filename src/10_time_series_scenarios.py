@@ -4,6 +4,7 @@ Created on Mar 7, 2022
 @author: graflu
 '''
 
+import geopandas as gpd
 import pandas as pd
 import numpy as np
 import xarray as xr
@@ -23,7 +24,11 @@ from logger import get_logger
 
 logger = get_logger('10_time_series_scenarios')
 
-def _calc_pheno_metrics(xds: xr.Dataset) -> Dict[str, xr.Dataset]:
+def _calc_pheno_metrics(
+        xds: xr.Dataset,
+        debug: Optional[bool] = False,
+        point_features: Optional[Path] = None
+    ) -> Dict[str, xr.Dataset]:
     """
     Calculation of the phenological metrics using ``Phenolopy``.
 
@@ -36,11 +41,22 @@ def _calc_pheno_metrics(xds: xr.Dataset) -> Dict[str, xr.Dataset]:
     :param xds:
         ``xarray`` dataset containing the vegetation parameter/index
         stacked over time
+    :param debug:
+        if True does extract time series at single points for different
+        crop types
+    :param point_features:
+        point features for extraction if debug == True
     :return:
         dictionary with two items: 'pheno_metrics' is a ``xarray``
         dataset with pixel-based pheno-metrics. 'ds' contains the smoothed
         per-pixel time series as another ``xarray`` dataset.
     """
+
+    # create indexers for extracting point features (optional)
+    if debug:
+        gdf = gpd.read_file(point_features)
+        x_indexer = xr.DataArray(gdf.geometry.x, dims=["point"])
+        y_indexer = xr.DataArray(gdf.geometry.y, dims=["point"])
 
     # remove outliers using median filter
     ds = remove_outliers(xds, method='median', user_factor=2, z_pval=0.05)
@@ -65,18 +81,13 @@ def _calc_pheno_metrics(xds: xr.Dataset) -> Dict[str, xr.Dataset]:
     )
 
     # debug
-    # import matplotlib.pyplot as plt
-    #
-    # plt.plot(ds['time'].values, ds['veg_index'].values[:,490,690], label='smoothed')
-    # sos = pheno_ds['sos_times'].values[490,690]
-    # eos = pheno_ds['eos_times'].values[490,690]
-    # first_date = ds['time'].values[0]
-    # sos_date = first_date + np.timedelta64(int(sos), 'D')
-    # eos_date = first_date + np.timedelta64(int(eos), 'D')
-    # plt.vlines(sos_date, ymin=0,ymax=6)
-    # plt.vlines(eos_date, ymin=0,ymax=6)
-    # plt.ylim(0,6)
-    # plt.xticks(rotation=90)
+    if debug:
+        # extract data
+        time = ds['time'].sel(x=x_indexer, y=y_indexer, method="nearest")
+        veg_index = ds['veg_index'].sel(x=x_indexer, y=y_indexer, method="nearest")
+        sos_times = ds['sos_times'].sel(x=x_indexer, y=y_indexer, method="nearest")
+        eos_times = ds['eos_times'].sel(x=x_indexer, y=y_indexer, method="nearest")
+        # join on dataframe features
 
     return {'pheno_metrics': pheno_ds, 'ds': ds}
 
@@ -87,6 +98,7 @@ def vegetation_time_series_scenarios(
         vi_name: str,
         min_val: float,
         max_val: float,
+        sample_points: Path,
         fully_correlated: Optional[bool] = False
     ) -> None:
     """
@@ -119,6 +131,8 @@ def vegetation_time_series_scenarios(
     :param max_val:
         maximum allowed value of the index or paramter in order to avoid impossible
         values
+    :param sample_points:
+        point features for sampling points for debugging
     :param fully_correlated:
         inter-scene correlation (full or None)
     """
@@ -227,7 +241,11 @@ def vegetation_time_series_scenarios(
                     attrs=attrs
                 )
                 # xds_ref = xds_ref.resample(time="1D").interpolate("linear")
-                res_ref = _calc_pheno_metrics(xds_ref)
+                res_ref = _calc_pheno_metrics(
+                    xds_ref,
+                    debug=True,
+                    point_features=sample_points
+                )
                 pheno_ds_ref = res_ref['pheno_metrics'] # pheno metric results
                 ds_ref = res_ref['ds'] # smoothed time series values
             except Exception as e:
@@ -296,6 +314,7 @@ def main(
         ymax: float,
         n_scenarios: int,
         crop_periods: Path,
+        sample_points: Path,
         fully_correlated: Optional[bool] = False
     ):
     """
@@ -334,7 +353,8 @@ def main(
         vi_name=vi_name,
         min_val=ymin,
         max_val=ymax,
-        fully_correlated=fully_correlated
+        fully_correlated=fully_correlated,
+        sample_points=sample_points
     )
 
 if __name__ == '__main__':
@@ -399,5 +419,6 @@ if __name__ == '__main__':
                 ymax=ymaxs[vi_name],
                 fully_correlated=corr,
                 crop_periods=crop_periods,
-                n_scenarios=n_scenarios
+                n_scenarios=n_scenarios,
+                sample_points=sample_points
             )

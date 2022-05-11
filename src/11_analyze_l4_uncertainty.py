@@ -120,7 +120,11 @@ def calc_l4_uncertainty(
         
         # get bandstack of all scenarios of the pheno metric to calculate the standard
         # deviation (=standard uncertainty)
-        stack_list = [x[pheno_metric].values for x in handler_list]
+        if pheno_metric != 'length_of_season':
+            stack_list = [x[pheno_metric].values for x in handler_list]
+        else:
+            # length of season is the difference between EOS and SOS in days
+            stack_list = [x['eos_times'].values - x['sos_times'] for x in handler_list]
         stack_array = np.stack(stack_list)
         standard_unc = np.nanstd(stack_array, axis=0)
         # calculate mean of scenarios
@@ -501,10 +505,10 @@ if __name__ == '__main__':
 
     # pheno-metrics to analyze
     pheno_metrics = [
-        'sos_times', 'pos_times', 'eos_times'
+        'sos_times', 'pos_times', 'eos_times', 'length_of_season'
     ]
     pheno_metrics_aliases = [
-        'SOS', 'POS', 'EOS'
+        'SOS', 'POS', 'EOS', 'LOS'
     ]
 
     # shapefile with crop type information for the single field parcels
@@ -519,30 +523,30 @@ if __name__ == '__main__':
     # two ways of inter-scene correlation
     corr_types = ['uncorrelated', 'fully_correlated']
 
-    # for corr_type in corr_types:
-    #     for vi_name in vi_names:
-    #
-    #         uncertainty_dir = Path(f'../S2_TimeSeries_Analysis_Test/{vi_name}/{corr_type}')
-    #         out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
-    #         if not out_dir.exists():
-    #             out_dir.mkdir()
-    #         result_dir = out_dir
-    #
-    #         out_dir_crops = out_dir.joinpath('selected_crops')
-    #         if not out_dir_crops.exists():
-    #             out_dir_crops.mkdir()
-    #
-    #         out_dir_ts_plots = out_dir.joinpath('pixel_time_series')
-    #         if not out_dir_ts_plots.exists():
-    #             out_dir_ts_plots.mkdir()
-    #
-    #
-    #         calc_l4_uncertainty(
-    #             uncertainty_dir=uncertainty_dir,
-    #             out_dir=out_dir,
-    #             vi_name=vi_name,
-    #             shp_crops=shapefile_crops
-    #         )
+    for corr_type in corr_types:
+        for vi_name in vi_names:
+    
+            uncertainty_dir = Path(f'../S2_TimeSeries_Analysis_Test/{vi_name}/{corr_type}')
+            out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
+            if not out_dir.exists():
+                out_dir.mkdir()
+            result_dir = out_dir
+    
+            out_dir_crops = out_dir.joinpath('selected_crops')
+            if not out_dir_crops.exists():
+                out_dir_crops.mkdir()
+    
+            out_dir_ts_plots = out_dir.joinpath('pixel_time_series')
+            if not out_dir_ts_plots.exists():
+                out_dir_ts_plots.mkdir()
+    
+    
+            calc_l4_uncertainty(
+                uncertainty_dir=uncertainty_dir,
+                out_dir=out_dir,
+                vi_name=vi_name,
+                shp_crops=shapefile_crops
+            )
 
     # change plot style here to ggplot (therefore, use two different loops)
     plt.style.use('ggplot')

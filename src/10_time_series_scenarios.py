@@ -83,11 +83,24 @@ def _calc_pheno_metrics(
     # debug
     if debug:
         # extract data
-        time = ds['time'].sel(x=x_indexer, y=y_indexer, method="nearest")
-        veg_index = ds['veg_index'].sel(x=x_indexer, y=y_indexer, method="nearest")
-        sos_times = ds['sos_times'].sel(x=x_indexer, y=y_indexer, method="nearest")
-        eos_times = ds['eos_times'].sel(x=x_indexer, y=y_indexer, method="nearest")
-        # join on dataframe features
+        veg_index = ds['veg_index'].sel(x=x_indexer, y=y_indexer, method="nearest").to_dataframe()
+        sos_times = pheno_ds['sos_times'].sel(x=x_indexer, y=y_indexer, method="nearest").to_dataframe()
+        eos_times = pheno_ds['eos_times'].sel(x=x_indexer, y=y_indexer, method="nearest").to_dataframe()
+        # convert to GeoDataFrames
+        def _to_gdf(df):
+            return gpd.GeoDataFrame(
+                df, geometry=gpd.points_from_xy(df.x, df.y), crs=32632
+            )
+        veg_index = _to_gdf(df=veg_index)
+        sos_times = _to_gdf(df=sos_times)
+        eos_times = _to_gdf(df=eos_times)
+        # join on coordinates
+        joined = veg_index.sjoin(sos_times)
+        joined.drop(columns=['x_left','y_left','x_right','y_right','index_right'], inplace=True)
+        ts_gdf = joined.sjoin(eos_times)
+        # nearest neighbor spatial join on gdf
+        sample_gdf = ts_gdf.sjoin_nearest(right=gdf, lsuffix='l', rsuffix='r')
+        sample_gdf.to_file('../S2_TimeSeries_Analysis/sample_pixels.gkpg', driver='GPKG')
 
     return {'pheno_metrics': pheno_ds, 'ds': ds}
 
@@ -385,10 +398,11 @@ if __name__ == '__main__':
     )
 
     # vegetation index to consider
-    arg = sys.argv
-    with open(arg[1], 'r') as src:
-        vi = src.readlines()
-        vi_names = [vi[0].replace('\n','')]
+    # arg = sys.argv
+    # with open(arg[1], 'r') as src:
+    #     vi = src.readlines()
+    #     vi_names = [vi[0].replace('\n','')]
+    vi_names = ['EVI', 'NDVI', 'GLAI']
     ymins = {'NDVI': -1, 'EVI': -1, 'GLAI': 0}
     ymaxs = {'NDVI': 1, 'EVI': 1, 'GLAI': 7}
 

@@ -109,9 +109,13 @@ def calc_l4_uncertainty(
         handler_list.append(handler)
         handler = None
         logger.info(f'Reading scenario {idx+1}/{len(scenarios)} ({scenario})')
+        # debug
+        # break
 
     # calculate the absolute uncertainty for each phenological metric
-    pheno_metrics = dict.fromkeys(handler_list[0].band_names)
+    pheno_metric_keys = handler_list[0].band_names
+    pheno_metric_keys.append('length_of_season')
+    pheno_metrics = dict.fromkeys(pheno_metric_keys)
     
     for pheno_metric in pheno_metrics:
 
@@ -124,7 +128,7 @@ def calc_l4_uncertainty(
             stack_list = [x[pheno_metric].values for x in handler_list]
         else:
             # length of season is the difference between EOS and SOS in days
-            stack_list = [x['eos_times'].values - x['sos_times'] for x in handler_list]
+            stack_list = [x['eos_times'].values - x['sos_times'].values for x in handler_list]
         stack_array = np.stack(stack_list)
         standard_unc = np.nanstd(stack_array, axis=0)
         # calculate mean of scenarios
@@ -505,10 +509,10 @@ if __name__ == '__main__':
 
     # pheno-metrics to analyze
     pheno_metrics = [
-        'sos_times', 'pos_times', 'eos_times', 'length_of_season'
+        'length_of_season', 'sos_times', 'pos_times', 'eos_times'
     ]
     pheno_metrics_aliases = [
-        'SOS', 'POS', 'EOS', 'LOS'
+        'LOS', 'SOS', 'POS', 'EOS'
     ]
 
     # shapefile with crop type information for the single field parcels
@@ -526,7 +530,7 @@ if __name__ == '__main__':
     for corr_type in corr_types:
         for vi_name in vi_names:
     
-            uncertainty_dir = Path(f'../S2_TimeSeries_Analysis_Test/{vi_name}/{corr_type}')
+            uncertainty_dir = Path(f'../S2_TimeSeries_Analysis/{vi_name}/{corr_type}')
             out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
             if not out_dir.exists():
                 out_dir.mkdir()
@@ -556,7 +560,7 @@ if __name__ == '__main__':
     for corr_type in corr_types:
         for vi_name in vi_names:
     
-            uncertainty_dir = Path(f'../S2_TimeSeries_Analysis_Test/{vi_name}/{corr_type}')
+            uncertainty_dir = Path(f'../S2_TimeSeries_Analysis/{vi_name}/{corr_type}')
             out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
             result_dir = out_dir
             out_dir_crops = out_dir.joinpath('selected_crops')

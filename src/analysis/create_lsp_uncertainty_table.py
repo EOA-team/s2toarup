@@ -25,7 +25,7 @@ def combine_results(
         res = []
         for lsp_metric in lsp_metrics:
             df_vis = None
-            col_selection = ['crop', 'median', 'mean']
+            col_selection = ['crop', 'median', 'q05', 'q95']
             for vidx, vi in enumerate(vis):
                 try:
                     path_res = next(
@@ -39,7 +39,7 @@ def combine_results(
                     print(e)
                     sys.exit()
                 df_vi = pd.read_csv(path_res)
-                col_mapping = {'median': f'{vi} median', 'mean': f'{vi} mean'}
+                col_mapping = {'median': f'{vi} median', 'q05': f'{vi} q05', 'q95': f'{vi} q95'}
                 try:
                     if vidx == 0:
                         df_vis = df_vi[col_selection].copy()
@@ -64,12 +64,11 @@ def combine_results(
 
 if __name__ == '__main__':
 
-    lsp_res_dir = Path('../../S2_TimeSeries_Analysis_Test')
+    lsp_res_dir = Path('../../S2_TimeSeries_Analysis')
     vis = ['EVI', 'NDVI', 'GLAI']
-    interscene_correlations = ['uncorrelated','fully_correlated']
-    lsp_metrics = ['sos_times', 'eos_times']
+    interscene_correlations = ['fully_correlated','uncorrelated']
+    lsp_metrics = ['sos_times', 'eos_times', 'length_of_season']
 
-    output_dir = Path('../../S2_TimeSeries_Analysis_Test')
+    output_dir = Path('../../S2_TimeSeries_Analysis')
 
     combine_results(lsp_res_dir, vis, interscene_correlations, lsp_metrics, output_dir)
-

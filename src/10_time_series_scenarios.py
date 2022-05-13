@@ -1,11 +1,21 @@
 '''
-Created on Mar 7, 2022
+Generation of vegetation time series scenarios using Monte Carlo from EVI, NDVI and GLAI data
+and their propagated radiometric uncertainty.
 
-@author: graflu
+The time series are interpolated linearly to daily values and smoothed using Savitzky-Golay.
+Phenological metrics including Start of Season (SOS), End of Season (EOS) are extracted for each
+pixel time series. To improve the phenology retrieval crop-type specific growing periods are set
+based on expert knowledge.
+
+The MC sampling is implemented assuming two different types of error correlation among the S2
+scenes:
+
+    * full inter-scene error correlation -> introduces systematic shifts aka. biases
+    * zero inter-scene error correlation -> each data point and its uncertainty is used to sample
+                                            independently from a Normal distribution 
 '''
 
 import geopandas as gpd
-import pandas as pd
 import numpy as np
 import xarray as xr
 
@@ -27,7 +37,8 @@ logger = get_logger('10_time_series_scenarios')
 def _calc_pheno_metrics(
         xds: xr.Dataset,
         debug: Optional[bool] = False,
-        point_features: Optional[Path] = None
+        point_features: Optional[Path] = None,
+        index_name: Optional[str] = None
     ) -> Dict[str, xr.Dataset]:
     """
     Calculation of the phenological metrics using ``Phenolopy``.
@@ -100,7 +111,10 @@ def _calc_pheno_metrics(
         ts_gdf = joined.sjoin(eos_times)
         # nearest neighbor spatial join on gdf
         sample_gdf = ts_gdf.sjoin_nearest(right=gdf, lsuffix='l', rsuffix='r')
-        sample_gdf.to_file('../S2_TimeSeries_Analysis/sample_pixels.gkpg', driver='GPKG')
+        sample_gdf.rename(columns={'veg_index': index_name}, inplace=True)
+        # clean up
+        sample_gdf.drop(columns=['index_r', 'index_right'], inplace=True)
+        sample_gdf.to_file(f'../S2_TimeSeries_Analysis/sample_pixels_{index_name}.gpkg', driver='GPKG')
 
     return {'pheno_metrics': pheno_ds, 'ds': ds}
 
@@ -112,6 +126,7 @@ def vegetation_time_series_scenarios(
         min_val: float,
         max_val: float,
         sample_points: Path,
+        index_name: str,
         fully_correlated: Optional[bool] = False
     ) -> None:
     """
@@ -139,13 +154,15 @@ def vegetation_time_series_scenarios(
         list of dates. Must equal the length of the ``ts_stack_list``. Is used
         to assign a date to each handler to construct the time series.
     :param min_val:
-        minimum allowed value of the index or parameter in order to avoid impossible
+        minimum alloweparentd value of the index or parameter in order to avoid impossible
         values
     :param max_val:
         maximum allowed value of the index or paramter in order to avoid impossible
         values
     :param sample_points:
         point features for sampling points for debugging
+    :param index_name:
+        name of the current VI or vegetation parameter
     :param fully_correlated:
         inter-scene correlation (full or None)
     """
@@ -257,7 +274,8 @@ def vegetation_time_series_scenarios(
                 res_ref = _calc_pheno_metrics(
                     xds_ref,
                     debug=True,
-                    point_features=sample_points
+                    point_features=sample_points,
+                    index_name=index_name
                 )
                 pheno_ds_ref = res_ref['pheno_metrics'] # pheno metric results
                 ds_ref = res_ref['ds'] # smoothed time series values
@@ -328,6 +346,7 @@ def main(
         n_scenarios: int,
         crop_periods: Path,
         sample_points: Path,
+        index_name: str,
         fully_correlated: Optional[bool] = False
     ):
     """
@@ -367,12 +386,11 @@ def main(
         min_val=ymin,
         max_val=ymax,
         fully_correlated=fully_correlated,
-        sample_points=sample_points
+        sample_points=sample_points,
+        index_name=index_name
     )
 
 if __name__ == '__main__':
-
-    import sys
 
     # original Sentinel-2 scenes with vegetation indices
     vi_dir = Path(
@@ -410,11 +428,11 @@ if __name__ == '__main__':
     n_scenarios = 1000
 
     # directory where to save phenological metrics to
-    out_dir_scenarios = Path(f'../S2_TimeSeries_Analysis_Test')
+    out_dir_scenarios = Path(f'../S2_TimeSeries_Analysis')
     if not out_dir_scenarios.exists():
         out_dir_scenarios.mkdir()
 
-    fully_correlated = [True] # [False, True]
+    fully_correlated = [False, True]
 
     for idx, vi_name in enumerate(vi_names):
 
@@ -434,5 +452,6 @@ if __name__ == '__main__':
                 fully_correlated=corr,
                 crop_periods=crop_periods,
                 n_scenarios=n_scenarios,
+                index_name=vi_name,
                 sample_points=sample_points
             )

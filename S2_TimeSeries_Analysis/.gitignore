@@ -8,3 +8,6 @@ S2_TimeSeries_Analysis/
 /glai_runs.txt
 /ndvi_runs.txt
 /sample_pixels.gkpg
+/sample_pixels_EVI.gpkg
+/sample_pixels_GLAI.gpkg
+/sample_pixels_NDVI.gpkg

@@ -49,8 +49,8 @@ def combine_results(
                         )
                     else:
                         df_vi.rename(columns=col_mapping, inplace=True)
-                        col_selection[1:3] = list(col_mapping.values())
-                        df_vis = pd.merge(df_vis, df_vi[col_selection], on='crop', how='left')
+                        col_selection[1:4] = list(col_mapping.values())
+                        df_vis = pd.merge(df_vis, df_vi[col_selection[0:4]], on='crop', how='left')
                 except Exception as e:
                     print(e)
             df_vis['metric'] = df_vi['metric_alias']

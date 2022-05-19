@@ -7,6 +7,7 @@ import geopandas as gpd
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
 
 plt.style.use('ggplot')
@@ -62,6 +63,14 @@ if __name__ == '__main__':
 
     # define mapping of "crop_codes" to crop types
     gdf = gpd.read_file(shapefile_crops)
+
+    # get area per crop in ha
+    gdf.dropna(inplace=True)
+    dissolved = gdf.dissolve(by='crop_type')
+    dissolved['area'] = np.round(dissolved.geometry.area / (100 * 100),1)
+    dissolved['area'].to_csv(res_dir.joinpath('crop_types_area.csv'))
+    print(dissolved['area'].to_latex())
+
     crop_code_mapping = dict(list(gdf.groupby([column_crop_code, column_crop_names]).groups))
 
     plot_uncertainty_boxplots(res_dir, vis, crop_code_mapping)

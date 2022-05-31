@@ -32,38 +32,38 @@ if __name__ == '__main__':
                 search_path = lsp_res_dir.joinpath(f'{vi}/{run}/Uncertainty_Maps/selected_crops')
                 fpath = next(search_path.glob(f'{vi}_{metric}_*_data.csv'))
                 df = pd.read_csv(fpath)
-                # drop grassland pixels (no meaningful LSP metrics)
-                # drop_idx = df[
-                #     df.crop.isin(['Extensively Used Grasland', 'Permament Grasland'])
-                # ].index
-                # df.drop(index=drop_idx, inplace=True)
+
+                # correct stupid typos and rename some crops
                 df['crop'] = df['crop'].apply(lambda x: 'Rapeseed' if x == 'Canola' else x)
                 df['crop'] = df['crop'].apply(lambda x: 'Grain Maize' if x == 'Corn' else x)
-                # crop_count = df.crop.value_counts()
-                # df['crop'] = df['crop'].apply(lambda x, crop_count=crop_count:
-                #     f'{x} ({crop_count[crop_count.index == x].values[0]})'
-                # )
+                df['crop'] = df['crop'].apply(lambda x: 'Permament Grassland' if x == 'Permament Grasland' else x)
+                df['crop'] = df['crop'].apply(lambda x: 'Extensively Used Grassland' if x == 'Extensively Used Grasland' else x)
 
-                sns.boxplot(x='crop', y=f'{metric} Uncertainty', data=df, ax=axes[rdx,vidx])
-                axes[rdx,vidx].set_ylim(0,160)
-                axes[rdx,vidx].set_xlabel('')
-                # f.suptitle(r'(a)', fontsize=22, x=0.14, y=0.925)
+                # sns.boxplot(x='crop', y=f'{metric} Uncertainty', data=df, ax=axes[rdx,vidx])
+                sns.kdeplot(x=f'{metric} Uncertainty', hue='crop', data=df, ax=axes[rdx,vidx],
+                            fill=True, alpha=.5, multiple='stack')
+                axes[rdx,vidx].set_xlim(0,100)
+                axes[rdx,vidx].set_ylim(0,.1)
+                if vidx != 2 or rdx != 1:
+                    axes[rdx,vidx].get_legend().remove()
+                else:
+                    pass
 
-                if vidx == 0:
-                    if run == 'uncorrelated':
-                        axes[rdx,vidx].set_ylabel('Zero Scene Correlation', fontsize=14)
-                    else:
-                        axes[rdx,vidx].set_ylabel('Full Scene Correlation', fontsize=14)
-                if vidx == 2:
+                if vidx == 0 and rdx == 0:
+                    axes[rdx,vidx].set_ylabel('Zero Scene Correlation', fontsize=14)
+                if vidx == 0 and rdx == 1:
+                    axes[rdx,vidx].set_ylabel('Full Scene Correlation', fontsize=14)
+                if rdx == 1:
                     label = metric.split('_')[0].upper() + ' Uncertainty (k=1) [days]'
                     if metric == 'length_of_season':
                         label = 'LOS Uncertainty (k=1) [days]'
-                    axes[rdx,vidx].set_ylabel(
+                    axes[rdx,vidx].set_xlabel(
                         label,
                         fontsize=14,
-                        rotation=270,
+                        # rotation=270,
                         labelpad=14
                     )
+                if vidx == 2:
                     axes[rdx,vidx].yaxis.set_label_position("right")
                     axes[rdx,vidx].yaxis.tick_right()
 
@@ -76,7 +76,7 @@ if __name__ == '__main__':
                     axes[rdx,vidx].title.set_text(vi)
                 if rdx == 1:
                     plt.setp(axes[rdx,vidx].get_xticklabels(), rotation=90)
-                if 0 < vidx < 2:
+                if vidx == 1:
                     axes[rdx,vidx].set_ylabel('')
                     axes[rdx,vidx].yaxis.set_ticklabels([])
                     axes[rdx,vidx].yaxis.set_ticks_position('none')
@@ -84,5 +84,3 @@ if __name__ == '__main__':
 
         fpath_fig = lsp_res_dir.joinpath(f'{metric}_uncertainty.png')
         f.savefig(fpath_fig, dpi=300, bbox_inches='tight')
-                
-                

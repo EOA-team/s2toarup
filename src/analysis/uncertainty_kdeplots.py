@@ -14,7 +14,7 @@ plt.style.use('ggplot')
 matplotlib.rc('xtick', labelsize=14) 
 matplotlib.rc('ytick', labelsize=14) 
 
-def plot_uncertainty_boxplots(res_dir, vis, crop_code_mapping):
+def plot_uncertainty_kdeplots(res_dir, vis, crop_code_mapping):
 
     fig, axes = plt.subplots(1, 3, figsize=(15,8))
     for idx, vi in enumerate(vis):
@@ -22,32 +22,56 @@ def plot_uncertainty_boxplots(res_dir, vis, crop_code_mapping):
         vi_df = pd.read_csv(vi_res_file, usecols=['crop_code', vi, f'{vi}_unc'])
         vi_df['rel_unc'] = vi_df[f'{vi}_unc'] / vi_df[vi] * 100
         vi_df
-        vi_df['crop_name'] = vi_df['crop_code'].apply(
+        vi_df['crop'] = vi_df['crop_code'].apply(
             lambda x,
             crop_code_mapping=crop_code_mapping: crop_code_mapping[x]
         )
-        vi_df['crop_name'] = vi_df['crop_name'].apply(lambda x: 'Rapeseed' if x == 'Canola' else x)
-        vi_df['crop_name'] = vi_df['crop_name'].apply(lambda x: 'Grain Maize' if x == 'Corn' else x)
-        # crop_count = vi_df.crop_name.value_counts()
-        # vi_df['crop_name'] = vi_df['crop_name'].apply(lambda x, crop_count=crop_count:
-        #     f'{x} ({crop_count[crop_count.index == x].values[0]})'
-        # )
-        sns.boxplot(x='crop_name', y='rel_unc', data=vi_df, ax=axes[idx])
-        plt.setp(axes[idx].get_xticklabels(), rotation=90)
-        axes[idx].set_xlabel('')
+        vi_df['crop'] = vi_df['crop'].apply(lambda x: 'Rapeseed' if x == 'Canola' else x)
+        vi_df['crop'] = vi_df['crop'].apply(lambda x: 'Grain Maize' if x == 'Corn' else x)
+        vi_df['crop'] = vi_df['crop'].apply(lambda x: 'Permament Grassland' if x == 'Permament Grasland' else x)
+        vi_df['crop'] = vi_df['crop'].apply(lambda x: 'Extensively Used Grassland' if x == 'Extensively Used Grasland' else x)
+
+        # ensure colors are the same for all plots
+        sns_palette = sns.color_palette('husl', 11)
+        palette = {
+            'Permament Grassland': sns_palette[0],
+            'Soybean': sns_palette[1],
+            'Silage Maize': sns_palette[2],
+            'Sugar Beet': sns_palette[3],
+            'Extensively Used Grassland': sns_palette[4],
+            'Winter Wheat': sns_palette[5],
+            'Grain Maize': sns_palette[6],
+            'Winter Barley': sns_palette[7],
+            'Rapeseed': sns_palette[8],
+            'Potato': sns_palette[9],
+            'Sunflower': sns_palette[10]
+        }
+
+        # cut uncertainties larger than 100% for plotting to get also a
+        # KDE with more vertices
+        vi_df = vi_df[(vi_df['rel_unc'] >= 0) & (vi_df['rel_unc'] <= 100)].copy()
+
+        sns.kdeplot(x='rel_unc', data=vi_df, hue='crop', ax=axes[idx],
+                    fill=True, alpha=.5, multiple='stack', palette=palette,
+                    hue_order=list(palette.keys()))
+        axes[idx].set_xscale('log')
+        axes[idx].set_xlabel('Relative Uncertainty (k=1) [%]', fontsize=18)
         axes[idx].title.set_text(vi)
-        axes[idx].set_ylim(-100,500)
-        if idx == 0:
-            axes[idx].set_ylabel('Relative Uncertainty (k=1) [%]', fontsize=18)
-        else:
+        axes[idx].set_ylim(0,.8)
+        axes[idx].set_xlim(0,100)
+        if idx < 2:
+            axes[idx].get_legend().remove()
+        if idx == 2:
+            axes[idx].yaxis.set_label_position("right")
+            axes[idx].yaxis.tick_right()
+        if idx == 1:
             axes[idx].set_ylabel('')
-            # plt.grid(True)
             axes[idx].yaxis.set_ticklabels([])
             axes[idx].yaxis.set_ticks_position('none')
+        
 
-    fpath_fig = res_dir.joinpath('vis_rel_unc_boxplots.png')
+    fpath_fig = res_dir.joinpath('vis_rel_unc_kdeplots.png')
     fig.savefig(fpath_fig, dpi=300, bbox_inches='tight')
-
 
 if __name__ == '__main__':
 
@@ -73,5 +97,5 @@ if __name__ == '__main__':
 
     crop_code_mapping = dict(list(gdf.groupby([column_crop_code, column_crop_names]).groups))
 
-    plot_uncertainty_boxplots(res_dir, vis, crop_code_mapping)
+    plot_uncertainty_kdeplots(res_dir, vis, crop_code_mapping)
     

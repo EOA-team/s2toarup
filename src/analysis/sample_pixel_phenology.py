@@ -4,6 +4,7 @@ Plots phenological curves and indicators for sample pixels
 
 import geopandas as gpd
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import pytz
 import random
@@ -52,15 +53,28 @@ def plot_samples(
     )
     sos_idx = timedelta(pixel_gdf['sos_times'].iloc[0]-1)
     sos_date = date(2019,1,1) + sos_idx
-    ax.vlines(sos_date, 0, 6, color='green', label='SOS')
+    ax.vlines(sos_date, 0, 6, color='grey', label='SOS', linewidth=2)
     eos_idx = timedelta(pixel_gdf['eos_times'].iloc[0]-1)
     eos_date = date(2019,1,1) + eos_idx
-    ax.vlines(eos_date, 0, 6, linestyle='dashed', color='green', label='EOS')
+    ax.vlines(eos_date, 0, 6, linestyle='dashed', color='grey', label='EOS', linewidth=2)
     ax.set_ylim(0,6)
     ax.set_ylabel('GLAI $[m^2/m^2]$', fontsize=18)
     ax.set_xlabel('Time [YYYY-MM]', fontsize=18)
-    ax.hlines(1.35, sos_date, eos_date, label='LOS')
-    pixel_gdf['baseline'] = 1.35
+
+    # seasonal amplitude
+    max_loc = np.argmax(pixel_gdf[vi])
+    pos_times = pixel_gdf['time'].values[max_loc]
+    left_min = np.min(pixel_gdf[vi][0:max_loc])
+    right_min = np.min(pixel_gdf[vi][max_loc::])
+    base_val = 0.5 * (left_min + right_min)
+    max_val = np.max(pixel_gdf[vi])
+    ax.vlines(pos_times, base_val, max_val, label='Seasonal Amplitude', linewidth=4)
+
+    # 20% threshold
+    amplitude = max_val - base_val
+    thresh = 0.2 * amplitude + base_val
+    ax.hlines(thresh, sos_date, eos_date, label='LOS', linewidth=2)
+    pixel_gdf['baseline'] = thresh
     offset_idx = pixel_gdf.time.min().timetuple().tm_yday
     sos_idx, eos_idx = sos_idx.days, eos_idx.days
     sos_idx -= offset_idx
@@ -68,10 +82,13 @@ def plot_samples(
     ax.fill_between(
         pixel_gdf['time'][sos_idx+1:eos_idx+1],
         pixel_gdf[vi][sos_idx+1:eos_idx+1],
-        pixel_gdf.baseline[sos_idx+1:eos_idx+1], color='lightgreen',
-        label='Growing Season'
+        pixel_gdf.baseline[sos_idx+1:eos_idx+1], color='cyan'
     )
+    ax.hlines(base_val, date(2019,4,20), pixel_gdf['time'].values[-1], color='black',
+              linewidth=2, label='Baseline')
+
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=14)
+    
     fname = f'lsp_sample_time_series.png'
     fpath = out_dir.joinpath(fname)
     f2.savefig(fpath, bbox_inches='tight')

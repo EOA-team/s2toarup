@@ -48,7 +48,11 @@ if __name__ == '__main__':
     scl_df['date'] = pd.to_datetime(scl_df['date'])
     scl_df_sel = scl_df[scl_df['date'].isin(sel_dates)].copy()
     scl_df_sel.sort_values(by='date', inplace=True)
-    table = scl_df_sel[col_selection].to_latex(index=False)
+    table = scl_df_sel[col_selection].to_latex(index=False, float_format="{:0.2f}".format)
+
+    # all dates
+    complete_table = scl_df.to_latex(index=False, float_format="{:0.1f}".format)
+    print(complete_table)
 
     fname = output_dir.joinpath('SCL_relative-number-of-pixels-per-class_abs-uncertainty.csv')
     with open(fname, 'w+') as dst:

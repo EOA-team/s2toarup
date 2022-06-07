@@ -1,6 +1,6 @@
 '''
 This script is a simplified version of 08_analyze_l1c_l2a_l3_scenarios.py
-that focusses on quantifying the impact of random and systematic uncertainty
+that focuses on quantifying the impact of random and systematic uncertainty
 contributors on Sentinel-2 L1C TOA radiometric data.
 
 It takes the (optionally) generated samples from 04_generate_l1c_scenarios.py
@@ -225,7 +225,7 @@ def analyze_rois(
             vector_features=rois,
             band_name_dst='random uncertainty'
         )
-        random_unc_handler.aad_band(
+        random_unc_handler.add_band(
             in_file_vector=rois,
             snap_band=random_unc_handler.bandnames[0],
             attribute_selection=['luc_code']
@@ -324,7 +324,6 @@ if __name__ == '__main__':
 
         for scene_path in scenario_dir.glob('*MSIL1C*'):
             calc_uncertainty(scene_dir=scene_path, out_dir=out_dir)
-            break
 
         map_uncertainty(unc_results_dir=out_dir)
     

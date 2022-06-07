@@ -68,8 +68,9 @@ def _calc_pheno_metrics(
         gdf = gpd.read_file(point_features)
         x_indexer = xr.DataArray(gdf.geometry.x, dims=["point"])
         y_indexer = xr.DataArray(gdf.geometry.y, dims=["point"])
-
+        org_ds = xds.copy()
     # remove outliers using median filter
+    
     ds = remove_outliers(xds, method='median', user_factor=2, z_pval=0.05)
 
     # interpolate nans linearly
@@ -114,6 +115,13 @@ def _calc_pheno_metrics(
         sample_gdf.rename(columns={'veg_index': index_name}, inplace=True)
         # clean up
         sample_gdf.drop(columns=['index_r', 'index_right'], inplace=True)
+
+        # original data points
+        veg_index_orig = org_ds[['veg_index', 'time']].sel(x=x_indexer, y=y_indexer, method="nearest").to_dataframe()
+        veg_index_orig = _to_gdf(veg_index_orig)
+        veg_index_orig = veg_index_orig.reset_index(level=[0,1])
+        veg_index_orig.to_file(f'../S2_TimeSeries_Analysis/sample_orig_pixels_{index_name}.gpkg', driver='GPKG')
+        
         sample_gdf.to_file(f'../S2_TimeSeries_Analysis/sample_pixels_{index_name}.gpkg', driver='GPKG')
 
     return {'pheno_metrics': pheno_ds, 'ds': ds}
@@ -191,7 +199,7 @@ def vegetation_time_series_scenarios(
             out_dir_scenario.mkdir()
         else:
             logger.info(f'Scenario {scenario+1}/{n_scenarios} already exists - skipping')
-            continue
+            # continue
 
         logger.info(f'Running scenario ({scenario+1}/{n_scenarios})')
         # add vegetation samples to 3d numpy array and pass it to xarray dataset
@@ -416,11 +424,12 @@ if __name__ == '__main__':
     )
 
     # vegetation index to consider
-    # arg = sys.argv
-    # with open(arg[1], 'r') as src:
-    #     vi = src.readlines()
-    #     vi_names = [vi[0].replace('\n','')]
-    vi_names = ['EVI', 'NDVI', 'GLAI']
+    import sys
+    arg = sys.argv
+    with open(arg[1], 'r') as src:
+        vi = src.readlines()
+        vi_names = [vi[0].replace('\n','')]
+    # vi_names = ['EVI', 'NDVI', 'GLAI']
     ymins = {'NDVI': -1, 'EVI': -1, 'GLAI': 0}
     ymaxs = {'NDVI': 1, 'EVI': 1, 'GLAI': 7}
 

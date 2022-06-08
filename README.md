@@ -1,6 +1,6 @@
 # Radiometric Atmospheric Correction Uncertainty Propagation Study
 
-This repository implements the **complete processing workflow required to reproduce our study about the impact of
+This repository implements the **complete processing and workflow required to reproduce our study about the impact of
 radiometric uncertainty on the retrieval of key phenological stages from Sentinel-2 data**.
 
 ## OS and Software Requirements
@@ -10,6 +10,8 @@ While the Python scripts are OS-independent, the shell-scripts only work in a *n
 See the `requirements.txt` file for a list of Python packages necessary to run the scripts. All dependencies should be installed beforehand into a clean virtual environment.
 
 Furthermore, the Sentinel-2 Radiometric Uncertainty Toolbox and Sen2Cor are required.
+
+For **reading and writing raster data** we use the `eodal` Python package (Earth Observation Data Analysis Library). See ... for more information.
 
 ### Installing the Sentinel-2 Radiometric Uncertainty Toolbox
 
@@ -82,15 +84,14 @@ INFO: org.esa.snap.core.util.EngineVersionCheckActivator: Please check regularly
 
 ### Installing Sen2Cor
 
-Download Sen2Cor from the [official access point](http://step.esa.int/main/snap-supported-plugins/sen2cor/sen2cor-v2-9/). Place the installer `*.run` in the bin folder of that project and let it install.
+Download Sen2Cor v2.9 from the [official access point](http://step.esa.int/main/snap-supported-plugins/sen2cor/sen2cor-v2-9/).
 
-A **pre-installed** version of Sen2Cor is already available in the [bin](./bin) directory of this repository. If you need an older version you can place it there as well and just change the path in the [bash script](./src/04_execute_sen2cor.sh).
+The `path` to the Sen2Cor executable must be provided in the shell script [05_execute_sen2cor.sh](src/processing/05_execute_sen2cor.sh#L59) or add the path to the binary directory to your $PATH.
 
 ## Filesystem Structure
 
 | directory                 | purpose                                                                                                                                                                                           |
-|---------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| /bin                      | place the Sen2Cor stand-alone version here.                                                                                                                                                       |
+|---------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|             |
 | /shp                      | contains the shapefile defining the extent of the study area (AOI_Esch_EPSG32632.shp) and the single regions of interest (ROIs) within that area (ZH_Polygons_2019_EPSG32632_selected-crops.shp). |
 | /src						| here, all the required Python and shell scripts are located.
 | /S2A_MSIL1C_orig          | here, the original L1C scenes will be downloaded to (from Creodias).                                                                                                                              |

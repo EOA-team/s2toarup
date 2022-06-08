@@ -237,7 +237,8 @@ def map_uncertainty(unc_results_dir: Path):
 def analyze_rois(
         unc_results_dir: Path,
         rois: gpd.GeoDataFrame,
-        band_selection: List[str] = ['B04', 'B08']
+        black_list: List[str],
+        band_selection: List[str] = ['B04', 'B08'],
     ):
     """
     Extract region of interest (ROI) to display uncertainty values
@@ -245,26 +246,34 @@ def analyze_rois(
     """
     # find scenes and loop over them to plot uncertainty components
     scenes = glob.glob(unc_results_dir.joinpath('S2*_MSIL1C*').as_posix())
+    scenes = [x for x in scenes if not x.endswith('png')]
+
+    # convert to DataFrame
+    scenes = pd.DataFrame({'scenes': scenes})
+    # get dates for x axis labels and spacing
+    scenes['date'] = scenes['scenes'].apply(
+        lambda x: datetime.strptime(Path(x).name.split('_')[2][0:8], '%Y%m%d').date()
+    )
+    # exclude black-listed dates
+    black_list_dates = [datetime.strptime(x, '%Y%m%d').date() for x in black_list]
+    scenes = scenes[~scenes.date.isin(black_list_dates)]
+    # order by date
+    scenes.sort_values(by='date', inplace=True)
 
     # open figure for plotting uncertainty histograms over time
-    crops = gdf.crop_type.unique()
+    crops = rois.crop_type.unique()
     n_crops = len(crops)
 
-    # get dates for x axis labels and spacing
-    dates = [datetime.strptime(Path(x).name.split('_')[2][0:8], '%Y%m%d').date() \
-             for x in scenes]
-    date_start, date_end = min(dates), max(dates)
-
-    for cdx, crop in enumerate(crops):
+    for crop in crops:
         df_list = []
-        for idx, scene in enumerate(scenes):
+        for _, record in scenes.iterrows():
             for band in band_selection:
                 crop_gdf = gdf[gdf.crop_type == crop].copy()
                 raster = RasterCollection()
                 # random contributors
                 raster.add_band(
                     band_constructor=Band.from_rasterio,
-                    fpath_raster=Path(scene).joinpath(f'random_uncertainty_{band}.tif'),
+                    fpath_raster=Path(record.scenes).joinpath(f'random_uncertainty_{band}.tif'),
                     vector_features=crop_gdf,
                     band_name_dst=f'Random Radiometric Uncertainty {band}'
                 )
@@ -279,7 +288,7 @@ def analyze_rois(
                 # systematic contributors
                 raster.add_band(
                     band_constructor=Band.from_rasterio,
-                    fpath_raster=Path(scene).joinpath(f'systematic_uncertainty_{band}.tif'),
+                    fpath_raster=Path(record.scenes).joinpath(f'systematic_uncertainty_{band}.tif'),
                     vector_features=crop_gdf,
                     band_name_dst=f'Systematic Radiometric Uncertainty {band}'
                 )
@@ -294,11 +303,9 @@ def analyze_rois(
                 
                 # convert to dataframe
                 df = df_1.append(df_2)
-                df['date'] = dates[idx]
-                df['uncertainty'] *= s2_gain_factor
+                df['date'] = record.date
                 df_list.append(df)
-            if idx == 2:
-                break
+
         large_df = pd.concat(df_list)
 
         # violin plots
@@ -318,7 +325,8 @@ def analyze_rois(
         ax[0].set_ylabel('Relative Radiometric Uncertainty [%]\n(k=1)', fontsize=16)
         ax[0].set_title('Sentinel-2 B04 (red)')
         labels = ax[0].xaxis.get_ticklabels()
-        ax[0].set_xticklabels(labels=labels,rotation=45)
+        ax[0].set_xticklabels(labels=labels,rotation=90)
+        ax[0].set_ylim(0,5)
 
         sns.violinplot(
             x='date',
@@ -332,22 +340,28 @@ def analyze_rois(
             saturation=.75,
             inner=None
         )
-        ax[1].set_ylabel('Relative Radiometric Uncertainty [%]\n(k=1)', fontsize=16)
+        ax[1].set_ylabel('')
         ax[1].set_title('Sentinel-2 B08 (near-infrared)')
         ax[1].yaxis.set_label_position('right')
-        ax[1].yaxis.tick_right()
+        # ax[1].yaxis.tick_right()
         labels = ax[1].xaxis.get_ticklabels()
-        ax[1].set_xticklabels(labels=labels,rotation=45)
+        ax[1].set_xticklabels(labels=labels,rotation=90)
+
+        crop_name = crop
+        if crop_name == 'Canola': crop_name = 'Rapeseed'
+        if crop_name == 'Permament Grasland': crop_name = 'Permanent Grassland'
+        if crop_name == 'Extensively Used Grasland': crop_name = 'Extensively Used Grassland'
+        if crop_name == 'Corn': crop_name = 'Grain Maize'
 
         f.suptitle(
-            f'{crop} (Pixels:  {df.groupby(by="date").agg("count")["uncertainty"].values[0]})',
+            f'{crop_name} (Pixels:  {df.groupby(by="date").agg("count")["uncertainty"].values[0]})',
             fontsize=20
         )
+        plt.tight_layout()
 
-        fname = f'{crop}_unc_violin-plots.png'
-                
-
-           
+        fname = unc_results_dir.joinpath(f'{crop_name}_unc_violin-plots.png')
+        f.savefig(fname, bbox_inches='tight', dpi=300)
+        logger.info(f'Plotted Uncertainty for {crop}')
 
 
 if __name__ == '__main__':
@@ -375,11 +389,14 @@ if __name__ == '__main__':
             # find the corresponding original S2 scene for relative uncertainty calculation
             scene_date = scene_path.name.split('_')[2]
             orig_scene = next(orig_scenes_dir.glob(f'*MSIL1C_{scene_date}*.SAFE'))
-            calc_uncertainty(scene_dir=scene_path, orig_scene=orig_scene, out_dir=out_dir)
+            # calc_uncertainty(scene_dir=scene_path, orig_scene=orig_scene, out_dir=out_dir)
 
-        analyze_rois(unc_results_dir=out_dir, rois=gdf)
+        # black-list scenes with clouds are snow
+        black_list = ['20190214', '20190216', '20190530','20190716']
 
-        map_uncertainty(unc_results_dir=out_dir)
+        analyze_rois(unc_results_dir=out_dir, rois=gdf, black_list=black_list)
+
+        # map_uncertainty(unc_results_dir=out_dir)
     
         # scene_path = out_dir.joinpath('S2A_MSIL1C_20190530T103031_N0207_R108_T32TMT_20190530T123429')
         # roi_file = Path('../shp/ZH_Sampling_Locations_Contributor_Analysis.shp')

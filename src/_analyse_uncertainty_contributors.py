@@ -13,14 +13,18 @@ import glob
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import os
 import seaborn as sns
 import re
 
 from agrisatpy.core.band import Band
 from agrisatpy.core.raster import RasterCollection
+from agrisatpy.core.sensors import Sentinel2
 from agrisatpy.utils.constants.sentinel2 import s2_gain_factor
+from datetime import datetime
 from pathlib import Path
+from typing import List
 
 from logger import get_logger
 
@@ -29,11 +33,12 @@ s2_gain_factor *= 100
 logger = get_logger('_analyze_unc_contrib')
 
 # define Sentinel-2 bands to analyze
-s2_band_selection = ['B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B8A', 'B11', 'B12']
+s2_band_selection = ['B02', 'B03', 'B04', 'B08']
 
 
 def calc_uncertainty(
         scene_dir: Path,
+        orig_scene: Path,
         out_dir: Path
     ):
     """
@@ -42,6 +47,8 @@ def calc_uncertainty(
 
     :param scene_dir:
         directory where the scenes and their MC results are stored
+    :param orig_scene
+        original S2 scene to use for calculating the relative uncertainty
     :param out_dir:
         directory where to store the results (create sub-directories for the
         scenes analyzed)
@@ -58,6 +65,29 @@ def calc_uncertainty(
     logger.info(f'Working on {scene_dir}')
 
     # loop over spectral bands (uncertainty is always calculated per band)
+    # read only the extent of the study area
+    fname_rand = Path(scenarios[0]).joinpath(
+                f'uncorrelated_contributors_sample_B04.jp2'
+            )
+    # read data into memory
+    rand_handler = RasterCollection()
+    rand_handler.add_band(
+        band_constructor=Band.from_rasterio,
+        fpath_raster=fname_rand,
+        band_name_dst='random'
+    )
+    bdf = gpd.GeoDataFrame(geometry=[rand_handler['random'].bounds])
+    bdf.set_crs(crs=rand_handler['random'].crs, inplace=True)
+    s2_orig = Sentinel2.from_safe(
+        orig_scene,
+        vector_features=bdf,
+        band_selection=s2_band_selection,
+        apply_scaling=False
+    )
+    # plot FCIR quicklook and save it
+    fcir = s2_orig.plot_multiple_bands(band_selection=['B08','B04','B03'])
+    fcir.savefig(out_dir.joinpath(orig_scene.name.split('.')[0] + '_fcir.png'))
+
     for band in s2_band_selection:
         # loop over scenarios
         for idx, scenario in enumerate(scenarios):
@@ -103,6 +133,9 @@ def calc_uncertainty(
         # calculate standard uncertainty
         rand_unc = np.nanstd(rand_array, axis=0)
         sys_unc = np.nanstd(sys_array, axis=0)
+        # convert to relative uncertainties
+        rand_unc = rand_unc / s2_orig[band].values * 100.
+        sys_unc = sys_unc / s2_orig[band].values * 100.
 
         fname_sys = out_dir_scene.joinpath(f'systematic_uncertainty_{band}.tif')
         fname_rand = out_dir_scene.joinpath(f'random_uncertainty_{band}.tif')
@@ -202,116 +235,129 @@ def map_uncertainty(unc_results_dir: Path):
 
 
 def analyze_rois(
-        scene_path: Path,
-        roi_file: Path,
-        luc_mapping: dict
+        unc_results_dir: Path,
+        rois: gpd.GeoDataFrame,
+        band_selection: List[str] = ['B04', 'B08']
     ):
     """
     Extract region of interest (ROI) to display uncertainty values
     for selected land cover types
     """
+    # find scenes and loop over them to plot uncertainty components
+    scenes = glob.glob(unc_results_dir.joinpath('S2*_MSIL1C*').as_posix())
 
-    rois = gpd.read_file(roi_file)
+    # open figure for plotting uncertainty histograms over time
+    crops = gdf.crop_type.unique()
+    n_crops = len(crops)
 
-    band_res = dict.fromkeys(s2_band_selection)
-    for band in s2_band_selection:
+    # get dates for x axis labels and spacing
+    dates = [datetime.strptime(Path(x).name.split('_')[2][0:8], '%Y%m%d').date() \
+             for x in scenes]
+    date_start, date_end = min(dates), max(dates)
 
-        # random results
-        fname_random = scene_path.joinpath(f'random_uncertainty_{band}.tif')
-        random_unc_handler = RasterCollection()
-        random_unc_handler.add_band(
-            band_constructor=Band.from_rasterio,
-            fpath_raster=fname_random,
-            vector_features=rois,
-            band_name_dst='random uncertainty'
-        )
-        random_unc_handler.add_band(
-            in_file_vector=rois,
-            snap_band=random_unc_handler.bandnames[0],
-            attribute_selection=['luc_code']
-        )
-        gdf_rand = random_unc_handler.to_dataframe()
-
-        # systematic results
-        fname_sys = scene_path.joinpath(f'systematic_uncertainty_{band}.tif')
-        sys_unc_handler = RasterCollection()
-        sys_unc_handler.add_band(
-            fname_sys,
-            in_file_aoi=rois
-        )
-        sys_unc_handler.add_bands_from_vector(
-            in_file_vector=rois,
-            snap_band=sys_unc_handler.bandnames[0],
-            attribute_selection=['luc_code']
-        )
-        gdf_sys = sys_unc_handler.to_dataframe()
-        gdf_sys = gdf_sys.rename(
-            columns={'sys_unc': f'systematic uncertainty'}
-        )
-
-        # join into a single dataframe
-        gdf_joined = gdf_rand.join(gdf_sys, lsuffix='_l', rsuffix='_r')
-        gdf_joined.drop(['geometry_l', 'luc_code_l'], axis=1, inplace=True)
-
-        # apply land code mapping
-        gdf_joined['luc'] = gdf_joined.luc_code_r.apply(
-            lambda x, luc_mapping=luc_mapping: luc_mapping[x] 
-        )
-        band_res[band] = gdf_joined
-
-    # make histogram plot of random and systematic components per ROI
-    band_names = [f'systematic uncertainty', f'random uncertainty']
-    for roi in gdf_joined['luc'].unique():
-
-        roi_code = [k for k,v in luc_mapping.items() if v == roi]
-        # roi size in sqm
-        area = rois[rois.luc_code == roi_code[0]].iloc[0].geometry.area
-        # convert to ha
-        area /= (100*100)
-
-        f, axs = plt.subplots(nrows=2, ncols=5, sharex=False, sharey=True, figsize=(20,12))
-
-        nrow = 0
-        ncol = 0
-        for band in s2_band_selection:
-
-            df = band_res[band].copy()
-            unc_values = df[df.luc == roi].copy()
-            unc_values[band_names] *= s2_gain_factor
-
-            sns.histplot(
-                data=unc_values[band_names],
-                stat='density',
-                ax=axs[nrow, ncol],
-                legend=True
-            )
-            if ncol == 0:
-                axs[nrow, ncol].set_ylabel('Relative Frequency', fontsize=24)
-            if ncol == 2 and nrow == 1:
-                axs[nrow, ncol].set_xlabel(
-                    r'Absolute Uncertainty (k=1) $\rho_{TOA}$ Reflectance Factor [%]',
-                    fontsize=24
+    for cdx, crop in enumerate(crops):
+        df_list = []
+        for idx, scene in enumerate(scenes):
+            for band in band_selection:
+                crop_gdf = gdf[gdf.crop_type == crop].copy()
+                raster = RasterCollection()
+                # random contributors
+                raster.add_band(
+                    band_constructor=Band.from_rasterio,
+                    fpath_raster=Path(scene).joinpath(f'random_uncertainty_{band}.tif'),
+                    vector_features=crop_gdf,
+                    band_name_dst=f'Random Radiometric Uncertainty {band}'
                 )
-            axs[nrow, ncol].set_title(band)
+                df_1 = raster.to_dataframe(
+                    band_selection=[f'Random Radiometric Uncertainty {band}']
+                )
+                df_1 = df_1.rename(
+                    columns={f'Random Radiometric Uncertainty {band}': 'uncertainty'}
+                )
+                df_1['Uncertainty Type'] = 'random'
+                df_1['band'] = band
+                # systematic contributors
+                raster.add_band(
+                    band_constructor=Band.from_rasterio,
+                    fpath_raster=Path(scene).joinpath(f'systematic_uncertainty_{band}.tif'),
+                    vector_features=crop_gdf,
+                    band_name_dst=f'Systematic Radiometric Uncertainty {band}'
+                )
+                df_2 = raster.to_dataframe(
+                    band_selection=[f'Systematic Radiometric Uncertainty {band}']
+                )
+                df_2 = df_2.rename(
+                    columns={f'Systematic Radiometric Uncertainty {band}': 'uncertainty'}
+                )
+                df_2['Uncertainty Type'] = 'systematic'
+                df_2['band'] = band
+                
+                # convert to dataframe
+                df = df_1.append(df_2)
+                df['date'] = dates[idx]
+                df['uncertainty'] *= s2_gain_factor
+                df_list.append(df)
+            if idx == 2:
+                break
+        large_df = pd.concat(df_list)
 
-            ncol += 1
-            if ncol == 5:
-                ncol = 0
-                nrow += 1
+        # violin plots
+        f, ax = plt.subplots(nrows=1, ncols=2, figsize=(30,10), sharey=True)
+        sns.violinplot(
+            x='date',
+            y='uncertainty',
+            hue='Uncertainty Type',
+            data=large_df[large_df.band == 'B04'],
+            split=True,
+            ax=ax[0],
+            scale='count',
+            scale_hue=False,
+            saturation=.75,
+            inner=None
+        )
+        ax[0].set_ylabel('Relative Radiometric Uncertainty [%]\n(k=1)', fontsize=16)
+        ax[0].set_title('Sentinel-2 B04 (red)')
+        labels = ax[0].xaxis.get_ticklabels()
+        ax[0].set_xticklabels(labels=labels,rotation=45)
 
-        f.suptitle(f'{roi}\nArea: {np.round(area,1)}ha', fontsize=24)
+        sns.violinplot(
+            x='date',
+            y='uncertainty',
+            hue='Uncertainty Type',
+            data=large_df[large_df.band == 'B08'],
+            split=True,
+            ax=ax[1],
+            scale='count',
+            scale_hue=False,
+            saturation=.75,
+            inner=None
+        )
+        ax[1].set_ylabel('Relative Radiometric Uncertainty [%]\n(k=1)', fontsize=16)
+        ax[1].set_title('Sentinel-2 B08 (near-infrared)')
+        ax[1].yaxis.set_label_position('right')
+        ax[1].yaxis.tick_right()
+        labels = ax[1].xaxis.get_ticklabels()
+        ax[1].set_xticklabels(labels=labels,rotation=45)
 
-        # save figure
-        fname = scene_path.joinpath(f'{roi.replace(" ","_")}_histogram_plots.png')
-        f.savefig(fname, dpi=150, bbox_inches='tight')
+        f.suptitle(
+            f'{crop} (Pixels:  {df.groupby(by="date").agg("count")["uncertainty"].values[0]})',
+            fontsize=20
+        )
+
+        fname = f'{crop}_unc_violin-plots.png'
+                
+
+           
 
 
 if __name__ == '__main__':
 
     batches = [str(x) for x in range(1,6)]
 
-    # define regions of interest (different crop types) + forest + water
-    
+    # define regions of interest (different crop types) + forest + settlement
+    gdf = gpd.read_file('../shp/areas_of_interest_uncertainty_contributors_dissolved.gpkg')
+
+    orig_scenes_dir = Path('/home/graflu/Documents/uncertainty/S2_MSIL1C_orig')
 
     for batch in batches:
 
@@ -322,12 +368,16 @@ if __name__ == '__main__':
         # map_uncertainty(unc_results_dir=out_dir)
     
         plt.style.use('ggplot')
-        matplotlib.rc('xtick', labelsize=20) 
-        matplotlib.rc('ytick', labelsize=20)
+        matplotlib.rc('xtick', labelsize=14) 
+        matplotlib.rc('ytick', labelsize=14)
 
         for scene_path in scenario_dir.glob('*MSIL1C*'):
-            # calc_uncertainty(scene_dir=scene_path, out_dir=out_dir)
-            analyze_rois(scene_path, roi_file, luc_mapping)
+            # find the corresponding original S2 scene for relative uncertainty calculation
+            scene_date = scene_path.name.split('_')[2]
+            orig_scene = next(orig_scenes_dir.glob(f'*MSIL1C_{scene_date}*.SAFE'))
+            calc_uncertainty(scene_dir=scene_path, orig_scene=orig_scene, out_dir=out_dir)
+
+        analyze_rois(unc_results_dir=out_dir, rois=gdf)
 
         map_uncertainty(unc_results_dir=out_dir)
     

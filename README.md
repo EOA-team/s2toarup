@@ -3,6 +3,12 @@
 This repository implements the **complete processing and workflow required to reproduce our study about the impact of
 radiometric uncertainty on the retrieval of key phenological stages from Sentinel-2 data**.
 
+Citation
+
+```
+todo
+```
+
 ## OS and Software Requirements
 
 While the Python scripts are OS-independent, the shell-scripts only work in a *nix environment. They were developed and tested under Fedora 34 (64-bit) machine using Python 3.9.7.
@@ -11,7 +17,19 @@ See the `requirements.txt` file for a list of Python packages necessary to run t
 
 Furthermore, the Sentinel-2 Radiometric Uncertainty Toolbox and Sen2Cor are required.
 
+For S2 data download, a [CREODIAS account](https://creodias.eu/) is required (free account). The API access token must be provided according to the [module doc string in the download module](src/processing/01_download_data_creodias.py).
+
+### Installing eodal for Raster Data Handling
+
 For **reading and writing raster data** we use the `eodal` Python package (Earth Observation Data Analysis Library). See ... for more information.
+
+Installing eodal will setup most of the required Python dependencies. It is recommended to install `eodal` into a clean virtual environment to avoid any undesired side-effects.
+
+Additional requirements not covered by the `eodal` dependencies are listed in the [requirements.txt](requirements.txt) and can be installed into the virtual environment using
+
+```{bash}
+pip install -r requirements.txt
+```
 
 ### Installing the Sentinel-2 Radiometric Uncertainty Toolbox
 
@@ -90,15 +108,22 @@ The `path` to the Sen2Cor executable must be provided in the shell script [05_ex
 
 ## Filesystem Structure
 
-| directory                 | purpose                                                                                                                                                                                           |
-|---------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|             |
-| /shp                      | contains the shapefile defining the extent of the study area (AOI_Esch_EPSG32632.shp) and the single regions of interest (ROIs) within that area (ZH_Polygons_2019_EPSG32632_selected-crops.shp). |
-| /src						| here, all the required Python and shell scripts are located.
-| /S2A_MSIL1C_orig          | here, the original L1C scenes will be downloaded to (from Creodias).                                                                                                                              |
-| /S2A_MSIL1C_RUT-Scenarios | here, the L1C scenarios (based on the radiometric uncertainty assessment) and the resulting L2A outputs (uncertainty propagation) will be stored.                                                 
-| /S2A_MSIL2A_Analysis      | here, the results of the analysis of the L1C and L2A scenarios will be stored
+The table below explains the file-system of this repository which will hold the Monte Carlo simulations and analysis results. `static` in the column `content type` means that the content is provided as is when cloning this repo, whereas `dynamic` means that the content is generated during execution of the workflow.
+
+| sub-directory          | purpose                                                                                                         | content type |
+|------------------------|-----------------------------------------------------------------------------------------------------------------|--------------|
+| src                    | contains the Python source code organized by single modules (*.py)                                              | static       |
+| log                    | all log information is placed here (ASCII files)                                                                | dynamic      |
+| S2_MSIL1C_orig         | here, the original S2 data in L1C processing level downloaded from CREODIAS is stored                           | dynamic      |
+| S2_MSIL1C_RUT-Scenario | sub-directory where the Monte-Carlo L1C scenarios are stored for each S2 scene                                  | dynamic      |
+| S2_MSIL2A_Analysis     | contains the uncertainty analysis results after propagating uncertainty through Sen2Cor into EVI, NDVI and GLAI | dynamic      |
+| S2_ProSAIL_LUTs        | contains lookup-tables of ProSAIL forward runs for each scene (50 000 spectra)                                  | static       |
+| S2_TimeSeriesAnalysis  | sub-directory where the phenology time series Monte Carlo simulations and analysis results are stored           | dynamic      |
+| shp                    | contains the shapefiles of the study area, crop type map and sampling points.                                   | static       |
 
 ## Executing the Workflow
 
-coming soon
+To re-generate the results presented in the paper, execute the Python modules and shell scripts in the [processing sub-package](src/processing/) in the order the scripts are named: I.e., start with the [downloader script](src/processing/01_download_data_creodias.py) (named `01_download_data_creodias.py`), continue with [02_write_property_file.py](src/processing/02_write_property_file.py) and so on until you reach [the last script](src/processing/11_analyze_l4_uncertainty.sh).
 
+**CAUTION**:
+    Some of the scripts require several days to terminate and consume reasonable amounts of CPU time, RAM and disk storage (e.g., running Sen2Cor several hundred times). Therefore, we also do not provide a single shell script to execute everything at once. Instead we recommend careful testing beforehand of the scripts (e.g., by lowering the number of scenarios generated, starting with a single S2 scene, etc.)

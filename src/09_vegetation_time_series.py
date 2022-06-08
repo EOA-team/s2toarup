@@ -143,6 +143,7 @@ def plot_uncertainty_time_series(
 
         # plot
         fig, (ax1, ax2, ax3) = plt.subplots(3, sharex=True, figsize=(15,20))
+        markersize=15
 
         # plot original time series showing spread between pixels (not scenarios!)
         ax1.plot(
@@ -151,7 +152,8 @@ def plot_uncertainty_time_series(
             marker='x',
             linestyle='solid',
             color='blue',
-            linewidth=3
+            linewidth=3,
+            markersize=markersize
         )
         # central 90% of values
         ax1.fill_between(
@@ -182,7 +184,8 @@ def plot_uncertainty_time_series(
             linestyle='solid',
             label='Median',
             color='blue',
-            linewidth=3
+            linewidth=3,
+            markersize=markersize
         )
         ax2.fill_between(
             x=crop_gdf_grouped.index,
@@ -210,7 +213,8 @@ def plot_uncertainty_time_series(
             linestyle='solid',
             label='Median',
             color='blue',
-            linewidth=3
+            linewidth=3,
+            markersize=markersize
         )
         ax3.fill_between(
             x=crop_gdf_grouped.index,
@@ -262,7 +266,8 @@ def main(
         vi_name: str,
         sample_polygons: Path,
         ymin: float,
-        ymax: float
+        ymax: float,
+        crop_periods: Path
     ):
     """
     main executable function of this module generating the time series plots
@@ -282,7 +287,8 @@ def main(
     file_df, ts_stack_dict = read_data_and_uncertainty(
         data_df=data_df,
         vi_name=vi_name,
-        parcels=sample_polygons
+        parcels=sample_polygons,
+        crop_periods=crop_periods
     )
     
     # check uncertainty in different crop types over time
@@ -294,16 +300,16 @@ def main(
     )
 
     # visualize it
-    # fname_csv = out_dir_scenarios.joinpath(
-    #     f'{vi_name}_crops.csv'
-    # )
-    # plot_uncertainty_time_series(
-    #     sample_polygons=sample_polygons,
-    #     vi_data_fpath=fname_csv,
-    #     out_dir=out_dir_scenarios,
-    #     ymin=ymin,
-    #     ymax=ymax
-    # )
+    fname_csv = out_dir_scenarios.joinpath(
+        f'{vi_name}_crops.csv'
+    )
+    plot_uncertainty_time_series(
+        sample_polygons=sample_polygons,
+        vi_data_fpath=fname_csv,
+        out_dir=out_dir_scenarios,
+        ymin=ymin,
+        ymax=ymax
+    )
 
 if __name__ == '__main__':
     # original Sentinel-2 scenes with vegetation indices
@@ -322,6 +328,11 @@ if __name__ == '__main__':
 
     # define point sampling locations for visualizing pixel time series
     sample_points = Path('../shp/ZH_Points_2019_EPSG32632_selected-crops.shp')
+
+    # define crop periods (key growth periods based on expert knowledge)
+    crop_periods = Path(
+        '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/01_Uncertainty/ESCH/scripts_paper_uncertainty/S2_TimeSeries_Analysis/crop_growth_periods-CH_entire_timerange.csv'
+    )
 
     # vegetation index to consider
     vi_names = ['NDVI', 'GLAI', 'EVI']
@@ -346,5 +357,6 @@ if __name__ == '__main__':
             vi_name=vi_name,
             sample_polygons=sample_polygons,
             ymin=ymins[vi_name],
-            ymax=ymaxs[vi_name]
+            ymax=ymaxs[vi_name],
+            crop_periods=crop_periods
         )

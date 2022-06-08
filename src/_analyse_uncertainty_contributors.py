@@ -310,6 +310,9 @@ if __name__ == '__main__':
 
     batches = [str(x) for x in range(1,6)]
 
+    # define regions of interest (different crop types) + forest + water
+    
+
     for batch in batches:
 
         scenario_dir = Path(f'/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2_MSIL1C_RUT-Scenarios/batch_{batch}')
@@ -323,7 +326,8 @@ if __name__ == '__main__':
         matplotlib.rc('ytick', labelsize=20)
 
         for scene_path in scenario_dir.glob('*MSIL1C*'):
-            calc_uncertainty(scene_dir=scene_path, out_dir=out_dir)
+            # calc_uncertainty(scene_dir=scene_path, out_dir=out_dir)
+            analyze_rois(scene_path, roi_file, luc_mapping)
 
         map_uncertainty(unc_results_dir=out_dir)
     

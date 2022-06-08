@@ -29,7 +29,7 @@ def combine_images(fpath_list, fpath_out):
 
 if __name__ == '__main__':
 
-    res_dir = Path('/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/01_Uncertainty/ESCH/scripts_paper_uncertainty/S2_TimeSeries_Analysis/S2_TimeSeries_Analysis')
+    res_dir = Path('../../S2_TimeSeries_Analysis')
     vis = ['EVI', 'NDVI', 'GLAI']
     out_dir = Path('../../S2_TimeSeries_Analysis')
 
@@ -50,10 +50,3 @@ if __name__ == '__main__':
         # merge images into a single figure
         fpath_out = out_dir.joinpath(f'{crop}_all-pixels-uncertainty-timeseries.png')
         combine_images(fpath_list=fpaths, fpath_out=fpath_out)
-            
-            
-            
-            
-            
-            
-            

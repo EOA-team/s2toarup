@@ -391,7 +391,7 @@ if __name__ == '__main__':
             orig_scene = next(orig_scenes_dir.glob(f'*MSIL1C_{scene_date}*.SAFE'))
             # calc_uncertainty(scene_dir=scene_path, orig_scene=orig_scene, out_dir=out_dir)
 
-        # black-list scenes with clouds are snow
+        # black-list scenes with clouds or snow
         black_list = ['20190214', '20190216', '20190530','20190716']
 
         analyze_rois(unc_results_dir=out_dir, rois=gdf, black_list=black_list)

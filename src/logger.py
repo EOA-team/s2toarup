@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 
 
-def get_logger(name: str) -> logging.Logger:
+def get_logger(name: str, log_dir: str='./../log') -> logging.Logger:
     """
     returns basic logger (console and file output)
 
@@ -16,7 +16,7 @@ def get_logger(name: str) -> logging.Logger:
     logger.setLevel(logging.INFO)
     # create file handler (has current timestamp in file name)
     now = datetime.now().strftime('%Y%m%d-%H%M%S')
-    fh = logging.FileHandler(f'./../log/{name}_{now}.log')
+    fh = logging.FileHandler(f'{log_dir}/{name}_{now}.log')
     fh.setLevel(logging.INFO)
     # create console handler
     ch = logging.StreamHandler()

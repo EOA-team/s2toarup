@@ -30,7 +30,7 @@ from logger import get_logger
 
 s2_gain_factor *= 100
 
-logger = get_logger('_analyze_unc_contrib')
+logger = get_logger('_analyze_unc_contrib', log_dir='../../log')
 
 # define Sentinel-2 bands to analyze
 s2_band_selection = ['B02', 'B03', 'B04', 'B08']
@@ -309,6 +309,7 @@ def analyze_rois(
         large_df = pd.concat(df_list)
 
         # violin plots
+        palette = ['blue', 'red']
         f, ax = plt.subplots(nrows=1, ncols=2, figsize=(30,10), sharey=True)
         sns.violinplot(
             x='date',
@@ -320,7 +321,8 @@ def analyze_rois(
             scale='count',
             scale_hue=False,
             saturation=.75,
-            inner=None
+            inner=None,
+            palette=palette
         )
         ax[0].set_ylabel('Relative Radiometric Uncertainty [%]\n(k=1)', fontsize=16)
         ax[0].set_title('Sentinel-2 B04 (red)')
@@ -338,7 +340,8 @@ def analyze_rois(
             scale='count',
             scale_hue=False,
             saturation=.75,
-            inner=None
+            inner=None,
+            palette=palette
         )
         ax[1].set_ylabel('')
         ax[1].set_title('Sentinel-2 B08 (near-infrared)')
@@ -369,7 +372,7 @@ if __name__ == '__main__':
     batches = [str(x) for x in range(1,6)]
 
     # define regions of interest (different crop types) + forest + settlement
-    gdf = gpd.read_file('../shp/areas_of_interest_uncertainty_contributors_dissolved.gpkg')
+    gdf = gpd.read_file('../../shp/areas_of_interest_uncertainty_contributors_dissolved.gpkg')
 
     orig_scenes_dir = Path('/home/graflu/Documents/uncertainty/S2_MSIL1C_orig')
 

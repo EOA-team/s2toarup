@@ -1,1 +1,14 @@
 seaborn
+matplotlib
+geopandas
+pandas
+numpy
+scipy
+sklearn
+statsmodels
+spectral
+prosail
+pillow
+xarray
+uncertainties
+numba

@@ -1,7 +1,7 @@
-# Radiometric Atmospheric Correction Uncertainty Propagation Study
+# Sentinel-2 Top-Of-Atmosphere Radiometric Uncertainty Propagator (stoarup)
 
 This repository implements the **complete processing and workflow required to reproduce our study about the impact of
-radiometric uncertainty on the retrieval of key phenological stages from Sentinel-2 data**.
+radiometric uncertainty in Sentinel-2 Top-of-Atmosphere data on the retrieval of land surface metrics.
 
 ## Citation
 

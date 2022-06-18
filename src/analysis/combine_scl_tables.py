@@ -1,7 +1,6 @@
 '''
-Created on Mar 30, 2022
-
-@author: graflu
+Combines the single SCL uncertainty results (per scene) into
+a single large table.
 '''
 
 from datetime import date
@@ -11,26 +10,17 @@ import pandas as pd
 
 if __name__ == '__main__':
 
-    scenario_dir = Path(
-        '/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2_MSIL1C_RUT-Scenarios'
-    )
-
+    scenario_dir = Path('../../S2_MSIL1C_RUT-Scenarios')
     output_dir = scenario_dir
 
     # loop over batches, read the SCL relative number of pixels and combine it
     # into a single data frame
-    res_list = []
-    for batch in range(1,6):
-        scl_res_file = next(
-            scenario_dir.rglob(
-                f'batch_{batch}/SCL_Uncertainty/SCL_relative-number-' \
-                'of-pixels-per-class_abs-uncertainty.csv'
-            )
+    scl_res_file =  scenario_dir.joinpath(
+            'SCL_Uncertainty/SCL_relative-number-' \
+            'of-pixels-per-class_abs-uncertainty.csv'
         )
-        scl_res = pd.read_csv(scl_res_file)
-        res_list.append(scl_res)
 
-    scl_df = pd.concat(res_list)
+    scl_df = pd.read_csv(scl_res_file)
 
     # create Latex table
     col_selection = [
@@ -57,4 +47,3 @@ if __name__ == '__main__':
     fname = output_dir.joinpath('SCL_relative-number-of-pixels-per-class_abs-uncertainty.csv')
     with open(fname, 'w+') as dst:
         dst.write(table)
-

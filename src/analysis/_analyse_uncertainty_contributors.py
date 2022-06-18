@@ -18,19 +18,19 @@ import os
 import seaborn as sns
 import re
 
-from agrisatpy.core.band import Band
-from agrisatpy.core.raster import RasterCollection
-from agrisatpy.core.sensors import Sentinel2
-from agrisatpy.utils.constants.sentinel2 import s2_gain_factor
+from eodal.core.band import Band
+from eodal.core.raster import RasterCollection
+from eodal.core.sensors import Sentinel2
+from eodal.utils.constants.sentinel2 import s2_gain_factor
 from datetime import datetime
 from pathlib import Path
 from typing import List
 
-from logger import get_logger
+from utils.logger import get_logger
 
 s2_gain_factor *= 100
 
-logger = get_logger('_analyze_unc_contrib', log_dir='../../log')
+logger = get_logger('_analyze_unc_contrib')
 
 # define Sentinel-2 bands to analyze
 s2_band_selection = ['B02', 'B03', 'B04', 'B08']
@@ -369,47 +369,26 @@ def analyze_rois(
 
 if __name__ == '__main__':
 
-    batches = [str(x) for x in range(1,6)]
-
     # define regions of interest (different crop types) + forest + settlement
     gdf = gpd.read_file('../../shp/areas_of_interest_uncertainty_contributors_dissolved.gpkg')
 
-    orig_scenes_dir = Path('/home/graflu/Documents/uncertainty/S2_MSIL1C_orig')
+    orig_scenes_dir = Path('../../S2_MSIL1C_orig')
 
-    for batch in batches:
+    scenario_dir = Path('../../S2_MSIL1C_RUT-Scenarios')
+    out_dir = Path('../../S2_MSIL1C_RUT-Scenarios/L1C_Analysis')
+    out_dir.mkdir(exist_ok=True)
 
-        scenario_dir = Path(f'/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2_MSIL1C_RUT-Scenarios/batch_{batch}')
-        out_dir = Path('/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2_MSIL1C_RUT-Scenarios/L1C_Analysis')
-        out_dir.mkdir(exist_ok=True)
-        # calc_uncertainty(scenario_dir, out_dir)
-        # map_uncertainty(unc_results_dir=out_dir)
-    
-        plt.style.use('ggplot')
-        matplotlib.rc('xtick', labelsize=14) 
-        matplotlib.rc('ytick', labelsize=14)
+    plt.style.use('ggplot')
+    matplotlib.rc('xtick', labelsize=14) 
+    matplotlib.rc('ytick', labelsize=14)
 
-        for scene_path in scenario_dir.glob('*MSIL1C*'):
-            # find the corresponding original S2 scene for relative uncertainty calculation
-            scene_date = scene_path.name.split('_')[2]
-            orig_scene = next(orig_scenes_dir.glob(f'*MSIL1C_{scene_date}*.SAFE'))
-            # calc_uncertainty(scene_dir=scene_path, orig_scene=orig_scene, out_dir=out_dir)
+    for scene_path in scenario_dir.glob('*MSIL1C*'):
+        # find the corresponding original S2 scene for relative uncertainty calculation
+        scene_date = scene_path.name.split('_')[2]
+        orig_scene = next(orig_scenes_dir.glob(f'*MSIL1C_{scene_date}*.SAFE'))
+        calc_uncertainty(scene_dir=scene_path, orig_scene=orig_scene, out_dir=out_dir)
 
-        # black-list scenes with clouds or snow
-        black_list = ['20190214', '20190216', '20190530','20190716']
+    # black-list scenes with clouds or snow
+    black_list = ['20190214', '20190216', '20190530','20190716']
 
-        analyze_rois(unc_results_dir=out_dir, rois=gdf, black_list=black_list)
-
-        # map_uncertainty(unc_results_dir=out_dir)
-    
-        # scene_path = out_dir.joinpath('S2A_MSIL1C_20190530T103031_N0207_R108_T32TMT_20190530T123429')
-        # roi_file = Path('../shp/ZH_Sampling_Locations_Contributor_Analysis.shp')
-        # luc_mapping = {
-        #     1: 'Water (Lake)',
-        #     2: 'Cumulus Cloud',
-        #     3: 'Mixed Forest',
-        #     4: 'Arable land (green vegetation)'
-        # }
-        #
-        # analyze_rois(scene_path, roi_file, luc_mapping)
-    
-    
+    analyze_rois(unc_results_dir=out_dir, rois=gdf, black_list=black_list)

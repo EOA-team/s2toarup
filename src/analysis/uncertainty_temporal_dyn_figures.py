@@ -1,7 +1,5 @@
 '''
-Created on Jun 3, 2022
-
-@author: graflu
+Combines the temporal uncertainty figures for EVI, NDVI and GLAI into a single figure.
 '''
 
 from pathlib import Path

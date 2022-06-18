@@ -183,10 +183,8 @@ def plot_samples(
     fpath = out_dir.joinpath(fname)
     f.savefig(fpath, bbox_inches='tight')
 
-        
-
 if __name__ == '__main__':
+
     sample_pixels_dir = Path('../../S2_TimeSeries_Analysis')
     out_dir = sample_pixels_dir
-
     plot_samples(sample_pixels_dir, out_dir)

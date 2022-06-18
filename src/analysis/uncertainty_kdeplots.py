@@ -102,13 +102,6 @@ if __name__ == '__main__':
     )
     vis = ['EVI', 'NDVI', 'GLAI']
 
-    # # median field parcel size without buffer
-    # shp = Path('../../shp/ZH_Polygons_2019_EPSG32632_selected-crops_buffered.shp')
-    # gdf = gpd.read_file(shp)
-    # median_area_org = gdf.geometry.area.agg(by='median')
-    # # to hectar
-    # median_area_org *= 1 / (100*100)
-
     # shapefile with crop type information for the single field parcels
     shapefile_crops = Path('../../shp/ZH_Polygons_2019_EPSG32632_selected-crops_buffered.shp')
     column_crop_code = 'crop_code'
@@ -119,33 +112,13 @@ if __name__ == '__main__':
 
     # get area per crop in ha
     gdf.dropna(inplace=True)
-    # median_area_buf = gdf.geometry.area.agg(by='median')
-    # mean_area_buf = gdf.geometry.area.agg(by='mean')
-    # # to hectar
-    # median_area_buf *= 1 / (100*100)
+
     dissolved = gdf.dissolve(by='crop_type')
     dissolved['area'] = np.round(dissolved.geometry.area / (100 * 100),1)
     dissolved['area'].to_csv(res_dir.joinpath('crop_types_area.csv'))
     # print(dissolved['area'].to_latex())
 
     crop_code_mapping = dict(list(gdf.groupby([column_crop_code, column_crop_names]).groups))
-
-    # from agrisatpy.core.sensors import Sentinel2
-    #
-    # test_scene = Path('/home/graflu/Documents/uncertainty/S2_MSIL1C_orig/S2A_MSIL1C_20190216T102111_N0207_R065_T32TMT_20190216T122039.SAFE')
-    # # get number of S2 pixels
-    # res = []
-    # for crop in crop_code_mapping:
-    #     crop_parcels = dissolved[dissolved.crop_code == crop]
-    #     s2 = Sentinel2().from_safe(
-    #         in_dir=test_scene, band_selection=['B8A','B02'],
-    #         vector_features=crop_parcels
-    #     )
-    #     res.append(
-    #         {'crop': crop_code_mapping[crop], 'pixel_count_10m': s2['blue'].values.count()}
-    #     )
-    #
-    # df = pd.DataFrame(res)
 
     plot_uncertainty_kdeplots(res_dir, vis, crop_code_mapping)
     

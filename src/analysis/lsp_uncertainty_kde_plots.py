@@ -1,7 +1,5 @@
 '''
-Created on Apr 4, 2022
-
-@author: graflu
+Plots kernel-density estimates of the uncertainty values in the LSP metrics.
 '''
 
 from pathlib import Path

@@ -1,7 +1,5 @@
 '''
-Created on Jun 13, 2022
-
-@author: graflu
+Plots sample NDVI time series for different crops
 '''
 
 import geopandas as gpd
@@ -100,7 +98,7 @@ if __name__ == '__main__':
     gdf = gpd.read_file('../../shp/areas_of_interest_uncertainty_contributors_dissolved.gpkg')
 
     # directory with original S2 scenes
-    orig_scenes_dir = Path('/home/graflu/Documents/uncertainty/S2_MSIL1C_orig')
+    orig_scenes_dir = Path('../../S2_MSIL1C_orig')
 
     # directory where to store plots
     out_dir = Path('../../S2_TimeSeries_Analysis')

@@ -9,7 +9,7 @@ import pandas as pd
 # URL to query agrarmeteo.ch for the Strickhof weather station
 # url = 'https://www.agrometeo.ch/de/meteorologie/data?stations=175&sensors=1%3Aavg,6%3Asum&from=2000-01-01&to=2022-04-04&scale=day&groupBy=station&measured=0'
 
-fpath_weather_data = '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/01_Uncertainty/ESCH/scripts_paper_uncertainty/shp//weather_data.csv'
+fpath_weather_data = '../../shp//weather_data.csv'
 df = pd.read_csv(fpath_weather_data, sep=';')
 
 df['Datum'] = pd.to_datetime(df['Datum'])

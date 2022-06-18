@@ -1,7 +1,6 @@
 '''
-Created on Mar 30, 2022
-
-@author: graflu
+Plots the figure showing the availability of S2 scenes in the
+study area alongside their cloud coverage.
 '''
 
 from pathlib import Path

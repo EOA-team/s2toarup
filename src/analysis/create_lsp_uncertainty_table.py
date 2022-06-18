@@ -1,5 +1,5 @@
 '''
-Combines LSP uncertainty results into single handy dataframes (tables
+Combines LSP-metric uncertainty results into single handy dataframes (tables
 for the paper)
 '''
 

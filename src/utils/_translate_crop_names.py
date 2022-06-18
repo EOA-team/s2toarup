@@ -7,7 +7,7 @@ rasterization of crop types.
 import geopandas as gpd
 
 
-fname_shp = '../shp/ZH_Polygons_2019_EPSG32632_selected-crops.shp'
+fname_shp = '../../shp/ZH_Polygons_2019_EPSG32632_selected-crops.shp'
 
 gdf = gpd.read_file(fname_shp)
 

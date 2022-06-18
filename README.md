@@ -19,7 +19,7 @@ Furthermore, the Sentinel-2 Radiometric Uncertainty Toolbox and Sen2Cor are requ
 
 For S2 data download, a [CREODIAS account](https://creodias.eu/) is required (free account). The API access token must be provided according to the [module doc string in the download module](src/processing/01_download_data_creodias.py).
 
-### Installing eodal for Raster Data Handling
+### Installing E:earth_africa:dal for Raster Data Handling
 
 For **reading and writing raster data** we use the E:earth_africa:dal Python package (Earth Observation Data Analysis Library). See [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6651767.svg)](https://doi.org/10.5281/zenodo.6651767) for more information.
 

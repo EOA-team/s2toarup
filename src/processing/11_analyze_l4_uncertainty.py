@@ -21,9 +21,9 @@ from typing import Union
 from typing import Any
 from typing import Optional
 
-from agrisatpy.core.band import Band
-from agrisatpy.core.raster import RasterCollection
-from logger import get_logger
+from eodal.core.band import Band
+from eodal.core.raster import RasterCollection
+from utils.logger import get_logger
 from copy import deepcopy
 
 logger = get_logger('l5_uncertainty')
@@ -516,7 +516,7 @@ if __name__ == '__main__':
     ]
 
     # shapefile with crop type information for the single field parcels
-    shapefile_crops = Path('../shp/ZH_Polygons_2019_EPSG32632_selected-crops_buffered.shp')
+    shapefile_crops = Path('../../shp/ZH_Polygons_2019_EPSG32632_selected-crops_buffered.shp')
     column_crop_code = 'crop_code'
     column_crop_names = 'crop_type'
 
@@ -530,7 +530,7 @@ if __name__ == '__main__':
     for corr_type in corr_types:
         for vi_name in vi_names:
     
-            uncertainty_dir = Path(f'../S2_TimeSeries_Analysis/{vi_name}/{corr_type}')
+            uncertainty_dir = Path(f'../../S2_TimeSeries_Analysis/{vi_name}/{corr_type}')
             out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
             if not out_dir.exists():
                 out_dir.mkdir()
@@ -560,7 +560,7 @@ if __name__ == '__main__':
     for corr_type in corr_types:
         for vi_name in vi_names:
     
-            uncertainty_dir = Path(f'../S2_TimeSeries_Analysis/{vi_name}/{corr_type}')
+            uncertainty_dir = Path(f'../../S2_TimeSeries_Analysis/{vi_name}/{corr_type}')
             out_dir = uncertainty_dir.joinpath('Uncertainty_Maps')
             result_dir = out_dir
             out_dir_crops = out_dir.joinpath('selected_crops')
@@ -581,27 +581,27 @@ if __name__ == '__main__':
                 )
     
             # visualize the randomly selected pixel time series samples
-            # vi_dir = uncertainty_dir
-            # # path to pixel samples
-            # sample_points_scenarios = glob.glob(
-            #     vi_dir.joinpath(f'{vi_name}_*time_series.csv').as_posix()
-            # )[0]
-            #
-            # # path to reference pheno metric results (calculated on original time series data)
-            # sample_points_pheno_metrics_reference = vi_dir.joinpath(
-            #     'reference'
-            #     ).joinpath(
-            #         'pheno_metrics.tif'
-            #     )
-            #
-            # out_dir_ts_plots_vi = out_dir_ts_plots
+            vi_dir = uncertainty_dir
+            # path to pixel samples
+            sample_points_scenarios = glob.glob(
+                vi_dir.joinpath(f'{vi_name}_*time_series.csv').as_posix()
+            )[0]
+            
+            # path to reference pheno metric results (calculated on original time series data)
+            sample_points_pheno_metrics_reference = vi_dir.joinpath(
+                'reference'
+                ).joinpath(
+                    'pheno_metrics.tif'
+                )
+            
+            out_dir_ts_plots_vi = out_dir_ts_plots
 
-            # visualize_sample_time_series(
-            #     sample_points_scenarios=sample_points_scenarios,
-            #     sample_points_pheno_metrics_reference=sample_points_pheno_metrics_reference,
-            #     pheno_metrics_uncertainty_dir=result_dir,
-            #     vi_name=vi_name,
-            #     ymin=ymins[vi_name],
-            #     ymax=ymaxs[vi_name],
-            #     out_dir=out_dir_ts_plots_vi
-            # )
+            visualize_sample_time_series(
+                sample_points_scenarios=sample_points_scenarios,
+                sample_points_pheno_metrics_reference=sample_points_pheno_metrics_reference,
+                pheno_metrics_uncertainty_dir=result_dir,
+                vi_name=vi_name,
+                ymin=ymins[vi_name],
+                ymax=ymaxs[vi_name],
+                out_dir=out_dir_ts_plots_vi
+            )

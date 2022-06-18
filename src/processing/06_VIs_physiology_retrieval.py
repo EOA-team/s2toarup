@@ -16,10 +16,10 @@ import glob
 import matplotlib.pyplot as plt
 
 from pathlib import Path
-from agrisatpy.operational.resampling.sentinel2.resample_and_stack import _get_output_file_names
-from agrisatpy.core.sensors import Sentinel2
+from eodal.operational.resampling.sentinel2.resample_and_stack import _get_output_file_names
+from eodal.core.sensors import Sentinel2
 
-from logger import get_logger
+from utils.logger import get_logger
 
 # setup logger -> will write log file to the /../log directory
 logger = get_logger('l3_vegetation-indices')
@@ -196,9 +196,11 @@ def resample_and_stack_orig_data(
 
 if __name__ == '__main__':
 
-    scenario_dir = Path('../S2_MSIL1C_RUT-Scenarios')
-    
-    shapefile_study_area = Path('../shp/AOI_Esch_EPSG32632_crop-bounds.shp')
+    # directory with MC L1C simulations
+    scenario_dir = Path('../../S2_MSIL1C_RUT-Scenarios')
+
+    # boundary of the study area
+    shapefile_study_area = Path('../../shp/AOI_Esch_EPSG32632_crop-bounds.shp')
     
     # vegetation indices on scenarios
     batches = [idx for idx in range(1,6)]
@@ -209,7 +211,7 @@ if __name__ == '__main__':
         )
 
     # # original Sentinel-2 L2A data
-    orig_l2a_data = Path('/home/graflu/Documents/uncertainty/S2_MSIL1C_orig')
+    orig_l2a_data = Path('../../S2_MSIL1C_orig')
     
     # resample bandstacks and SCL for original datasets
     resample_and_stack_orig_data(

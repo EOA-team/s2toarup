@@ -11,10 +11,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple
 
-from agrisatpy.core.band import Band
-from agrisatpy.core.sensors import Sentinel2
+from eodal.core.band import Band
+from eodal.core.sensors import Sentinel2
 
-from logger import get_logger
+from utils.logger import get_logger
 
 logger = get_logger('read_data')
 

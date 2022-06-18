@@ -12,8 +12,11 @@
 #	scene but ending with *.RUT instead of *.SAFE
 #
 
-# TODO: find out how to specify a relative path here
-dot_safe_dir=/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2_MSIL1C_orig/spring
+# USER-INPUTS
+# define the path to gpt (graph processing tool) of SNAP
+snap_exec="$snap_exec"
+
+dot_safe_dir=../../S2_MSIL1C_orig
 cd "$dot_safe_dir"
 
 # find subdirectories and loop over them
@@ -51,15 +54,15 @@ for dir in ${dirlist[@]}; do
 	
 	 		# 	************************** uncertainty contributors *************************
 	 		# instrument noise
-	 		/home/graflu/snap/bin/gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"noise_"$band".tif -Pband_names="$band" -p Instrument_noise.properties
+	 		"$snap_exec" S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"noise_"$band".tif -Pband_names="$band" -p Instrument_noise.properties
 	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
 	
 			# out-of-field straylight systematic part
-	 		/home/graflu/snap/bin/gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"stray_sys_"$band".tif -Pband_names="$band" -p OOF_straylight-systematic.properties
+	 		"$snap_exec" S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"stray_sys_"$band".tif -Pband_names="$band" -p OOF_straylight-systematic.properties
 	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
 	 
 	 		# out-of-field straylight random part
-	 		/home/graflu/snap/bin/gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"stray_rand_"$band".tif -Pband_names="$band" -p OOF_straylight-random.properties
+	 		"$snap_exec" S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"stray_rand_"$band".tif -Pband_names="$band" -p OOF_straylight-random.properties
 	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
 	
 			# crosstalk (not considered any more, see Gorrono et al., 2018 for a discussion)
@@ -67,35 +70,35 @@ for dir in ${dirlist[@]}; do
 	 		# rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
 	
 			# ADC quantisation
-	 		/home/graflu/snap/bin/gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"ADC_"$band".tif -Pband_names="$band" -p ADC_quantisation.properties
+	 		"$snap_exec" S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"ADC_"$band".tif -Pband_names="$band" -p ADC_quantisation.properties
 	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
 	
 			# dark signal stability
-	 		/home/graflu/snap/bin/gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"DS_"$band".tif -Pband_names="$band" -p DS_stability.properties
+	 		"$snap_exec" S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"DS_"$band".tif -Pband_names="$band" -p DS_stability.properties
 	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
 	
 			# non-linearty and non-uniformity knowledge
-	 		/home/graflu/snap/bin/gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"gamma_"$band".tif -Pband_names="$band" -p Gamma_knowledge.properties
+	 		"$snap_exec" S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"gamma_"$band".tif -Pband_names="$band" -p Gamma_knowledge.properties
 	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
 	
 			# diffuser reflectance absolute knowledge
-	 		/home/graflu/snap/bin/gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"diff_abs_"$band".tif -Pband_names="$band" -p Diffuser-absolute_knowledge.properties
+	 		"$snap_exec" S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"diff_abs_"$band".tif -Pband_names="$band" -p Diffuser-absolute_knowledge.properties
 	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
 	
 			# diffuse reflectance temporal knowledge
-	 		/home/graflu/snap/bin/gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"diff_temp_"$band".tif -Pband_names="$band" -p Diffuser-temporal_knowledge.properties
+	 		"$snap_exec" S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"diff_temp_"$band".tif -Pband_names="$band" -p Diffuser-temporal_knowledge.properties
 	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
 	
 			# Angular diffuser knowledge - cosine effect
-	 		/home/graflu/snap/bin/gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"diff_cos_"$band".tif -Pband_names="$band" -p Diffuser-cosine_effect.properties
+	 		"$snap_exec" S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"diff_cos_"$band".tif -Pband_names="$band" -p Diffuser-cosine_effect.properties
 	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
 	
 			# strayligth in calibration mode
-	 		/home/graflu/snap/bin/gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"diff_k_"$band".tif -Pband_names="$band" -p Diffuser-straylight_residual.properties
+	 		"$snap_exec" S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"diff_k_"$band".tif -Pband_names="$band" -p Diffuser-straylight_residual.properties
 	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
 	
 			# L1C image quantisation
-			/home/graflu/snap/bin/gpt S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"quant_"$band".tif -Pband_names="$band" -p L1C_image_quantisation.properties
+			"$snap_exec" S2RutOp -Ssource="${dir}" -x -f GeoTiff -t "${rut_dir}"/"${unc_files_basename}"quant_"$band".tif -Pband_names="$band" -p L1C_image_quantisation.properties
 	 		rm -rf /home/"$USER"/.snap/var/cache/s2tbx/l1c-reader/8.0.4
 		
 		done

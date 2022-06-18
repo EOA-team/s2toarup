@@ -13,10 +13,10 @@ from pathlib import Path
 from sklearn.metrics import confusion_matrix
 from pretty_print_confusion import pp_matrix
 
-from agrisatpy.core.sensors import Sentinel2
-from agrisatpy.utils.constants.sentinel2 import SCL_Classes
+from eodal.core.sensors import Sentinel2
+from eodal.utils.constants.sentinel2 import SCL_Classes
 
-from logger import get_logger
+from utils.logger import get_logger
 
 logger = get_logger('SCL_Uncertainty')
 scl_classes = SCL_Classes().values()
@@ -29,6 +29,13 @@ def scl_uncertainty(
     """
     Classification uncertainty of the scene classification layer (SCL)
     of the L2A Sentinel-2 product
+
+    :param scenario_dir:
+        directory with L1C/L2A scenario runs
+    :param output_dir:
+        directory where to save the results to
+    :param aoi:
+        vector file defining the area of interest to read
     """
     # find scenes for which scenarios are available
     scenes = glob.glob(scenario_dir.joinpath('S2*_MSIL1C*').as_posix())
@@ -167,47 +174,44 @@ def scl_uncertainty(
 
 if __name__ == '__main__':
 
-    aoi = Path('../shp/AOI_Esch_EPSG32632.shp')
+    aoi = Path('../../shp/AOI_Esch_EPSG32632.shp')
 
-    batches = [x for x in range(1,6)]
+    scenario_dir = Path('../../S2_MSIL1C_RUT-Scenarios')
+    output_dir = scenario_dir.joinpath('SCL_Uncertainty')
+    output_dir.mkdir(exist_ok=True)
 
-    for batch in batches:
-        scenario_dir = Path(f'../S2_MSIL1C_RUT-Scenarios/batch_{batch}')
-        output_dir = scenario_dir.joinpath('SCL_Uncertainty')
-        output_dir.mkdir(exist_ok=True)
-    
-        scl_uncertainty(
-            scenario_dir=scenario_dir,
-            output_dir=output_dir,
-            aoi=aoi
-        )
+    scl_uncertainty(
+        scenario_dir=scenario_dir,
+        output_dir=output_dir,
+        aoi=aoi
+    )
 
     # combine results from batches into two single DataFrames and save them to csv and latex
     area_stats_list = []
     class_confidence_list = []
-    for batch in batches:
-        fname_area_stats = Path(
-            f'../S2_MSIL1C_RUT-Scenarios/batch_{batch}/SCL_Uncertainty/SCL_relative-number-of-pixels-per-class_abs-uncertainty.csv'
-        )
-        df = pd.read_csv(fname_area_stats)
-        area_stats_list.append(df)
-        fname_class_confidence = Path(
-            f'../S2_MSIL1C_RUT-Scenarios/batch_{batch}/SCL_Uncertainty/SCL_class-assignment-confidence-abs-variability.csv'
-        )
-        df = pd.read_csv(fname_class_confidence)
-        class_confidence_list.append(df)
+    
+    fname_area_stats = Path(
+        '../../S2_MSIL1C_RUT-Scenarios/SCL_Uncertainty/SCL_relative-number-of-pixels-per-class_abs-uncertainty.csv'
+    )
+    area_stats = pd.read_csv(fname_area_stats)
+    fname_class_confidence = Path(
+        '../../S2_MSIL1C_RUT-Scenarios/SCL_Uncertainty/SCL_class-assignment-confidence-abs-variability.csv'
+    )
+    class_confidence = pd.read_csv(fname_class_confidence)
 
-    area_stats = pd.concat(area_stats_list)
-    class_confidence = pd.concat(class_confidence_list)
-
-    fname_area_stats = Path('../S2_MSIL2A_Analysis').joinpath('SCL_relative-number-of-pixels-per-class_abs-uncertainty.csv')
+    fname_area_stats = Path('../../S2_MSIL2A_Analysis').joinpath(
+        'SCL_relative-number-of-pixels-per-class_abs-uncertainty.csv'
+    )
     area_stats = area_stats.sort_values(by='date')
     area_stats.to_csv(fname_area_stats, index=False)
 
-    fname_class_confidence = Path('../S2_MSIL2A_Analysis').joinpath('SCL_class-assignment-confidence-abs-variability.csv')
+    fname_class_confidence = Path('../../S2_MSIL2A_Analysis').joinpath(
+        'SCL_class-assignment-confidence-abs-variability.csv'
+    )
     class_confidence = class_confidence.sort_values(by='date')
     class_confidence.to_csv(fname_class_confidence, index=False)
 
+    # output latex table (optional)
     # df = pd.read_csv(fname_area_stats)
     # sel_cols = ['date', 'cloud_shadows', 'vegetation', 'non_vegetated', 'water', 'unclassified',
     #    'cloud_medium_probability', 'cloud_high_probability', 'thin_cirrus']

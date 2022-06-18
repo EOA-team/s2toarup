@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 
 
-def get_logger(name: str, log_dir: str='./../log') -> logging.Logger:
+def get_logger(name: str, log_dir: str='../../log') -> logging.Logger:
     """
     returns basic logger (console and file output)
 

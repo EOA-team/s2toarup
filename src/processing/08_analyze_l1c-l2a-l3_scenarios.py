@@ -31,7 +31,7 @@ from typing import List
 from rasterio.transform import Affine
 from numpy import absolute
 
-from logger import get_logger
+from utils.logger import get_logger
 
 # get logger
 logger = get_logger('08_analyze_uncertainty_l1c-l2a-l3')
@@ -1020,11 +1020,8 @@ if __name__ == '__main__':
     from shapely.geometry import box
     
     # shapefile (or other vector format) defining the extent of the study area
-    # in_file_shp = Path(
-    #     '../shp/AOI_Esch_EPSG32632.shp'
-    # )
     in_file_shp_rois = Path(
-        '../shp/ZH_Polygons_2019_EPSG32632_selected-crops_buffered.shp'
+        '../../shp/ZH_Polygons_2019_EPSG32632_selected-crops_buffered.shp'
     )
     id_column = 'crop_type'
     gdf = gpd.read_file(in_file_shp_rois)
@@ -1032,44 +1029,39 @@ if __name__ == '__main__':
     bounds = box(*bounds)
     gdf_out = gpd.GeoDataFrame(geometry=[bounds], crs=gdf.crs)
     in_file_shp = Path(
-        '../shp/AOI_Esch_EPSG32632_crop-bounds.shp'
+        '../../shp/AOI_Esch_EPSG32632_crop-bounds.shp'
     )
     gdf_out.to_file(in_file_shp)
 
     # directory where to save the resulting files to
     out_dir_home = Path(
-        '../S2_MSIL2A_Analysis'
+        '../../S2_MSIL2A_Analysis'
     )
 
     options = {
-        'orig_dataset_directory': Path(
-            '/home/graflu/Documents/uncertainty/S2_MSIL1C_orig'
-        )
+        'orig_dataset_directory': Path('../../S2_MSIL1C_orig')
     }
 
     # directory containing the raster realizations
-    for batch in range(4,6):
-        unc_scenario_dir_home = Path(
-            f'../S2_MSIL1C_RUT-Scenarios/batch_{batch}'
-        )
+    unc_scenario_dir_home = Path('../../S2_MSIL1C_RUT-Scenarios')
     
-        # absolute uncertainty
-        main(
-            unc_scenario_dir_home=unc_scenario_dir_home,
-            out_dir_home=out_dir_home,
-            in_file_shp=in_file_shp,
-            in_file_shp_rois=in_file_shp_rois,
-            id_column=id_column,
-            **options
-        )
-    
-        # relative uncertainty
-        main(
-            unc_scenario_dir_home=unc_scenario_dir_home,
-            out_dir_home=out_dir_home,
-            in_file_shp=in_file_shp,
-            in_file_shp_rois=in_file_shp_rois,
-            id_column=id_column,
-            absolute_uncertainty=False,
-            **options
-        )
+    # absolute uncertainty
+    main(
+        unc_scenario_dir_home=unc_scenario_dir_home,
+        out_dir_home=out_dir_home,
+        in_file_shp=in_file_shp,
+        in_file_shp_rois=in_file_shp_rois,
+        id_column=id_column,
+        **options
+    )
+
+    # relative uncertainty
+    main(
+        unc_scenario_dir_home=unc_scenario_dir_home,
+        out_dir_home=out_dir_home,
+        in_file_shp=in_file_shp,
+        in_file_shp_rois=in_file_shp_rois,
+        id_column=id_column,
+        absolute_uncertainty=False,
+        **options
+    )

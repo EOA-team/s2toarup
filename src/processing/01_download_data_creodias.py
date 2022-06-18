@@ -18,10 +18,10 @@ from datetime import date
 from pathlib import Path
 from typing import Optional
 
-from agrisatpy.downloader.sentinel2.creodias import query_creodias
-from agrisatpy.downloader.sentinel2.creodias import download_datasets
-from agrisatpy.downloader.sentinel2.utils import unzip_datasets
-from agrisatpy.utils.constants import ProcessingLevels
+from eodal.downloader.sentinel2.creodias import query_creodias
+from eodal.downloader.sentinel2.creodias import download_datasets
+from eodal.downloader.sentinel2.utils import unzip_datasets
+from eodal.utils.constants import ProcessingLevels
 
 
 def main(
@@ -81,9 +81,9 @@ if __name__ == '__main__':
 
     # shapefile defining the bounds of your region of interest
     aoi_file = Path(
-        './../shp/AOI_Esch_EPSG32632.shp'
+        '../../shp/AOI_Esch_EPSG32632.shp'
     )
-    download_dir = Path('./../S2A_MSIL1C_orig/spring')
+    download_dir = Path('../../S2_MSIL1C_orig')
 
     if not download_dir.exists():
         download_dir.mkdir()

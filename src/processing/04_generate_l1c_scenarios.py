@@ -52,9 +52,9 @@ from shapely.geometry import Polygon
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from logger import get_logger
+from utils.logger import get_logger
 
-# setup logger -> will write log file to the /../log directory
+# setup logger -> will write log file to the log directory
 logger = get_logger('l1c-monte-carlo')
 
 
@@ -878,51 +878,25 @@ def main(
 
 if __name__ == '__main__':
 
-    # debug
-    # orig_dataset_path = Path(
-    #     './../S2A_MSIL1C_orig/done/S2A_MSIL1C_20190818T103031_N0208_R108_T32TMT_20190818T124651.SAFE'
-    # )
-    # unc_dataset_path = Path(
-    #     './../S2A_MSIL1C_orig/done/S2A_MSIL1C_20190818T103031_N0208_R108_T32TMT_20190818T124651.RUT'
-    # )
-    # scenario_path = Path(
-    #     './../debug'
-    # )
-    # template_path = Path(
-    #     './../debug/template'
-    # )
-    # n_scenarios = 1
-    # roi_bounds_10m = [7200,8400,4200,5400]  # pixel coordinates (i.e., rows and columns)
-    #
-    # gen_rad_unc_scenarios(orig_dataset_path, unc_dataset_path, scenario_path, template_path, n_scenarios, roi_bounds_10m)
-    #
-
     ### define user inputs
 
-    # TODO: correct paths afterwards
     # directory with L1C data (.SAFE subdirectories)
-    orig_datasets_dir = Path('../S2_MSIL1C_orig')
+    orig_datasets_dir = Path('../../S2_MSIL1C_orig')
     
     # directory with radiometric uncertainty outputs (.RUT subdirectories)
     unc_datasets_dir = orig_datasets_dir
     
     # directory where to store the scenarios (a subdirectory will be created for each scene)
     # in which the actual scenarios are placed
-    scenario_dir = Path('../S2_MSIL1C_RUT-Scenarios')
+    scenario_dir = Path('../../S2_MSIL1C_RUT-Scenarios')
     
     # define bounds of the study area (aka region of interest)
     # bounds col_min, col_max, row_min, row_max (image coordinates of the 10m raster)
     roi_bounds_10m = [7200,8400,4200,5400]
 
-    # scene_selection = [
-    #     'S2A_MSIL1C_20190328T102021_N0207_R065_T32TMT_20190328T154025.SAFE',
-    #     'S2A_MSIL1C_20190530T103031_N0207_R108_T32TMT_20190530T123429.SAFE',
-    #     'S2A_MSIL1C_20190818T103031_N0208_R108_T32TMT_20190818T124651.SAFE'
-    # ]
-    
     # number of scenarios (each scenario is a possible realization of a S2 scene!)
     n_scenarios = 300
- 
+
     main(
         orig_datasets_dir,
         unc_datasets_dir,

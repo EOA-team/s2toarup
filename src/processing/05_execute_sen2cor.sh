@@ -20,8 +20,13 @@
 #	possible as well. In this case replace the path in line 29 of this script.
 #
 
+# USER INPUT
+# define directory where Sen2Cor is installed to
+sen2cor_install_dir="/home/graflu/Downloads/Sen2Cor-02.09.00-Linux64"
+source "$sen2cor_install_dir"/L2A_Bashrc
+
 # define directory where the L1C realizations are located
-unc_scenarios="/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2A_MSIL1C_RUT-Scenarios/autumn/batch_1"
+unc_scenarios="../../S2A_MSIL1C_RUT-Scenarios"
 
 cd "$unc_scenarios" 
 
@@ -48,7 +53,7 @@ for unc_dir in ${scenario_list[@]}; do
 			    output_dir="${unc_dir}"/"${counter}"
 			    counter=$((counter+1))
 			    # call Sen2Cor (L2A_Process must be located in $PATH or provide full path to executable)
-			    /home/graflu/Downloads/Sen2Cor-02.09.00-Linux64/bin/L2A_Process --resolution 10 --output_dir "${output_dir}" "${scenario}"
+			    L2A_process --resolution 10 --output_dir "${output_dir}" "${scenario}"
 			    echo Processed "${scenario}"
 			fi
 		done

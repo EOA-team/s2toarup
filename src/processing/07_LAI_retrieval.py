@@ -1,18 +1,24 @@
 '''
+Performs the Green Leaf Area Index (GLAI) retrieval using lookup-tables (LUT)
+from the radiative transfer model ProSAIL.
 
+The LUTs have already been pre-calculated using the `rtm_inv` sub-package
+provided in the utils sub-package.
+
+The parameterisation has been taken from Danner et al. (2021, DOI: 10.1016/j.isprsjprs.2021.01.017)
+
+See also `~utils.rtm_inv.README.md` for more details.
 '''
 
-import os
 import glob
-import numpy as np
 import pandas as pd
 from pathlib import Path
 
-from agrisatpy.core.band import Band
-from agrisatpy.core.raster import RasterCollection
-from agrisatpy.core.sensors import Sentinel2
-from rtm_inv.inversion import inv_img, retrieve_traits
-from logger import get_logger
+from eodal.core.band import Band
+from eodal.core.raster import RasterCollection
+from eodal.core.sensors import Sentinel2
+from utils.rtm_inv.core.inversion import inv_img, retrieve_traits
+from utils.logger import get_logger
 
 logger = get_logger('07_LAI_retrieval')
 
@@ -116,11 +122,9 @@ def loop_scenarios(
 if __name__ == '__main__':
 
     # input directories and files
-    field_parcels = Path('../shp/ZH_Polygons_2019_EPSG32632_selected-crops_buffered.shp')
-    lut_dir = Path('../S2_ProSAIL_LUTs')
+    field_parcels = Path('../../shp/ZH_Polygons_2019_EPSG32632_selected-crops_buffered.shp')
+    # path to ProSAIL lookup-tables (already pre-calculated).
+    lut_dir = Path('../../S2_ProSAIL_LUTs')
 
-    for batch in range(1,6):
-        scenario_dir = Path(f'../S2_MSIL1C_RUT-Scenarios/batch_{batch}')
-        loop_scenarios(scenario_dir, field_parcels, lut_dir)
-        
-    # scenario_dir = Path('/mnt/ides/Lukas/04_Work/GPR_LAI/S2_RUT_Scenarios')
+    scenario_dir = Path(f'../../S2_MSIL1C_RUT-Scenarios')
+    loop_scenarios(scenario_dir, field_parcels, lut_dir)

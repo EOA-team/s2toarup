@@ -14,9 +14,10 @@ from copy import deepcopy
 import geopandas as gpd
 import matplotlib.pyplot as plt
 
-from _find_datasets import get_data_and_uncertainty_files, read_data_and_uncertainty
-from agrisatpy.core.raster import RasterCollection
-from logger import get_logger
+from analysis._find_datasets import get_data_and_uncertainty_files, \
+    read_data_and_uncertainty
+from eodal.core.raster import RasterCollection
+from utils.logger import get_logger
 
 # setup logger -> will write log file to the /../log directory
 logger = get_logger('l4_phenology')
@@ -314,24 +315,23 @@ def main(
 if __name__ == '__main__':
     # original Sentinel-2 scenes with vegetation indices
     vi_dir = Path(
-        # '../S2A_MSIL1C_orig/*.VIs'
-        '/home/graflu/Documents/uncertainty/S2_MSIL1C_orig/*.VIs'
+        '../../S2A_MSIL1C_orig/*.VIs'
     )
     
     # directory with uncertainty analysis results
     uncertainty_analysis_dir = Path(
-        '../S2_MSIL2A_Analysis'
+        '../../S2_MSIL2A_Analysis'
     )
 
     # define sample polygons (for visualizing the uncertainty per crop type over time)
-    sample_polygons = Path('../shp/ZH_Polygons_2019_EPSG32632_selected-crops_buffered.shp')
+    sample_polygons = Path('../../shp/ZH_Polygons_2019_EPSG32632_selected-crops_buffered.shp')
 
     # define point sampling locations for visualizing pixel time series
-    sample_points = Path('../shp/ZH_Points_2019_EPSG32632_selected-crops.shp')
+    sample_points = Path('../../shp/ZH_Points_2019_EPSG32632_selected-crops.shp')
 
     # define crop periods (key growth periods based on expert knowledge)
     crop_periods = Path(
-        '/home/graflu/public/Evaluation/Projects/KP0031_lgraf_PhenomEn/01_Uncertainty/ESCH/scripts_paper_uncertainty/S2_TimeSeries_Analysis/crop_growth_periods-CH_entire_timerange.csv'
+        '../../crop_growth_periods-CH_entire_timerange.csv'
     )
 
     # vegetation index to consider
@@ -340,7 +340,7 @@ if __name__ == '__main__':
     ymaxs = {'NDVI': 1, 'EVI': 1, 'GLAI': 7}
 
     # directory where to save phenological metrics to
-    out_dir_scenarios = Path(f'../S2_TimeSeries_Analysis')
+    out_dir_scenarios = Path(f'../../S2_TimeSeries_Analysis')
     if not out_dir_scenarios.exists():
         out_dir_scenarios.mkdir()
 

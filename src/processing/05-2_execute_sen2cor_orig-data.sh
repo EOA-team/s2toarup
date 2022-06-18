@@ -6,12 +6,14 @@
 #	products serve as reference products.
 #
 
-# define directory where the L1C realizations are located
-orig_datasets="/mnt/ides/Lukas/software/scripts_paper_uncertainty/S2A_MSIL1C_orig/spring"
-
+# USER INPUT
 # define directory where Sen2Cor is installed to
 sen2cor_install_dir="/home/graflu/Downloads/Sen2Cor-02.09.00-Linux64"
 source "$sen2cor_install_dir"/L2A_Bashrc
+
+# define directory where the L1C realizations are located
+orig_datasets="../../S2A_MSIL1C_orig"
+
 
 cd "$orig_datasets" 
 

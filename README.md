@@ -3,10 +3,10 @@
 This repository implements the **complete processing and workflow required to reproduce our study about the impact of
 radiometric uncertainty on the retrieval of key phenological stages from Sentinel-2 data**.
 
-Citation
+## Citation
 
 ```
-todo
+Graf, L.V., Gorrono, J., Hueni, A., Walter, A., Aasen, H: Propagating the Sentinel-2 Top-of-Atmosphere Radiometric Uncertainty into Land Surface Phenology Metrics Using a Monte Carlo Framework. 2022. Submitted for Publication.
 ```
 
 ## OS and Software Requirements
@@ -21,14 +21,14 @@ For S2 data download, a [CREODIAS account](https://creodias.eu/) is required (fr
 
 ### Installing eodal for Raster Data Handling
 
-For **reading and writing raster data** we use the `eodal` Python package (Earth Observation Data Analysis Library). See ... for more information.
+For **reading and writing raster data** we use the E:earth_africa:dal Python package (Earth Observation Data Analysis Library). See [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6651767.svg)](https://doi.org/10.5281/zenodo.6651767) for more information.
 
-Installing eodal will setup most of the required Python dependencies. It is recommended to install `eodal` into a clean virtual environment to avoid any undesired side-effects.
+Installing E:earth_africa:dal will setup most of the required Python dependencies. It is recommended to install E:earth_africa:dal into a clean virtual environment to avoid any undesired side-effects.
 
-Additional requirements not covered by the `eodal` dependencies are listed in the [requirements.txt](requirements.txt) and can be installed into the virtual environment using
+All requirements besides E:earth_africa:dal dependencies are listed in the [requirements.txt](requirements.txt) and can be installed into the virtual environment using
 
 ```{bash}
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 
 ### Installing the Sentinel-2 Radiometric Uncertainty Toolbox
@@ -125,5 +125,9 @@ The table below explains the file-system of this repository which will hold the 
 
 To re-generate the results presented in the paper, execute the Python modules and shell scripts in the [processing sub-package](src/processing/) in the order the scripts are named: I.e., start with the [downloader script](src/processing/01_download_data_creodias.py) (named `01_download_data_creodias.py`), continue with [02_write_property_file.py](src/processing/02_write_property_file.py) and so on until you reach [the last script](src/processing/11_analyze_l4_uncertainty.sh).
 
+**IMPORTANT**
+* You have to provide the path to the SNAP graph processing tool (gpt) executable in the [S2RUT shell script](src/processing/03_s2_radiometric_uncertainty.sh)
+* You have to provide the path to the L2A_Bashrc file of the Sen2Cor installation in the [shell script running Sen2Cor](src/processing/05_execute_sen2cor.sh) and [here](src/processing/05_execute_sen2cor_orig-data.sh)
+
 **CAUTION**:
-    Some of the scripts require several days to terminate and consume reasonable amounts of CPU time, RAM and disk storage (e.g., running Sen2Cor several hundred times). Therefore, we also do not provide a single shell script to execute everything at once. Instead we recommend careful testing beforehand of the scripts (e.g., by lowering the number of scenarios generated, starting with a single S2 scene, etc.)
+    Some of the scripts require **several days to terminate** and consume reasonable amounts of CPU time, RAM and disk storage (e.g., running Sen2Cor several hundred times). Therefore, we also do not provide a single shell script to execute everything at once. Instead we recommend careful testing beforehand of the scripts (e.g., by lowering the number of scenarios generated, starting with a single S2 scene, etc.)

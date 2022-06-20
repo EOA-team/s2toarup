@@ -1,6 +1,6 @@
 # Sentinel-2 Top-Of-Atmosphere Radiometric Uncertainty Propagator (stoarup)
 
-This repository implements the **complete processing and workflow required to reproduce our study about the impact of
+This repository implements the complete processing and workflow required to reproduce the study about the impact of
 radiometric uncertainty in Sentinel-2 Top-of-Atmosphere data on the retrieval of land surface metrics.
 
 ## Citation

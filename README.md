@@ -1,3 +1,9 @@
+
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6669854.svg)](https://doi.org/10.5281/zenodo.6669854)
+
+
+
 # Sentinel-2 Top-Of-Atmosphere Radiometric Uncertainty Propagator (stoarup)
 
 This repository implements the complete processing and workflow required to reproduce the study about the impact of

@@ -14,7 +14,7 @@
 
 # USER-INPUTS
 # define the path to gpt (graph processing tool) of SNAP
-snap_exec="$snap_exec"
+snap_exec="<path-to-SNAPs-graph-processing-tool>"
 
 dot_safe_dir=../../S2_MSIL1C_orig
 cd "$dot_safe_dir"

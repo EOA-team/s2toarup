@@ -1,8 +1,5 @@
 
-
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6669854.svg)](https://doi.org/10.5281/zenodo.6669854)
-
-
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6669854.svg)](https://doi.org/10.5281/zenodo.6669854) [![Linux](https://svgshare.com/i/Zhy.svg)](https://svgshare.com/i/Zhy.svg) [![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/) [![made-with-bash](https://img.shields.io/badge/Made%20with-Bash-1f425f.svg)](https://www.gnu.org/software/bash/)
 
 # Sentinel-2 Top-Of-Atmosphere Radiometric Uncertainty Propagator (stoarup)
 

@@ -51,7 +51,7 @@ export JDK_HOME=/=${JAVA_HOME}
 export PATH=$PATH:${JAVA_HOME}/bin
 export PATH=$PATH:${JAVA_HOME}/include
 ```
-Don't forget to run `source ~\.bashrc` after making the changes to apply them. Then continue with building jpy. Copy the wheel package (jpy-0.10.0.dev1-cp39-cp39-linux_x86_64.whl) into /home/$USER/.snap/snap-python/snappy/
+Don't forget to run `source ~/.bashrc` after making the changes to apply them. Then continue with building jpy. Copy the wheel package (jpy-0.10.0.dev1-cp39-cp39-linux_x86_64.whl) into /home/$USER/.snap/snap-python/snappy/
 
 The actual algorithm of the toolbox is coded in Python and takes its inputs from the metadata xml (MTD_MSIL1C.xml). The algorithm works bandwise and assign pixel uncertainties values between 0 and 250 (250 = 25% uncertainty or higher). Thus, a value of 12 corresponds to a uncertainty of 1.2%.
 

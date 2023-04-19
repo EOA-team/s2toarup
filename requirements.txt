@@ -12,3 +12,4 @@ pillow
 xarray
 uncertainties
 numba
+eodal

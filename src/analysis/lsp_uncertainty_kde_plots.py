@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 plt.style.use('ggplot')
-
+sns.color_palette("Paired")
 
 if __name__ == '__main__':
 
@@ -36,8 +36,15 @@ if __name__ == '__main__':
                 df['crop'] = df['crop'].apply(lambda x: 'Extensively Used Grassland' if x == 'Extensively Used Grasland' else x)
 
                 # sns.boxplot(x='crop', y=f'{metric} Uncertainty', data=df, ax=axes[rdx,vidx])
-                sns.kdeplot(x=f'{metric} Uncertainty', hue='crop', data=df, ax=axes[rdx,vidx],
-                            fill=True, alpha=.5, multiple='stack')
+                sns.kdeplot(
+                    x=f'{metric} Uncertainty',
+                    hue='crop',
+                    data=df,
+                    ax=axes[rdx,vidx],
+                    fill=True,
+                    alpha=.5,
+                    multiple='stack'
+                )
                 axes[rdx,vidx].set_xlim(0,100)
                 axes[rdx,vidx].set_ylim(0,.1)
                 if vidx != 2 or rdx != 1:

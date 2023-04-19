@@ -16,7 +16,7 @@ plt.rcParams['axes.labelsize'] = 16
 plt.rcParams['axes.titlesize'] = 16
 plt.rcParams['legend.fontsize'] = 16
 
-fpath_s2_scenes = Path('/home/graflu/Documents/uncertainty/s2_scenes.csv')
+fpath_s2_scenes = Path('../../data/s2_scenes.csv')
 df = pd.read_csv(fpath_s2_scenes)
 df['sensing_date'] = pd.to_datetime(df['sensing_date'])
 
@@ -34,20 +34,24 @@ sns.scatterplot(
 ax.set_xlabel('Sensing Date [YYYY-MM]', fontsize=16)
 ax.set_ylabel('Cloudy Pixel Percentage [%]', fontsize=16)
 
-start = mdates.date2num(d=df.sensing_date.iloc[0])
-end = mdates.date2num(d=df.sensing_date.iloc[18])
-width = end - start
-rect = Rectangle((start, 0), width, 20, alpha=0.2)
-ax.add_patch(rect)
+# start = mdates.date2num(d=df.sensing_date.iloc[0])
+# end = mdates.date2num(d=df.sensing_date.iloc[18])
+# width = end - start
+# rect = Rectangle((start, 0), width, 20, alpha=0.2)
+# ax.add_patch(rect)
 
 text_x, text_y = mdates.date2num(df.sensing_date.iloc[8]), 20.1
 ax.text(text_x, text_y, 'PDGS 02.07', color='blue', fontsize=16)
 
-start = mdates.date2num(d=df.sensing_date.iloc[18])
-end = mdates.date2num(d=df.sensing_date.iloc[-1])
-width = end - start
-rect = Rectangle((start, 0), width, 20, alpha=0.2, color='g')
-ax.add_patch(rect)
+# draw a vertical line to indicate the transition from one baseline to another
+ax.vlines(x=df.sensing_date.iloc[18], ymin=0, ymax=20,
+          linestyle='dashed', linewidth=3, color='grey')
+
+# start = mdates.date2num(d=df.sensing_date.iloc[18])
+# end = mdates.date2num(d=df.sensing_date.iloc[-1])
+# width = end - start
+# rect = Rectangle((start, 0), width, 20, alpha=0.2, color='g')
+# ax.add_patch(rect)
 
 text_x, text_y = mdates.date2num(df.sensing_date.iloc[21]), 20.1
 ax.text(text_x, text_y, 'PDGS 02.08', color='g', fontsize=16)

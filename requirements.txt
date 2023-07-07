@@ -4,7 +4,7 @@ geopandas
 pandas
 numpy
 scipy
-sklearn
+scikit-learn
 statsmodels
 spectral
 prosail

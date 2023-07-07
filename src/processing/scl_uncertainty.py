@@ -100,9 +100,9 @@ def scl_uncertainty(
         scl_analysis = mode(data_arr, axis=0)
 
         # majority vote
-        majority = scl_analysis.mode[0,:,:]
+        majority = scl_analysis.mode[:,:]
         # confidence of the majority vote
-        confidence = scl_analysis.count[0,:,:] / n_scenarios * 100.
+        confidence = scl_analysis.count[:,:] / n_scenarios * 100.
 
         # create confusion matrix
         # the majority vote serves as the "truth" against which the scenario outcomes are evaluated

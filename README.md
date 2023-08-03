@@ -1,6 +1,3 @@
-
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6669854.svg)](https://doi.org/10.5281/zenodo.6669854) [![Linux](https://svgshare.com/i/Zhy.svg)](https://svgshare.com/i/Zhy.svg) [![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/) [![made-with-bash](https://img.shields.io/badge/Made%20with-Bash-1f425f.svg)](https://www.gnu.org/software/bash/)
-
 # Sentinel-2 Top-Of-Atmosphere Radiometric Uncertainty Propagator (stoarup)
 
 This repository implements the complete processing and workflow required to reproduce the study about the impact of
@@ -8,8 +5,19 @@ radiometric uncertainty in Sentinel-2 Top-of-Atmosphere data on the retrieval of
 
 ## Citation
 
-```
-Graf, L.V., Gorrono, J., Hueni, A., Walter, A., Aasen, H: Propagating the Sentinel-2 Top-of-Atmosphere Radiometric Uncertainty into Land Surface Phenology Metrics Using a Monte Carlo Framework. 2022. Submitted for Publication.
+```latex
+@article{graf_propagating_2023,
+	title = {Propagating Sentinel-2 Top-of-Atmosphere Radiometric Uncertainty into Land Surface Phenology Metrics Using a Monte Carlo Framework},
+	issn = {2151-1535},
+	doi = {10.1109/JSTARS.2023.3297713},
+	pages = {1--41},
+	journaltitle = {{IEEE} Journal of Selected Topics in Applied Earth Observations and Remote Sensing},
+    journal = {IEEE Journal of Selected Topics in Applied Earth Observations and Remote Sensing},
+	author = {Graf, Lukas Valentin and Gorroño, Javier and Hueni, Andreas and Walter, Achim and Aasen, Helge},
+	date = {2023},
+	keywords = {Crops, Ecophysiological Parameters, Indexes, Land Surface Phenology, Measurement, Monte-Carlo Simulation, Radiative Transfer Modelling, Radiometry, Remote sensing, Sentinel-2, {TIMESAT}, Uncertainty, Vegetation mapping},
+    year = {2023}
+}
 ```
 
 ## OS and Software Requirements
